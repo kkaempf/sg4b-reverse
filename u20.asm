@@ -11,11 +11,14 @@ RAM_TEST:	equ 0x4f8d
 STACK_BASE:	equ 0x52ad
 ; Warm boot/cold boot -- contains aa in warm boots
 WARM_FLAG:	equ 0x53bb
-
+MAGIC: equ 0xaa	; Stored in WARM_FLAG to see if we're doing a warm boot
 
 ; Some sort of display control. If bit 4 is set, no display
 FLAGS: equ 0x4f79
-FLAG_DISP: equ 4		;	Displat control flag -- may be also be something like I/O redirection
+FLAG_DISP: equ 4		;	Display control flag? -- may be also be something like I/O redirection
+
+
+PORT_DMA: equ 0x62	; DMA port
 
 COLD_START:
 	di
@@ -43,10 +46,10 @@ l000dh:
 	db 0x01, 0x01, 0x1c
 
 ; RST-38 entry point (warm boot?)
-	di			;0038	f3		.
-	jp BOOT			;0039	c3 8e 01	. . .
+	di
+	jp BOOT
 l003ch:
-	cp e			;003c	bb		.
+	db 0xbb
 l003dh:
 	nop			;003d	00		.
 l003eh:
@@ -266,37 +269,44 @@ l0182h:
 	exx			;018a	d9		.
 	ei			;018b	fb		.
 	reti			;018c	ed 4d		. M
+
 ; Cold start boot
 BOOT:
-	di			;018e	f3		.
-l018fh:
-	ld sp,STACK_BASE	;018f	31 ad 52	1 . R
+	di
+	ld sp,STACK_BASE
+
 ; Wait for RAM to stabilize
 WAIT_RAM:
-	ld a,0aah		;0192	3e aa		> .
-	ld (RAM_TEST),a		;0194	32 8d 4f	2 . O
-	ld a,(RAM_TEST)		;0197	3a 8d 4f	: . O
-	cp 0aah			;019a	fe aa		. .
-	jr nz,WAIT_RAM		;019c	20 f4		  .
-	ld a,(WARM_FLAG)	;019e	3a bb 53	: . S
-	cp 0aah			;01a1	fe aa		. .
-	jp z,WARM_BOOT		;01a3	ca 58 02	. X .
-; Cold boot, clear 0x4000-0x6fff
+	ld a,%10101010
+	ld (RAM_TEST),a
+	ld a,(RAM_TEST)
+	cp %10101010
+	jr nz,WAIT_RAM
+	ld a,(WARM_FLAG)
+	cp MAGIC
+	jp z,WARM_BOOT
+
 COLD_BOOT:
-	ld bc,l3000h		;01a6	01 00 30	. . 0
-	ld de,04001h		;01a9	11 01 40	. . @
-	ld hl,RAM_BASE		;01ac	21 00 40	! . @
-	ld (hl),000h		;01af	36 00		6 .
-	ldir			;01b1	ed b0		. .
+	;	clear 0x4000-0x6fff
+	ld bc,l3000h
+	ld de,RAM_BASE+1
+	ld hl,RAM_BASE
+	ld (hl),0
+	ldir
+
 	ld a,003h		;01b3	3e 03		> .
 	call SOMETHING_MEM	;01b5	cd 1a 0f	. . .
-	ld hl,0c000h		;01b8	21 00 c0	! . .
-	ld de,0c001h		;01bb	11 01 c0	. . .
-	ld bc,l3fffh		;01be	01 ff 3f	. . ?
-	ld (hl),000h		;01c1	36 00		6 .
-	ldir			;01c3	ed b0		. .
-	xor a			;01c5	af		.
+
+	;	clear 0xc000-0xffff
+	ld hl,0c000h
+	ld de,0c001h
+	ld bc,l3fffh
+	ld (hl),0
+	ldir
+
+	xor a
 	call sub_087ch		;01c6	cd 7c 08	. | .
+
 	ld hl,003e7h		;01c9	21 e7 03	! . .
 	ld (052c2h),hl		;01cc	22 c2 52	" . R
 	call sub_22f0h		;01cf	cd f0 22	. . "
@@ -321,10 +331,10 @@ COLD_BOOT:
 	call 0b3a3h		;01f9	cd a3 b3	. . .
 	ld a,(l000ah)		;01fc	3a 0a 00	: . .
 	ld (05b88h),a		;01ff	32 88 5b	2 . [
-	ld a,0aah		;0202	3e aa		> .
+	ld a,MAGIC
 	ld (040fch),a		;0204	32 fc 40	2 . @
 	ld (04f8ch),a		;0207	32 8c 4f	2 . O
-	ld (WARM_FLAG),a	;020a	32 bb 53	2 . S
+	ld (WARM_FLAG),a	; We booted
 	ld a,01ah		;020d	3e 1a		> .
 	ld (05b71h),a		;020f	32 71 5b	2 q [
 	ld hl,(05b77h)		;0212	2a 77 5b	* w [
@@ -498,12 +508,15 @@ sub_034eh:
 sub_0364h:
 	ei			;0364	fb		.
 	reti			;0365	ed 4d		. M
+
 	ld a,000h		;0367	3e 00		> .
 	ld (05fcfh),a		;0369	32 cf 5f	2 . _
 	ret			;036c	c9		.
+
 	ld a,0aah		;036d	3e aa		> .
 	ld (05fcfh),a		;036f	32 cf 5f	2 . _
 	ret			;0372	c9		.
+
 	push af			;0373	f5		.
 	push bc			;0374	c5		.
 	push de			;0375	d5		.
@@ -512,10 +525,13 @@ sub_0364h:
 	push iy			;0379	fd e5		. .
 	ld a,(CUR_MAP)		;037b	3a 22 41	: " A
 	push af			;037e	f5		.
-	ld hl,OUT_DATA62	;037f	21 0a 07	! . .
-	ld c,062h		;0382	0e 62		. b
-	ld b,013h		;0384	06 13		. .
-	otir			;0386	ed b3		. .
+
+		;	Sends 19 bytes to DMA controller
+	ld hl,OUT_DATA62
+	ld c,PORT_DMA
+	ld b,OUT_DATA62_END-OUT_DATA62
+	otir
+
 	ld hl,05fa3h		;0388	21 a3 5f	! . _
 	inc (hl)		;038b	34		4
 	ld hl,052bfh		;038c	21 bf 52	! . R
@@ -959,25 +975,15 @@ l06fah:
 	pop af			;0705	f1		.
 	call sub_0364h		;0706	cd 64 03	. d .
 	ret			;0709	c9		.
-; Out to port 0x62
+
+; Out to port 0x62 (DMA)
 OUT_DATA62:
-	add a,e			;070a	83		.
-	jp 0c3c3h		;070b	c3 c3 c3	. . .
-	jp 0c3c3h		;070e	c3 c3 c3	. . .
-	ld a,(hl)		;0711	7e		~
-	inc hl			;0712	23		#
-	ld b,c			;0713	41		A
-	nop			;0714	00		.
-	ld a,(bc)		;0715	0a		.
-	inc d			;0716	14		.
-	sub b			;0717	90		.
-	rst 38h			;0718	ff		.
-	pop bc			;0719	c1		.
-	sub d			;071a	92		.
-	rst 8			;071b	cf		.
-	add a,a			;071c	87		.
-	nop			;071d	00		.
-	nop			;071e	00		.
+	db 0x83, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x7e
+	db 0x23, 0x41, 0x00, 0x0a, 0x14, 0x90, 0xff, 0xc1
+	db 0x92, 0xcf, 0x87
+OUT_DATA62_END:
+	db 0x00, 0x00
+
 sub_071fh:
 	ld e,000h		;071f	1e 00		. .
 	ld c,000h		;0721	0e 00		. .
@@ -1235,14 +1241,14 @@ l0885h:
 	dec hl			;0898	2b		+
 	dec hl			;0899	2b		+
 l089ah:
-	xor a			;089a	af		.
-	ld (hl),a		;089b	77		w
-	inc hl			;089c	23		#
-	ld (hl),a		;089d	77		w
-	inc hl			;089e	23		#
-	ld (hl),a		;089f	77		w
-	inc hl			;08a0	23		#
-	ld (hl),a		;08a1	77		w
+	xor a
+	ld (hl),a
+	inc hl
+	ld (hl),a
+	inc hl
+	ld (hl),a
+	inc hl
+	ld (hl),a
 	jr l08a6h		;08a2	18 02		. .
 l08a4h:
 	inc hl			;08a4	23		#
@@ -3806,30 +3812,11 @@ l173fh:
 	ldir			;1745	ed b0		. .
 	ld a,044h		;1747	3e 44		> D
 	jp 0893fh		;1749	c3 3f 89	. ? .
-	ld d,h			;174c	54		T
-	ld b,c			;174d	41		A
-	ld d,b			;174e	50		P
-	ld b,l			;174f	45		E
-	jr nz,l1793h		;1750	20 41		  A
-	ld b,e			;1752	43		C
-	ld d,h			;1753	54		T
-	ld c,c			;1754	49		I
-	ld c,a			;1755	4f		O
-	ld c,(hl)		;1756	4e		N
-	dec b			;1757	05		.
-	ld d,b			;1758	50		P
-	ld c,h			;1759	4c		L
-	ld b,c			;175a	41		A
-	ld e,c			;175b	59		Y
-	ld b,l			;175c	45		E
-	ld d,d			;175d	52		R
-	jr nz,l17aeh		;175e	20 4e		  N
-	ld d,l			;1760	55		U
-	ld c,l			;1761	4d		M
-	ld b,d			;1762	42		B
-	ld b,l			;1763	45		E
-	ld d,d			;1764	52		R
-	jr nz,$+51		;1765	20 31		  1
+	
+	db "TAPE ACTION"
+	db 5
+	db "PLAYER NUMBER 1"
+
 	pop af			;1767	f1		.
 	ld c,a			;1768	4f		O
 	call SOMETHING_KBD	;1769	cd a7 17	. . .
@@ -4110,15 +4097,15 @@ l1934h:
 	ld de,0ba3ah		;1951	11 3a ba	. : .
 	ld e,h			;1954	5c		\
 	cp 005h			;1955	fe 05		. .
-	jr nz,l1966h		;1957	20 0d		  .
+	jr nz,OUTVERSION
 	ld a,056h		;1959	3e 56		> V
 	ld hl,COLD_START	;195b	21 00 00	! . .
 	call 088dch		;195e	cd dc 88	. . .
 	ld a,(05cc6h)		;1961	3a c6 5c	: . \
-	jr l1969h		;1964	18 03		. .
-l1966h:
+	jr OUTA44		;1964	18 03		. .
+OUTVERSION:
 	ld a,(VERSION)		;1966	3a 04 00	: . .
-l1969h:
+OUTA44:	; Outputs A as a 4.4 fixed point number
 	call HEX2		;1969	cd a3 1a	. . .
 	ld a,b			;196c	78		x
 	call OUTCH		;196d	cd 84 10	. . .
@@ -6516,7 +6503,7 @@ l2a06h:
 	ld hl,04d46h		;2a11	21 46 4d	! F M
 	ld de,04d47h		;2a14	11 47 4d	. G M
 	ld (hl),020h		;2a17	36 20		6  
-	ld bc,l018fh		;2a19	01 8f 01	. . .
+	ld bc,0x18f		;2a19	01 8f 01	. . .
 	ldir			;2a1c	ed b0		. .
 	jr l29e9h		;2a1e	18 c9		. .
 l2a20h:
