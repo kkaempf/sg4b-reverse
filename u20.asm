@@ -15,6 +15,7 @@ WARM_FLAG:	equ 0x53bb
 
 ; Some sort of display control. If bit 4 is set, no display
 FLAGS: equ 0x4f79
+FLAG_DISP: equ 4		;	Displat control flag -- may be also be something like I/O redirection
 
 COLD_START:
 	di
@@ -2674,7 +2675,7 @@ l105eh:
 OUTCH:
 	push hl
 	ld hl,FLAGS
-	bit 4,(hl)
+	bit FLAG_DISP,(hl)
 	pop hl
 	ret nz
 	cp ' '  
@@ -3833,7 +3834,7 @@ l173fh:
 	ld c,a			;1768	4f		O
 	call SOMETHING_KBD	;1769	cd a7 17	. . .
 	ld hl,FLAGS
-	bit 4,(hl)		;176f	cb 66		. f
+	bit FLAG_DISP,(hl)		;176f	cb 66		. f
 	jr z,l178fh		;1771	28 1c		( .
 	cp 0f9h			;1773	fe f9		. .
 	jr z,l178fh		;1775	28 18		( .
@@ -3978,7 +3979,7 @@ l185bh:
 l1863h:
 	pop bc			;1863	c1		.
 	ld a,b			;1864	78		x
-	ld hl,04f79h		;1865	21 79 4f	! y O
+	ld hl,FLAGS		;1865	21 79 4f	! y O
 	cp 0a1h			;1868	fe a1		. .
 	jr nz,l1871h		;186a	20 05		  .
 	res 0,(hl)		;186c	cb 86		. .
@@ -4087,7 +4088,7 @@ l1925h:
 	call sub_1318h		;192f	cd 18 13	. . .
 	ld c,0c9h		;1932	0e c9		. .
 l1934h:
-	ld hl,04f79h		;1934	21 79 4f	! y O
+	ld hl,FLAGS		;1934	21 79 4f	! y O
 	set 1,(hl)		;1937	cb ce		. .
 	xor a			;1939	af		.
 	jp SOMETHING_MEM	;193a	c3 1a 0f	. . .
@@ -4381,7 +4382,7 @@ l1b1dh:
 	djnz l1b1dh		;1b20	10 fb		. .
 	ret			;1b22	c9		.
 sub_1b23h:
-	ld a,(04f79h)		;1b23	3a 79 4f	: y O
+	ld a,(FLAGS)		;1b23	3a 79 4f	: y O
 	bit 7,a			;1b26	cb 7f		. .
 	jr z,l1b6ah		;1b28	28 40		( @
 	ld a,(04f76h)		;1b2a	3a 76 4f	: v O
@@ -4700,7 +4701,7 @@ l1d50h:
 	ld a,020h		;1d5f	3e 20		>  
 	call sub_1d06h		;1d61	cd 06 1d	. . .
 	ld d,a			;1d64	57		W
-	ld a,(04f79h)		;1d65	3a 79 4f	: y O
+	ld a,(FLAGS)
 	bit 0,a			;1d68	cb 47		. G
 	jr z,l1d7bh		;1d6a	28 0f		( .
 	ld c,000h		;1d6c	0e 00		. .
@@ -4768,7 +4769,7 @@ l1db7h:
 	ld b,a			;1dc5	47		G
 	ld a,000h		;1dc6	3e 00		> .
 	call sub_1d7fh		;1dc8	cd 7f 1d	. . .
-	ld a,(04f79h)		;1dcb	3a 79 4f	: y O
+	ld a,(FLAGS)
 	bit 0,a			;1dce	cb 47		. G
 	jr z,l1de1h		;1dd0	28 0f		( .
 	ld c,000h		;1dd2	0e 00		. .
@@ -5131,7 +5132,7 @@ sub_206ah:
 	ld a,049h		;2075	3e 49		> I
 	call 088dch		;2077	cd dc 88	. . .
 	ret			;207a	c9		.
-	ld a,(04f79h)		;207b	3a 79 4f	: y O
+	ld a,(FLAGS)
 	bit 0,a			;207e	cb 47		. G
 	jr z,l2090h		;2080	28 0e		( .
 	ld a,000h		;2082	3e 00		> .
@@ -5306,7 +5307,7 @@ l2158h:
 	pop de			;215a	d1		.
 	pop hl			;215b	e1		.
 	ret			;215c	c9		.
-	ld a,(04f79h)		;215d	3a 79 4f	: y O
+	ld a,(FLAGS)
 	bit 0,a			;2160	cb 47		. G
 	jr z,l2179h		;2162	28 15		( .
 	ld a,(04f83h)		;2164	3a 83 4f	: . O
@@ -5365,7 +5366,7 @@ l21b1h:
 	djnz l21b1h		;21b8	10 f7		. .
 	pop bc			;21ba	c1		.
 	ret			;21bb	c9		.
-	ld a,(04f79h)		;21bc	3a 79 4f	: y O
+	ld a,(FLAGS)
 	bit 0,a			;21bf	cb 47		. G
 	jr z,l21d9h		;21c1	28 16		( .
 	ld a,(04f83h)		;21c3	3a 83 4f	: . O
@@ -5389,7 +5390,7 @@ l21d9h:
 	call sub_218dh		;21e7	cd 8d 21	. . !
 	call l1cfch		;21ea	cd fc 1c	. . .
 	ret			;21ed	c9		.
-	ld a,(04f79h)		;21ee	3a 79 4f	: y O
+	ld a,(FLAGS)
 	bit 0,a			;21f1	cb 47		. G
 	jr z,l2209h		;21f3	28 14		( .
 	ld c,000h		;21f5	0e 00		. .
@@ -5410,7 +5411,7 @@ l2209h:
 	call sub_1d06h		;2210	cd 06 1d	. . .
 	call l1cfch		;2213	cd fc 1c	. . .
 	ret			;2216	c9		.
-	ld a,(04f79h)		;2217	3a 79 4f	: y O
+	ld a,(FLAGS)		;2217	3a 79 4f	: y O
 	bit 0,a			;221a	cb 47		. G
 	jr z,l2230h		;221c	28 12		( .
 	ld c,000h		;221e	0e 00		. .
@@ -5581,8 +5582,8 @@ sub_2318h:
 	ldir			;2323	ed b0		. .
 	ret			;2325	c9		.
 sub_2326h:
-	ld hl,04f79h		;2326	21 79 4f	! y O
-	res 4,(hl)		;2329	cb a6		. .
+	ld hl,FLAGS		;2326	21 79 4f	! y O
+	res FLAG_DISP,(hl)		;2329	cb a6		. .
 	ld hl,04109h		;232b	21 09 41	! . A
 	ld (hl),01ah		;232e	36 1a		6 .
 	ld b,005h		;2330	06 05		. .
@@ -5610,8 +5611,8 @@ l2351h:
 	ld a,000h		;2356	3e 00		> .
 	ld (05cb9h),a		;2358	32 b9 5c	2 . \
 	ret			;235b	c9		.
-	ld hl,04f79h		;235c	21 79 4f	! y O
-	set 4,(hl)		;235f	cb e6		. .
+	ld hl,FLAGS		;235c	21 79 4f	! y O
+	set FLAG_DISP,(hl)		;235f	cb e6		. .
 	xor a			;2361	af		.
 	ld (05fe0h),a		;2362	32 e0 5f	2 . _
 	call sub_087ch		;2365	cd 7c 08	. | .
@@ -5762,7 +5763,7 @@ l2415h:
 	ret			;247e	c9		.
 sub_247fh:
 	push af			;247f	f5		.
-	ld a,(04f79h)		;2480	3a 79 4f	: y O
+	ld a,(FLAGS)		;2480	3a 79 4f	: y O
 	bit 0,a			;2483	cb 47		. G
 	jr z,l24aah		;2485	28 23		( #
 	ld hl,04a4dh		;2487	21 4d 4a	! M J
@@ -5816,8 +5817,8 @@ l24c1h:
 	ld hl,l24c1h		;24c7	21 c1 24	! . $
 	push hl			;24ca	e5		.
 	call sub_1704h		;24cb	cd 04 17	. . .
-	ld a,(04f79h)		;24ce	3a 79 4f	: y O
-	bit 4,a			;24d1	cb 67		. g
+	ld a,(FLAGS)		;24ce	3a 79 4f	: y O
+	bit FLAG_DISP,a			;24d1	cb 67		. g
 	ret z			;24d3	c8		.
 	ld ix,052cbh		;24d4	dd 21 cb 52	. ! . R
 	ld hl,COLD_START	;24d8	21 00 00	! . .
@@ -6562,8 +6563,8 @@ l2a5eh:
 	jp z,l2949h		;2a7d	ca 49 29	. I )
 	jr l2a5eh		;2a80	18 dc		. .
 sub_2a82h:
-	ld hl,04f79h		;2a82	21 79 4f	! y O
-	bit 4,(hl)		;2a85	cb 66		. f
+	ld hl,FLAGS		;2a82	21 79 4f	! y O
+	bit FLAG_DISP,(hl)		;2a85	cb 66		. f
 	ret nz			;2a87	c0		.
 	ld hl,04123h		;2a88	21 23 41	! # A
 	ld b,036h		;2a8b	06 36		. 6
@@ -6720,8 +6721,8 @@ l2b8ch:
 	call sub_0334h		;2b8f	cd 34 03	. 4 .
 	ld hl,l2b8ch		;2b92	21 8c 2b	! . +
 	push hl			;2b95	e5		.
-	ld a,(04f79h)		;2b96	3a 79 4f	: y O
-	bit 4,a			;2b99	cb 67		. g
+	ld a,(FLAGS)		;2b96	3a 79 4f	: y O
+	bit FLAG_DISP,a			;2b99	cb 67		. g
 	ret z			;2b9b	c8		.
 	ld a,(05754h)		;2b9c	3a 54 57	: T W
 	inc a			;2b9f	3c		<
@@ -7709,8 +7710,8 @@ sub_32d1h:
 	ld a,(l003ch)		;32d1	3a 3c 00	: < .
 	cp 0bbh			;32d4	fe bb		. .
 	ret nz			;32d6	c0		.
-	ld a,(04f79h)		;32d7	3a 79 4f	: y O
-	bit 4,a			;32da	cb 67		. g
+	ld a,(FLAGS)		;32d7	3a 79 4f	: y O
+	bit FLAG_DISP,a			;32da	cb 67		. g
 	jr nz,l32f9h		;32dc	20 1b		  .
 	ld a,(060cfh)		;32de	3a cf 60	: . `
 	cp 000h			;32e1	fe 00		. .
@@ -7793,8 +7794,8 @@ l334dh:
 	ld a,(iy+01dh)		;334d	fd 7e 1d	. ~ .
 	cp 004h			;3350	fe 04		. .
 	jr nz,l3366h		;3352	20 12		  .
-	ld a,(04f79h)		;3354	3a 79 4f	: y O
-	bit 4,a			;3357	cb 67		. g
+	ld a,(FLAGS)		;3354	3a 79 4f	: y O
+	bit FLAG_DISP,a			;3357	cb 67		. g
 	jr z,l3366h		;3359	28 0b		( .
 	ld (iy+008h),000h	;335b	fd 36 08 00	. 6 . .
 	ld (iy+019h),00ah	;335f	fd 36 19 0a	. 6 . .
@@ -7897,10 +7898,10 @@ sub_33dch:
 	ld a,(l0006h)		;33dc	3a 06 00	: . .
 	cp 0aah			;33df	fe aa		. .
 	ret nz			;33e1	c0		.
-	ld a,(04f79h)		;33e2	3a 79 4f	: y O
+	ld a,(FLAGS)		;33e2	3a 79 4f	: y O
 	ld b,a			;33e5	47		G
 	ld a,(053bdh)		;33e6	3a bd 53	: . S
-	bit 4,b			;33e9	cb 60		. `
+	bit FLAG_DISP,b			;33e9	cb 60		. `
 	jr nz,l33f4h		;33eb	20 07		  .
 	bit 3,a			;33ed	cb 5f		. _
 	ret z			;33ef	c8		.
