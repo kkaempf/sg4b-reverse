@@ -17,57 +17,28 @@ COLD_START:
 	di
 	jp BOOT
 l0004h:
-	db $57
+	db 0x57
 l0005h:
-	rst 38h			;0005	ff		.
+	db 0xff
 l0006h:
-	rst 38h			;0006	ff		.
+	db 0xff
 l0007h:
-	rst 38h			;0007	ff		.
-	rst 38h			;0008	ff		.
-	rst 38h			;0009	ff		.
+	db 0xff, 0xff, 0xff
 l000ah:
-	rst 38h			;000a	ff		.
+	db 0xff
 l000bh:
-	rst 38h			;000b	ff		.
+	db 0xff
 l000ch:
-	xor d			;000c	aa		.
+	db 0xaa
 l000dh:
-	rst 38h			;000d	ff		.
-	rst 38h			;000e	ff		.
-	rst 38h			;000f	ff		.
-	ld (hl),e		;0010	73		s
-	inc bc			;0011	03		.
-	rst 38h			;0012	ff		.
-	rst 38h			;0013	ff		.
-	rst 38h			;0014	ff		.
-	rst 38h			;0015	ff		.
-	rst 38h			;0016	ff		.
-	rst 38h			;0017	ff		.
-	inc b			;0018	04		.
-	ld c,h			;0019	4c		L
-	dec b			;001a	05		.
-	ld h,b			;001b	60		`
-	inc bc			;001c	03		.
-	pop bc			;001d	c1		.
-	ld bc,0041ch		;001e	01 1c 04	. . .
-	add a,h			;0021	84		.
-	dec b			;0022	05		.
-	ld l,b			;0023	68		h
-	inc bc			;0024	03		.
-	pop bc			;0025	c1		.
-	ld bc,0041ch		;0026	01 1c 04	. . .
-	ld c,h			;0029	4c		L
-	dec b			;002a	05		.
-	ret pe			;002b	e8		.
-	inc bc			;002c	03		.
-	ld bc,01c01h		;002d	01 01 1c	. . .
-	inc b			;0030	04		.
-	ld c,h			;0031	4c		L
-	dec b			;0032	05		.
-	ret pe			;0033	e8		.
-	inc bc			;0034	03		.
-	ld bc,01c01h		;0035	01 01 1c	. . .
+	db 0xff, 0xff, 0xff, 0x73, 0x03, 0xff, 0xff, 0xff
+	db 0xff, 0xff, 0xff, 0x04, 0x4c, 0x05, 0x60, 0x03
+	db 0xc1, 0x01, 0x1c, 0x04, 0x84, 0x05, 0x68, 0x03
+	db 0xc1, 0x01, 0x1c, 0x04, 0x4c, 0x05, 0xe8, 0x03
+	db 0x01, 0x01, 0x1c, 0x04, 0x4c, 0x05, 0xe8, 0x03
+	db 0x01, 0x01, 0x1c
+
+; RST-38 entry point (warm boot?)
 	di			;0038	f3		.
 	jp BOOT			;0039	c3 8e 01	. . .
 l003ch:
