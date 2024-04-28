@@ -14,7 +14,7 @@ WARM_FLAG:	equ 0x53bb
 
 
 ; Some sort of display control. If bit 4 is set, no display
-DISP_MODE: equ 0x4f79
+FLAGS: equ 0x4f79
 
 COLD_START:
 	di
@@ -2673,7 +2673,7 @@ l105eh:
 	db 0x3e
 OUTCH:
 	push hl
-	ld hl,0x4f79
+	ld hl,FLAGS
 	bit 4,(hl)
 	pop hl
 	ret nz
@@ -3832,7 +3832,7 @@ l173fh:
 	pop af			;1767	f1		.
 	ld c,a			;1768	4f		O
 	call SOMETHING_KBD	;1769	cd a7 17	. . .
-	ld hl,04f79h		;176c	21 79 4f	! y O
+	ld hl,FLAGS
 	bit 4,(hl)		;176f	cb 66		. f
 	jr z,l178fh		;1771	28 1c		( .
 	cp 0f9h			;1773	fe f9		. .
