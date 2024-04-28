@@ -13,11 +13,14 @@ STACK_BASE:	equ 0x52ad
 WARM_FLAG:	equ 0x53bb
 
 
+; Some sort of display control. If bit 4 is set, no display
+DISP_MODE: equ 0x4f79
+
 COLD_START:
 	di
 	jp BOOT
 l0004h:
-	db 0x57
+	db 0x57			;	Version number?
 l0005h:
 	db 0xff
 l0006h:
@@ -2667,12 +2670,14 @@ l105eh:
 	ld a,l			;1080	7d		}
 	ld a,(hl)		;1081	7e		~
 	ld a,(hl)		;1082	7e		~
-	ld a,0e5h		;1083	3e e5		> .
-	ld hl,04f79h		;1085	21 79 4f	! y O
-	bit 4,(hl)		;1088	cb 66		. f
-	pop hl			;108a	e1		.
-	ret nz			;108b	c0		.
-	cp 020h			;108c	fe 20		.  
+	db 0x3e
+OUTCH:
+	push hl
+	ld hl,0x4f79
+	bit 4,(hl)
+	pop hl
+	ret nz
+	cp ' '  
 	jr nc,l10cch		;108e	30 3c		0 <
 	cp 010h			;1090	fe 10		. .
 	ret nc			;1092	d0		.
@@ -4113,7 +4118,7 @@ l1934h:
 l1966h:
 	ld a,(l0004h)		;1966	3a 04 00	: . .
 l1969h:
-	call sub_1aa3h		;1969	cd a3 1a	. . .
+	call HEX2		;1969	cd a3 1a	. . .
 	ld a,b			;196c	78		x
 	call 01084h		;196d	cd 84 10	. . .
 	ld a,02eh		;1970	3e 2e		> .
@@ -4170,7 +4175,7 @@ l19d0h:
 	add hl,de		;19d8	19		.
 sub_19d9h:
 	push bc			;19d9	c5		.
-	call sub_1aa3h		;19da	cd a3 1a	. . .
+	call HEX2		;19da	cd a3 1a	. . .
 	ld a,b			;19dd	78		x
 	call 01084h		;19de	cd 84 10	. . .
 	ld a,c			;19e1	79		y
@@ -4287,20 +4292,24 @@ l1a95h:
 	out (02fh),a		;1a9b	d3 2f		. /
 	call SOMETHING_KBD	;1a9d	cd a7 17	. . .
 	jp l1925h		;1aa0	c3 25 19	. % .
-sub_1aa3h:
+; Input a = 0xNM
+; Output (b,c) ascii values of N and M
+HEX2:
 	ld b,a			;1aa3	47		G
 	and 00fh		;1aa4	e6 0f		. .
-	call sub_1ab8h		;1aa6	cd b8 1a	. . .
+	call HEX1		;1aa6	cd b8 1a	. . .
 	ld c,a			;1aa9	4f		O
 	ld a,b			;1aaa	78		x
 	srl a			;1aab	cb 3f		. ?
 	srl a			;1aad	cb 3f		. ?
 	srl a			;1aaf	cb 3f		. ?
 	srl a			;1ab1	cb 3f		. ?
-	call sub_1ab8h		;1ab3	cd b8 1a	. . .
+	call HEX1		;1ab3	cd b8 1a	. . .
 	ld b,a			;1ab6	47		G
 	ret			;1ab7	c9		.
-sub_1ab8h:
+; Input a = 0..f
+; Output a = '0'..'9','A'..'F'
+HEX1:
 	add a,030h		;1ab8	c6 30		. 0
 	cp 03ah			;1aba	fe 3a		. :
 	ret c			;1abc	d8		.
