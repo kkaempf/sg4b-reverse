@@ -5,32 +5,38 @@
 ; RAM base
 RAM_BASE:	equ 0x4000
 CUR_MAP:	equ 0x4122
-; RAM TEST ADRES
+; RAM TEST ADRESS
 RAM_TEST:	equ 0x4f8d
 ; Stack base
 STACK_BASE:	equ 0x52ad
 ; Warm boot/cold boot -- contains aa in warm boots
 WARM_FLAG:	equ 0x53bb
 MAGIC: equ 0xaa	; Stored in WARM_FLAG to see if we're doing a warm boot
+MAGIC5: equ 0xaa ; Stored in NEEDSOFFSETDE (0x0005) if we need to offset DE by 75
 
 ; Some sort of display control. If bit 4 is set, no display
 FLAGS: equ 0x4f79
 FLAG_DISP: equ 4		;	Display control flag? -- may be also be something like I/O redirection
+
+CURSORX: equ 0x4f86		;	Horizontal cursor position (0-39)
 
 ; [JCM-1] I believe that 40E0 is a pointer to where the RS232 buffer is in RAM.
 SERIALBUF: equ 0x40e0
 ; [JCM-1] I believe that 40E4 is a pointer to the location of the keyboard buffer.
 KBDBUF: equ 0x40e4
 
+TMPHL: equ 0x04f87	;	A temporary 2 bytes location to save HL
 
 PORT_DMA: equ 0x62	; DMA port
+
+PORT_DATAKBD: equ 0x01	; Keyboard data port
 
 COLD_START:
 	di
 	jp BOOT
 VERSION:
 	db 0x57			;	Version number
-l0005h:
+NEEDSOFFSETDE:
 	db 0xff
 l0006h:
 	db 0xff
@@ -132,11 +138,11 @@ l0064h:
 	add a,b			;00ab	80		.
 
 ; [JCM-1] The keyboard interrupt handler starts at 00AC
-	exx			;00ac	d9		.
-	push af			;00ad	f5		.
-	ld c,001h		;00ae	0e 01		. .
-	in a,(c)		;00b0	ed 78		. x
-	ld b,a			;00b2	47		G
+	exx
+	push af
+	ld c,PORT_DATAKBD
+	in a,(c)
+	ld b,a
 	cp 0d0h			;00b3	fe d0		. .
 	jr nz,l00dch		;00b5	20 25		  %
 	ld a,(05fd3h)		;00b7	3a d3 5f	: . _
@@ -665,15 +671,17 @@ l0461h:
 l047fh:
 	in a,(005h)		;047f	db 05		. .
 	ld b,a			;0481	47		G
-	ld a,(5)		;0482	3a 05 00	: . .
-	cp 0aah			;0485	fe aa		. .
-	jr nz,l048dh		;0487	20 04		  .
-	ld a,0ffh		;0489	3e ff		> .
-	xor b			;048b	a8		.
-	ld b,a			;048c	47		G
-l048dh:
+		;	b = b XOR 0xff if NEEDSOFFSETDE is MAGIC5
+	ld a,(NEEDSOFFSETDE)
+	cp MAGIC5
+	jr nz,_skip
+	ld a,0xff
+	xor b
+	ld b,a
+_skip:
 	bit 6,b			;048d	cb 70		. p
 	jp z,l06e8h		;048f	ca e8 06	. . .
+
 l0492h:
 	ld a,(ix+013h)		;0492	dd 7e 13	. ~ .
 	and a			;0495	a7		.
@@ -2307,8 +2315,8 @@ l0e72h:
 	ld a,(04107h)		;0e78	3a 07 41	: . A
 	cp 001h			;0e7b	fe 01		. .
 	jr nz,l0ea2h		;0e7d	20 23		  #
-	ld a,(l0005h)		;0e7f	3a 05 00	: . . (xxx)
-	cp 0aah			;0e82	fe aa		. .
+	ld a,(NEEDSOFFSETDE)		;0e7f	3a 05 00	: . . (xxx)
+	cp MAGIC5			;0e82	fe aa		. .
 	jr nz,l0e90h		;0e84	20 0a		  .
 	ld a,(041d4h)		;0e86	3a d4 41	: . A
 	ld hl,04123h		;0e89	21 23 41	! # A
@@ -2693,56 +2701,59 @@ l105eh:
 	ld a,(hl)		;1081	7e		~
 	ld a,(hl)		;1082	7e		~
 	db 0x3e
+; Output characters from A
+; Chars 0 to 15 are mapped to function from JTABLE
+; Chars 16 to 31 are ignored
 OUTCH:
 	push hl
 	ld hl,FLAGS
 	bit FLAG_DISP,(hl)
 	pop hl
-	ret nz
+	ret nz			; Aborts if FLAG_DISP is not set
 	cp ' '  
-	jr nc,l10cch		;108e	30 3c		0 <
-	cp 010h			;1090	fe 10		. .
-	ret nc			;1092	d0		.
-	ld (04f87h),hl		;1093	22 87 4f	" . O
-	push de			;1096	d5		.
-	push af			;1097	f5		.
-	add a,a			;1098	87		.
-	ld e,a			;1099	5f		_
-	ld d,000h		;109a	16 00		. .
-	ld hl,l10abh		;109c	21 ab 10	! . .
-	add hl,de		;109f	19		.
-	ld e,(hl)		;10a0	5e		^
-	inc hl			;10a1	23		#
-	ld d,(hl)		;10a2	56		V
-	ex de,hl		;10a3	eb		.
-	pop af			;10a4	f1		.
-	pop de			;10a5	d1		.
-	push hl			;10a6	e5		.
-	ld hl,(04f87h)		;10a7	2a 87 4f	* . O
-	ret			;10aa	c9		.
-l10abh:
-	rl b			;10ab	cb 10		. .
-	rl b			;10ad	cb 10		. .
-	ret p			;10af	f0		.
-	ld (de),a		;10b0	12		.
-	ret z			;10b1	c8		.
-	ld (de),a		;10b2	12		.
-	halt			;10b3	76		v
-	ld de,l12b1h		;10b4	11 b1 12	. . .
-	rl b			;10b7	cb 10		. .
-	rl b			;10b9	cb 10		. .
-	cp e			;10bb	bb		.
-	ld de,l119bh		;10bc	11 9b 11	. . .
-	ld d,(hl)		;10bf	56		V
-	ld de,l1239h		;10c0	11 39 12	. 9 .
-	xor 011h		;10c3	ee 11		. .
-	rl b			;10c5	cb 10		. .
-	adc a,d			;10c7	8a		.
-	ld (de),a		;10c8	12		.
-	and (hl)		;10c9	a6		.
-	ld (de),a		;10ca	12		.
-	ret			;10cb	c9		.
-l10cch:
+	jr nc,OUTPRNT
+	cp 010h
+	ret nc 			; > 0x10-0x1f => aborts
+	ld (TMPHL),hl
+
+		;	We lookup in the jump table
+	push de
+	push af
+	add a,a		; de = a*2
+	ld e,a
+	ld d,0
+	ld hl,JTABLE
+	add hl,de
+	ld e,(hl)	; get low byte
+	inc hl
+	ld d,(hl)	; get high byte
+	ex de,hl
+	pop af
+	pop de
+	push hl		; Push jump table target
+	ld hl,(TMPHL)
+	ret			; Jumps to target
+JTABLE:
+	dw JNONE
+	dw JNONE
+	dw TARGET2
+	dw TARGET3
+	dw TARGET4
+	dw TARGET5
+	dw JNONE
+	dw JNONE
+	dw TARGET8
+	dw TARGET9
+	dw TARGET10
+	dw TARGET11
+	dw TARGET12
+	dw JNONE
+	dw TARGET14
+	dw TARGET15
+JNONE:
+	ret
+; Printable character?
+OUTPRNT:
 	push af			;10cc	f5		.
 	push bc			;10cd	c5		.
 	push de			;10ce	d5		.
@@ -2750,17 +2761,17 @@ l10cch:
 	ld hl,(04f84h)		;10d0	2a 84 4f	* . O
 	ld b,a			;10d3	47		G
 	push bc			;10d4	c5		.
-	ld a,(04f86h)		;10d5	3a 86 4f	: . O
+	ld a,(CURSORX)		;10d5	3a 86 4f	: . O
 	ld c,a			;10d8	4f		O
-	ld b,000h		;10d9	06 00		. .
+	ld b,0			;10d9	06 00		. .
 	ld de,42		;10db	11 2a 00	. * .
 	or a			;10de	b7		.
 	sbc hl,de		;10df	ed 52		. R
 	add hl,bc		;10e1	09		.
 	pop bc			;10e2	c1		.
-	ld (hl),b		;10e3	70		p
+	ld (hl),b		; Store char
 	inc a			;10e4	3c		<
-	ld (04f86h),a		;10e5	32 86 4f	2 . O
+	ld (CURSORX),a		;10e5	32 86 4f	2 . O
 	ld hl,(04f84h)		;10e8	2a 84 4f	* . O
 	ld b,a			;10eb	47		G
 	ld a,(hl)		;10ec	7e		~
@@ -2768,76 +2779,91 @@ l10cch:
 	or b			;10ef	b0		.
 	ld (hl),a		;10f0	77		w
 	call sub_1191h		;10f1	cd 91 11	. . .
-	ld a,(04f86h)		;10f4	3a 86 4f	: . O
-	cp 028h			;10f7	fe 28		. (
-	call nc,l12b1h		;10f9	d4 b1 12	. . .
+	ld a,(CURSORX)	; Position X
+	cp 40			; Right of screen?
+	call nc,TARGET5	; Next line
 	pop hl			;10fc	e1		.
 	pop de			;10fd	d1		.
 	pop bc			;10fe	c1		.
 	pop af			;10ff	f1		.
 	ret			;1100	c9		.
-sub_1101h:
-	push hl			;1101	e5		.
-	push af			;1102	f5		.
-	ld a,(l0005h)		;1103	3a 05 00	: . .
-	cp 0aah			;1106	fe aa		. .
-	jr nz,l110fh		;1108	20 05		  .
-	ld hl,l004bh		;110a	21 4b 00	! K .
-	add hl,de		;110d	19		.
-	ex de,hl		;110e	eb		.
-l110fh:
-	pop af			;110f	f1		.
-	pop hl			;1110	e1		.
-	ret			;1111	c9		.
+
+
+
+; Weird routine that adds 75 to DE depending on content of ROM address 0x5
+; (does nothing on ROM 57)
+ADJUSTDE:
+	push hl
+	push af
+	ld a,(NEEDSOFFSETDE)
+	cp MAGIC5
+	jr nz,_exit
+	ld hl,0x4b		; Adds 75 (0x4b) to de and exit
+	add hl,de
+	ex de,hl
+_exit:
+	pop af
+	pop hl
+	ret
+
+
+;	Starting a 0x4186, do 26 times: OR a byte with 0x3c every 67 bytes
 sub_1112h:
-	push bc			;1112	c5		.
-	push de			;1113	d5		.
-	push hl			;1114	e5		.
-	push af			;1115	f5		.
-	ld de,04186h		;1116	11 86 41	. . A
-	call sub_1101h		;1119	cd 01 11	. . .
-	ld h,d			;111c	62		b
-	ld l,e			;111d	6b		k
-	ld de,l0043h		;111e	11 43 00	. C .
-	ld b,01ah		;1121	06 1a		. .
-l1123h:
-	ld a,(hl)		;1123	7e		~
-	or 03fh			;1124	f6 3f		. ?
-	ld (hl),a		;1126	77		w
-	add hl,de		;1127	19		.
-	djnz l1123h		;1128	10 f9		. .
-	pop af			;112a	f1		.
-	pop hl			;112b	e1		.
-	pop de			;112c	d1		.
-	pop bc			;112d	c1		.
-	ret			;112e	c9		.
+	push bc
+	push de
+	push hl
+	push af
+	ld de,04186h
+	call ADJUSTDE
+	ld h,d
+	ld l,e
+	ld de,67
+	ld b,26
+_loop:
+	ld a,(hl)
+	or 0x3f
+	ld (hl),a
+	add hl,de
+	djnz _loop
+	pop af
+	pop hl
+	pop de
+	pop bc
+	ret
+
+; Complicated. Finds the Ath position in HL where bit 5 is set, looking at every 67 bytes. Returns this location plus 43 or 88
+; Looks at at most 26 values
+; => It looks to me that there are 26 control blocs of 67 bytes. Bit 5 is some sort of flag.
 sub_112fh:
-	push bc			;112f	c5		.
-	push de			;1130	d5		.
-	ld de,04159h		;1131	11 59 41	. Y A
-	call sub_1101h		;1134	cd 01 11	. . .
-	ld h,d			;1137	62		b
-	ld l,e			;1138	6b		k
-	ld b,01ah		;1139	06 1a		. .
-	ld de,l0043h		;113b	11 43 00	. C .
-	ld c,0ffh		;113e	0e ff		. .
-l1140h:
-	bit 5,(hl)		;1140	cb 6e		. n
-	jr z,l1148h		;1142	28 04		( .
-	inc c			;1144	0c		.
-	cp c			;1145	b9		.
-	jr z,l114fh		;1146	28 07		( .
-l1148h:
-	add hl,de		;1148	19		.
-	djnz l1140h		;1149	10 f5		. .
-	ld de,0x2b		;114b	11 2b 00	. + .
-	add hl,de		;114e	19		.
-l114fh:
-	ld de,0x2d		;114f	11 2d 00	. - .
-	add hl,de		;1152	19		.
-	pop de			;1153	d1		.
-	pop bc			;1154	c1		.
-	ret			;1155	c9		.
+	push bc
+	push de
+	ld de,04159h
+	call ADJUSTDE
+	ld h,d
+	ld l,e
+	ld b,26
+	ld de,67
+	ld c,-1
+_loop:
+	bit 5,(hl)
+	jr z,_skip
+	inc c			; Increments C
+	cp c			; Until it is equal to A
+	jr z,_done
+_skip:
+	add hl,de
+	djnz _loop
+	ld de,43
+	add hl,de
+_done:
+	ld de,45
+	add hl,de
+	pop de
+	pop bc
+	ret
+
+
+TARGET10:
 	push af			;1156	f5		.
 	push hl			;1157	e5		.
 	call sub_1112h		;1158	cd 12 11	. . .
@@ -2848,13 +2874,14 @@ l114fh:
 	and 0c0h		;1165	e6 c0		. .
 	ld (hl),a		;1167	77		w
 	ld a,(04f82h)		;1168	3a 82 4f	: . O
-	ld (04f86h),a		;116b	32 86 4f	2 . O
+	ld (CURSORX),a		;116b	32 86 4f	2 . O
 	or (hl)			;116e	b6		.
 	ld (hl),a		;116f	77		w
 	call sub_1191h		;1170	cd 91 11	. . .
 	pop hl			;1173	e1		.
 	pop af			;1174	f1		.
 	ret			;1175	c9		.
+TARGET4:
 	push af			;1176	f5		.
 	push hl			;1177	e5		.
 	call sub_1112h		;1178	cd 12 11	. . .
@@ -2865,7 +2892,7 @@ l114fh:
 	and 0c0h		;1183	e6 c0		. .
 	ld (hl),a		;1185	77		w
 	ld a,000h		;1186	3e 00		> .
-	ld (04f86h),a		;1188	32 86 4f	2 . O
+	ld (CURSORX),a		;1188	32 86 4f	2 . O
 	call sub_1191h		;118b	cd 91 11	. . .
 	pop hl			;118e	e1		.
 	pop af			;118f	f1		.
@@ -2878,47 +2905,48 @@ sub_1191h:
 	or 03fh			;1197	f6 3f		. ?
 	ld (hl),a		;1199	77		w
 	ret			;119a	c9		.
-l119bh:
+TARGET9:
 	push af			;119b	f5		.
 	push hl			;119c	e5		.
 	ld hl,(04f84h)		;119d	2a 84 4f	* . O
 	ld a,(hl)		;11a0	7e		~
 	and 0c0h		;11a1	e6 c0		. .
 	ld (hl),a		;11a3	77		w
-	ld a,(04f86h)		;11a4	3a 86 4f	: . O
+	ld a,(CURSORX)		;11a4	3a 86 4f	: . O
 	inc a			;11a7	3c		<
-	ld (04f86h),a		;11a8	32 86 4f	2 . O
+	ld (CURSORX),a		;11a8	32 86 4f	2 . O
 	or (hl)			;11ab	b6		.
 	ld (hl),a		;11ac	77		w
 	call sub_1191h		;11ad	cd 91 11	. . .
-	ld a,(04f86h)		;11b0	3a 86 4f	: . O
-	cp 028h			;11b3	fe 28		. (
-	call nc,l12b1h		;11b5	d4 b1 12	. . .
+	ld a,(CURSORX)		;11b0	3a 86 4f	: . O
+	cp 40			;11b3	fe 28		. (
+	call nc,TARGET5		;11b5	d4 b1 12	. . .
 	pop hl			;11b8	e1		.
 	pop af			;11b9	f1		.
 	ret			;11ba	c9		.
+TARGET8:
 	push af			;11bb	f5		.
 	push hl			;11bc	e5		.
 	ld hl,(04f84h)		;11bd	2a 84 4f	* . O
 	ld a,(hl)		;11c0	7e		~
 	and 0c0h		;11c1	e6 c0		. .
 	ld (hl),a		;11c3	77		w
-	ld a,(04f86h)		;11c4	3a 86 4f	: . O
+	ld a,(CURSORX)		;11c4	3a 86 4f	: . O
 	dec a			;11c7	3d		=
-	ld (04f86h),a		;11c8	32 86 4f	2 . O
+	ld (CURSORX),a		;11c8	32 86 4f	2 . O
 	or (hl)			;11cb	b6		.
 	ld (hl),a		;11cc	77		w
 	call sub_1191h		;11cd	cd 91 11	. . .
-	ld a,(04f86h)		;11d0	3a 86 4f	: . O
+	ld a,(CURSORX)		;11d0	3a 86 4f	: . O
 	cp 0ffh			;11d3	fe ff		. .
 	jr nz,l11ebh		;11d5	20 14		  .
-	call sub_11eeh		;11d7	cd ee 11	. . .
+	call TARGET12		;11d7	cd ee 11	. . .
 	ld hl,(04f84h)		;11da	2a 84 4f	* . O
 	ld a,(hl)		;11dd	7e		~
 	and 0c0h		;11de	e6 c0		. .
 	ld (hl),a		;11e0	77		w
 	ld a,027h		;11e1	3e 27		> '
-	ld (04f86h),a		;11e3	32 86 4f	2 . O
+	ld (CURSORX),a		;11e3	32 86 4f	2 . O
 	or (hl)			;11e6	b6		.
 	ld (hl),a		;11e7	77		w
 	call sub_1191h		;11e8	cd 91 11	. . .
@@ -2926,14 +2954,14 @@ l11ebh:
 	pop hl			;11eb	e1		.
 	pop af			;11ec	f1		.
 	ret			;11ed	c9		.
-sub_11eeh:
+TARGET12:
 	push af			;11ee	f5		.
 	push bc			;11ef	c5		.
 	push de			;11f0	d5		.
 	push hl			;11f1	e5		.
 	ld hl,(04f84h)		;11f2	2a 84 4f	* . O
 	ld de,04186h		;11f5	11 86 41	. . A
-	call sub_1101h		;11f8	cd 01 11	. . .
+	call ADJUSTDE		;11f8	cd 01 11	. . .
 	call sub_0f20h		;11fb	cd 20 0f	.   .
 	jr z,l1234h		;11fe	28 34		( 4
 	ld a,(hl)		;1200	7e		~
@@ -2943,7 +2971,7 @@ sub_11eeh:
 	or a			;1207	b7		.
 	sbc hl,bc		;1208	ed 42		. B
 	ld de,04159h		;120a	11 59 41	. Y A
-	call sub_1101h		;120d	cd 01 11	. . .
+	call ADJUSTDE		;120d	cd 01 11	. . .
 	ld bc,l0043h		;1210	01 43 00	. C .
 l1213h:
 	call sub_0f20h		;1213	cd 20 0f	.   .
@@ -2959,7 +2987,7 @@ l1221h:
 	ld a,(hl)		;1225	7e		~
 	and 0c0h		;1226	e6 c0		. .
 	ld (hl),a		;1228	77		w
-	ld a,(04f86h)		;1229	3a 86 4f	: . O
+	ld a,(CURSORX)		;1229	3a 86 4f	: . O
 	or (hl)			;122c	b6		.
 	ld (hl),a		;122d	77		w
 	ld (04f84h),hl		;122e	22 84 4f	" . O
@@ -2970,14 +2998,14 @@ l1234h:
 	pop bc			;1236	c1		.
 	pop af			;1237	f1		.
 	ret			;1238	c9		.
-l1239h:
+TARGET11:
 	push af			;1239	f5		.
 	push bc			;123a	c5		.
 	push de			;123b	d5		.
 	push hl			;123c	e5		.
 	ld hl,(04f84h)		;123d	2a 84 4f	* . O
 	ld de,04811h		;1240	11 11 48	. . H
-	call sub_1101h		;1243	cd 01 11	. . .
+	call ADJUSTDE		;1243	cd 01 11	. . .
 	call sub_0f20h		;1246	cd 20 0f	.   .
 	jr z,l127bh		;1249	28 30		( 0
 	ld a,(hl)		;124b	7e		~
@@ -2986,7 +3014,7 @@ l1239h:
 	ld bc,22		;124f	01 16 00	. . .
 	add hl,bc		;1252	09		.
 	ld de,047e4h		;1253	11 e4 47	. . G
-	call sub_1101h		;1256	cd 01 11	. . .
+	call ADJUSTDE		;1256	cd 01 11	. . .
 	ld bc,l0043h		;1259	01 43 00	. C .
 l125ch:
 	call sub_0f20h		;125c	cd 20 0f	.   .
@@ -3001,7 +3029,7 @@ l1268h:
 	ld a,(hl)		;126c	7e		~
 	and 0c0h		;126d	e6 c0		. .
 	ld (hl),a		;126f	77		w
-	ld a,(04f86h)		;1270	3a 86 4f	: . O
+	ld a,(CURSORX)		;1270	3a 86 4f	: . O
 	or (hl)			;1273	b6		.
 	ld (hl),a		;1274	77		w
 	ld (04f84h),hl		;1275	22 84 4f	" . O
@@ -3015,7 +3043,8 @@ l127bh:
 	ld a,(05fb6h)		;1280	3a b6 5f	: . _
 	xor 0ffh		;1283	ee ff		. .
 	ld (05fb6h),a		;1285	32 b6 5f	2 . _
-	jr nz,l12a6h		;1288	20 1c		  .
+	jr nz,TARGET15		;1288	20 1c		  .
+TARGET14:
 	push af			;128a	f5		.
 	push hl			;128b	e5		.
 	ld a,(05fb6h)		;128c	3a b6 5f	: . _
@@ -3025,7 +3054,7 @@ l127bh:
 	ld a,(hl)		;1295	7e		~
 	and 0c0h		;1296	e6 c0		. .
 	ld (hl),a		;1298	77		w
-	ld a,(04f86h)		;1299	3a 86 4f	: . O
+	ld a,(CURSORX)		;1299	3a 86 4f	: . O
 	or (hl)			;129c	b6		.
 	ld (hl),a		;129d	77		w
 	ld a,000h		;129e	3e 00		> .
@@ -3034,19 +3063,19 @@ l12a3h:
 	pop hl			;12a3	e1		.
 	pop af			;12a4	f1		.
 	ret			;12a5	c9		.
-l12a6h:
+TARGET15:
 	push af			;12a6	f5		.
 	call sub_1112h		;12a7	cd 12 11	. . .
 	ld a,001h		;12aa	3e 01		> .
 	ld (05b6dh),a		;12ac	32 6d 5b	2 m [
 	pop af			;12af	f1		.
 	ret			;12b0	c9		.
-l12b1h:
+TARGET5:	; new line?
 	push af			;12b1	f5		.
 	push hl			;12b2	e5		.
-	call l1239h		;12b3	cd 39 12	. 9 .
-	ld a,000h		;12b6	3e 00		> .
-	ld (04f86h),a		;12b8	32 86 4f	2 . O
+	call TARGET11		;12b3	cd 39 12	. 9 .
+	ld a,0			; First column
+	ld (CURSORX),a		;12b8	32 86 4f	2 . O
 	ld hl,(04f84h)		;12bb	2a 84 4f	* . O
 	ld a,(hl)		;12be	7e		~
 	and 0c0h		;12bf	e6 c0		. .
@@ -3055,13 +3084,13 @@ l12b1h:
 	pop hl			;12c5	e1		.
 	pop af			;12c6	f1		.
 	ret			;12c7	c9		.
-sub_12c8h:
+TARGET3:
 	push af			;12c8	f5		.
 	push bc			;12c9	c5		.
 	push de			;12ca	d5		.
 	push hl			;12cb	e5		.
 	ld hl,(04f84h)		;12cc	2a 84 4f	* . O
-	ld a,(04f86h)		;12cf	3a 86 4f	: . O
+	ld a,(CURSORX)		;12cf	3a 86 4f	: . O
 	ld c,a			;12d2	4f		O
 	ld b,000h		;12d3	06 00		. .
 	ld de,42		;12d5	11 2a 00	. * .
@@ -3085,15 +3114,16 @@ l12ebh:
 	pop bc			;12ed	c1		.
 	pop af			;12ee	f1		.
 	ret			;12ef	c9		.
+TARGET2:
 	push bc			;12f0	c5		.
 	push de			;12f1	d5		.
 	push hl			;12f2	e5		.
-	call sub_12c8h		;12f3	cd c8 12	. . .
+	call TARGET3		;12f3	cd c8 12	. . .
 	ld hl,(04f84h)		;12f6	2a 84 4f	* . O
 	ld bc,25		;12f9	01 19 00	. . .
 	add hl,bc		;12fc	09		.
 	ld de,0482ah		;12fd	11 2a 48	. * H
-	call sub_1101h		;1300	cd 01 11	. . .
+	call ADJUSTDE		;1300	cd 01 11	. . .
 	ld c,01bh		;1303	0e 1b		. .
 l1305h:
 	call sub_0f20h		;1305	cd 20 0f	.   .
@@ -3828,9 +3858,9 @@ l173fh:
 	ld a,044h		;1747	3e 44		> D
 	jp 0893fh		;1749	c3 3f 89	. ? .
 	
-	db "TAPE ACTION"
-	db 5
-	db "PLAYER NUMBER 1"
+	db "TAPE ACTION" ; 174c
+	db 5 ; 1757
+	db "PLAYER NUMBER 1" ; 1758
 
 	pop af			;1767	f1		.
 	ld c,a			;1768	4f		O
@@ -4373,7 +4403,7 @@ l1b0bh:
 sub_1b0dh:
 	call sub_2a82h		;1b0d	cd 82 2a	. . *
 	ld de,04185h		;1b10	11 85 41	. . A
-	call sub_1101h		;1b13	cd 01 11	. . .
+	call ADJUSTDE		;1b13	cd 01 11	. . .
 	ld h,d			;1b16	62		b
 	ld l,e			;1b17	6b		k
 	ld de,l0043h		;1b18	11 43 00	. C .
@@ -5600,7 +5630,7 @@ l233bh:
 	inc a			;233e	3c		<
 	djnz l233bh		;233f	10 fa		. .
 	ld de,04159h		;2341	11 59 41	. Y A
-	call sub_1101h		;2344	cd 01 11	. . .
+	call ADJUSTDE		;2344	cd 01 11	. . .
 	ld h,d			;2347	62		b
 	ld l,e			;2348	6b		k
 	ld (04116h),hl		;2349	22 16 41	" . A
@@ -5625,7 +5655,7 @@ l2351h:
 	ldir			;2374	ed b0		. .
 	ld b,006h		;2376	06 06		. .
 	ld de,04159h		;2378	11 59 41	. Y A
-	call sub_1101h		;237b	cd 01 11	. . .
+	call ADJUSTDE		;237b	cd 01 11	. . .
 	push de			;237e	d5		.
 	pop ix			;237f	dd e1		. .
 	ld hl,04116h		;2381	21 16 41	! . A
@@ -6570,8 +6600,8 @@ sub_2a82h:
 	ret nz			;2a87	c0		.
 	ld hl,04123h		;2a88	21 23 41	! # A
 	ld b,036h		;2a8b	06 36		. 6
-	ld a,(l0005h)		;2a8d	3a 05 00	: . .
-	cp 0aah			;2a90	fe aa		. .
+	ld a,(NEEDSOFFSETDE)		;2a8d	3a 05 00	: . .
+	cp MAGIC5			;2a90	fe aa		. .
 	jr nz,l2a96h		;2a92	20 02		  .
 	ld b,081h		;2a94	06 81		. .
 l2a96h:
@@ -6621,8 +6651,8 @@ l2ac4h:
 	inc hl			;2ad1	23		#
 	djnz l2aa7h		;2ad2	10 d3		. .
 	ld b,036h		;2ad4	06 36		. 6
-	ld a,(l0005h)		;2ad6	3a 05 00	: . .
-	cp 0aah			;2ad9	fe aa		. .
+	ld a,(NEEDSOFFSETDE)		;2ad6	3a 05 00	: . .
+	cp MAGIC5			;2ad9	fe aa		. .
 	jr nz,l2adfh		;2adb	20 02		  .
 	ld b,0fah		;2add	06 fa		. .
 l2adfh:
@@ -9065,7 +9095,7 @@ l3b95h:
 	jr c,l3b95h		;3b9e	38 f5		8 .
 l3ba0h:
 	ld b,a			;3ba0	47		G
-	ld a,(04f86h)		;3ba1	3a 86 4f	: . O
+	ld a,(CURSORX)		;3ba1	3a 86 4f	: . O
 	inc a			;3ba4	3c		<
 	ld c,a			;3ba5	4f		O
 	pop af			;3ba6	f1		.
@@ -11431,7 +11461,7 @@ l8993h:
 	ret			;8998	c9 	. 
 sub_8999h:
 	ld hl,l89b6h		;8999	21 b6 89 	! . . 
-	ld de,l0005h		;899c	11 05 00 	. . . 
+	ld de,5		;899c	11 05 00 	. . . 
 	ld b,013h		;899f	06 13 	. . 
 l89a1h:
 	cp (hl)			;89a1	be 	. 
@@ -12012,7 +12042,7 @@ l8d79h:
 	ld (hl),a			;8d79	77 	w 
 	inc hl			;8d7a	23 	# 
 	djnz l8d79h		;8d7b	10 fc 	. . 
-	ld hl,l0005h		;8d7d	21 05 00 	! . . 
+	ld hl,5		;8d7d	21 05 00 	! . . 
 	ld (05ea1h),hl		;8d80	22 a1 5e 	" . ^ 
 	ret			;8d83	c9 	. 
 l8d84h:
@@ -15026,7 +15056,7 @@ sub_a2a4h:
 	pop de			;a2a5	d1 	. 
 	push bc			;a2a6	c5 	. 
 	inc hl			;a2a7	23 	# 
-	ld bc,l0005h		;a2a8	01 05 00 	. . . 
+	ld bc,5		;a2a8	01 05 00 	. . . 
 	ldir		;a2ab	ed b0 	. . 
 	pop bc			;a2ad	c1 	. 
 	ret			;a2ae	c9 	. 
@@ -17798,7 +17828,7 @@ lb64dh:
 sub_b65fh:
 	ld de,053c2h		;b65f	11 c2 53 	. . S 
 	ld hl,053bdh		;b662	21 bd 53 	! . S 
-	ld bc,l0005h		;b665	01 05 00 	. . . 
+	ld bc,5		;b665	01 05 00 	. . . 
 	ldir		;b668	ed b0 	. . 
 	ld a,(05cbah)		;b66a	3a ba 5c 	: . \ 
 	cp 005h		;b66d	fe 05 	. . 
@@ -18062,7 +18092,7 @@ lb81ch:
 sub_b821h:
 	ld hl,053cah		;b821	21 ca 53 	! . S 
 	ld de,053bdh		;b824	11 bd 53 	. . S 
-	ld bc,l0005h		;b827	01 05 00 	. . . 
+	ld bc,5		;b827	01 05 00 	. . . 
 	ld a,(05cbah)		;b82a	3a ba 5c 	: . \ 
 	cp 005h		;b82d	fe 05 	. . 
 	jr z,lb837h		;b82f	28 06 	( . 
@@ -19277,7 +19307,7 @@ lc01fh:
 	ld a,010h		;c034	3e 10 	> . 
 	out (007h),a		;c036	d3 07 	. . 
 	ld a,(053bdh)		;c038	3a bd 53 	: . S 
-	ld (l0005h),a		;c03b	32 05 00 	2 . . 
+	ld (5),a		;c03b	32 05 00 	2 . . 
 	ld b,004h		;c03e	06 04 	. . 
 	ld c,003h		;c040	0e 03 	. . 
 	ld hl,000a0h		;c042	21 a0 00 	! . . 
@@ -19513,7 +19543,7 @@ lc1ach:
 	djnz lc18bh		;c1ac	10 dd 	. . 
 	ret			;c1ae	c9 	. 
 sub_c1afh:
-	ld de,l0005h		;c1af	11 05 00 	. . . 
+	ld de,5		;c1af	11 05 00 	. . . 
 	ld a,(05fd0h)		;c1b2	3a d0 5f 	: . _ 
 	ld c,a			;c1b5	4f 	O 
 	ld a,(05fd1h)		;c1b6	3a d1 5f 	: . _ 
