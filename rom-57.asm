@@ -17,6 +17,11 @@ MAGIC: equ 0xaa	; Stored in WARM_FLAG to see if we're doing a warm boot
 FLAGS: equ 0x4f79
 FLAG_DISP: equ 4		;	Display control flag? -- may be also be something like I/O redirection
 
+; [JCM-1] I believe that 40E0 is a pointer to where the RS232 buffer is in RAM.
+SERIALBUF: equ 0x40e0
+; [JCM-1] I believe that 40E4 is a pointer to the location of the keyboard buffer.
+KBDBUF: equ 0x40e4
+
 
 PORT_DMA: equ 0x62	; DMA port
 
@@ -125,6 +130,8 @@ l0064h:
 	jr nc,l00bah		;00a8	30 10		0 .
 	ld (bc),a		;00aa	02		.
 	add a,b			;00ab	80		.
+
+; [JCM-1] The keyboard interrupt handler starts at 00AC
 	exx			;00ac	d9		.
 	push af			;00ad	f5		.
 	ld c,001h		;00ae	0e 01		. .
@@ -141,7 +148,7 @@ l00beh:
 	cp 001h			;00c1	fe 01		. .
 	jp nz,COLD_START	;00c3	c2 00 00	. . .
 l00c6h:
-	ld hl,040e4h		;00c6	21 e4 40	! . @
+	ld hl,KBDBUF		;00c6	21 e4 40	! . @
 	ld a,b			;00c9	78		x
 	call sub_0f09h		;00ca	cd 09 0f	. . .
 l00cdh:
@@ -181,15 +188,19 @@ l00fah:
 	pop bc			;00fb	c1		.
 	ei			;00fc	fb		.
 	reti			;00fd	ed 4d		. M
+
+; [JCM-1] The RS232 interrupt handler starts at 00FF 
 	exx			;00ff	d9		.
 	push af			;0100	f5		.
 	ld c,000h		;0101	0e 00		. .
-	ld hl,040e0h		;0103	21 e0 40	! . @
+	ld hl,SERIALBUF		;0103	21 e0 40	! . @
 	call SERIAL_SOMETHING	;0106	cd 07 0f	. . .
 	jr l00cdh		;0109	18 c2		. .
 	push bc			;010b	c5		.
 	ld c,002h		;010c	0e 02		. .
 	jr l00edh		;010e	18 dd		. .
+
+; [JCM-1] There is a handler for interrupt 0x10 at 0110
 l0110h:
 	exx			;0110	d9		.
 	push af			;0111	f5		.
@@ -200,6 +211,8 @@ l0110h:
 	push bc			;011c	c5		.
 	ld c,012h		;011d	0e 12		. .
 	jr l00edh		;011f	18 cc		. .
+
+; [JCM-1] There is a handler for interrupt 0x10 at 0110
 l0121h:
 	exx			;0121	d9		.
 	push af			;0122	f5		.
@@ -210,6 +223,8 @@ l0121h:
 	push bc			;012d	c5		.
 	ld c,013h		;012e	0e 13		. .
 	jr l00edh		;0130	18 bb		. .
+
+; [JCM-1] There is a handler for interrupt 0x14 at 0132
 l0132h:
 	exx			;0132	d9		.
 	push af			;0133	f5		.
@@ -295,7 +310,7 @@ COLD_BOOT:
 	ldir
 
 	ld a,003h		;01b3	3e 03		> .
-	call SOMETHING_MEM	;01b5	cd 1a 0f	. . .
+	call SETMEMMAP	;01b5	cd 1a 0f	. . .
 
 	;	clear 0xc000-0xffff
 	ld hl,0c000h
@@ -359,7 +374,7 @@ l0230h:
 	ldir			;0239	ed b0		. .
 	call sub_0849h		;023b	cd 49 08	. I .
 	xor a			;023e	af		.
-	call SOMETHING_MEM	;023f	cd 1a 0f	. . .
+	call SETMEMMAP	;023f	cd 1a 0f	. . .
 	ld hl,(0e000h)		;0242	2a 00 e0	* . .
 	ld de,0aaaah		;0245	11 aa aa	. . .
 	call sub_0f20h		;0248	cd 20 0f	.   .
@@ -378,7 +393,7 @@ WARM_BOOT:
 	ld (040e0h),hl		;0263	22 e0 40	" . @
 	ld (040e2h),hl		;0266	22 e2 40	" . @
 	ld hl,04020h		;0269	21 20 40	!   @
-	ld (040e4h),hl		;026c	22 e4 40	" . @
+	ld (KBDBUF),hl		;026c	22 e4 40	" . @
 	ld (040e6h),hl		;026f	22 e6 40	" . @
 	ld hl,04040h		;0272	21 40 40	! @ @
 	ld (040e8h),hl		;0275	22 e8 40	" . @
@@ -458,7 +473,7 @@ l031ah:
 	ex de,hl		;0325	eb		.
 	ld sp,hl		;0326	f9		.
 	pop af			;0327	f1		.
-	call SOMETHING_MEM	;0328	cd 1a 0f	. . .
+	call SETMEMMAP	;0328	cd 1a 0f	. . .
 	pop iy			;032b	fd e1		. .
 	pop ix			;032d	dd e1		. .
 	pop hl			;032f	e1		.
@@ -603,7 +618,7 @@ l040fh:
 	inc hl			;0414	23		#
 	ldir			;0415	ed b0		. .
 	ld a,(ix+000h)		;0417	dd 7e 00	. ~ .
-	call SOMETHING_MEM	;041a	cd 1a 0f	. . .
+	call SETMEMMAP	;041a	cd 1a 0f	. . .
 	ld h,(ix+00ch)		;041d	dd 66 0c	. f .
 	ld l,(ix+00bh)		;0420	dd 6e 0b	. n .
 	ld a,(hl)		;0423	7e		~
@@ -701,7 +716,7 @@ l04d5h:
 	ld a,(ix+00ch)		;04e7	dd 7e 0c	. ~ .
 	ld (ix+013h),a		;04ea	dd 77 13	. w .
 	ld a,(ix+009h)		;04ed	dd 7e 09	. ~ .
-	call SOMETHING_MEM	;04f0	cd 1a 0f	. . .
+	call SETMEMMAP	;04f0	cd 1a 0f	. . .
 	call sub_0607h		;04f3	cd 07 06	. . .
 	call sub_061eh		;04f6	cd 1e 06	. . .
 	inc de			;04f9	13		.
@@ -879,7 +894,7 @@ l062dh:
 	ld d,(ix+004h)		;063f	dd 56 04	. V .
 	ld e,(ix+003h)		;0642	dd 5e 03	. ^ .
 	ld a,(ix+00ah)		;0645	dd 7e 0a	. ~ .
-	call SOMETHING_MEM	;0648	cd 1a 0f	. . .
+	call SETMEMMAP	;0648	cd 1a 0f	. . .
 	ld bc,1		;064b	01 01 00	. . .
 	ld a,(ix+01dh)		;064e	dd 7e 1d	. ~ .
 	cp 002h			;0651	fe 02		. .
@@ -966,7 +981,7 @@ l06e8h:
 	ld (05b6eh),a		;06f7	32 6e 5b	2 n [
 l06fah:
 	pop af			;06fa	f1		.
-	call SOMETHING_MEM	;06fb	cd 1a 0f	. . .
+	call SETMEMMAP	;06fb	cd 1a 0f	. . .
 	pop iy			;06fe	fd e1		. .
 	pop ix			;0700	dd e1		. .
 	pop hl			;0702	e1		.
@@ -1193,7 +1208,7 @@ l0852h:
 	inc bc			;0857	03		.
 	ld h,b			;0858	60		`
 	ld l,c			;0859	69		i
-	call SOMETHING_MEM	;085a	cd 1a 0f	. . .
+	call SETMEMMAP	;085a	cd 1a 0f	. . .
 	call sub_07f9h		;085d	cd f9 07	. . .
 	cp 0ffh			;0860	fe ff		. .
 	pop de			;0862	d1		.
@@ -1308,7 +1323,7 @@ l08edh:
 	push af			;0904	f5		.
 	ld hl,(05fe2h)		;0905	2a e2 5f	* . _
 	call sub_07f5h		;0908	cd f5 07	. . .
-	call SOMETHING_MEM	;090b	cd 1a 0f	. . .
+	call SETMEMMAP	;090b	cd 1a 0f	. . .
 	ex de,hl		;090e	eb		.
 	ld hl,05cc6h		;090f	21 c6 5c	! . \
 	ld bc,l0170h		;0912	01 70 01	. p .
@@ -1324,7 +1339,7 @@ l08edh:
 	inc hl			;0925	23		#
 	ld (05fe2h),hl		;0926	22 e2 5f	" . _
 	call sub_07f5h		;0929	cd f5 07	. . .
-	call SOMETHING_MEM	;092c	cd 1a 0f	. . .
+	call SETMEMMAP	;092c	cd 1a 0f	. . .
 	ld (hl),000h		;092f	36 00		6 .
 	ld a,(05e36h)		;0931	3a 36 5e	: 6 ^
 	bit 1,a			;0934	cb 4f		. O
@@ -1372,7 +1387,7 @@ sub_0968h:
 	ld a,002h		;096e	3e 02		> .
 l0970h:
 	push af			;0970	f5		.
-	call SOMETHING_MEM	;0971	cd 1a 0f	. . .
+	call SETMEMMAP	;0971	cd 1a 0f	. . .
 	ld a,05ah		;0974	3e 5a		> Z
 	ld hl,0fffbh		;0976	21 fb ff	! . .
 	ld (hl),a		;0979	77		w
@@ -1397,7 +1412,7 @@ l0995h:
 l0997h:
 	ld l,a			;0997	6f		o
 	pop af			;0998	f1		.
-	call SOMETHING_MEM	;0999	cd 1a 0f	. . .
+	call SETMEMMAP	;0999	cd 1a 0f	. . .
 	ld a,l			;099c	7d		}
 	ld (05b87h),a		;099d	32 87 5b	2 . [
 	ld c,000h		;09a0	0e 00		. .
@@ -1426,7 +1441,7 @@ sub_09b1h:
 	push hl			;09ca	e5		.
 	push de			;09cb	d5		.
 	xor a			;09cc	af		.
-	call SOMETHING_MEM	;09cd	cd 1a 0f	. . .
+	call SETMEMMAP	;09cd	cd 1a 0f	. . .
 	ld a,(05fd9h)		;09d0	3a d9 5f	: . _
 	ld de,(05fdbh)		;09d3	ed 5b db 5f	. [ . _
 	ld hl,(05fddh)		;09d7	2a dd 5f	* . _
@@ -1434,7 +1449,7 @@ sub_09b1h:
 l09dbh:
 	push af			;09db	f5		.
 	ld a,(05fdfh)		;09dc	3a df 5f	: . _
-	call SOMETHING_MEM	;09df	cd 1a 0f	. . .
+	call SETMEMMAP	;09df	cd 1a 0f	. . .
 	pop af			;09e2	f1		.
 	ret			;09e3	c9		.
 sub_09e4h:
@@ -2408,7 +2423,7 @@ sub_0f09h:
 	ld (hl),e		;0f18	73		s
 	ret			;0f19	c9		.
 ; Memory Mapping?
-SOMETHING_MEM:
+SETMEMMAP:
 	ld (CUR_MAP),a		;0f1a	32 22 41	2 " A
 	out (0feh),a		;0f1d	d3 fe		. .
 	ret			;0f1f	c9		.
@@ -2419,7 +2434,7 @@ sub_0f20h:
 	pop hl			;0f24	e1		.
 	ret			;0f25	c9		.
 sub_0f26h:
-	call SOMETHING_MEM	;0f26	cd 1a 0f	. . .
+	call SETMEMMAP	;0f26	cd 1a 0f	. . .
 	push af			;0f29	f5		.
 	ld a,(hl)		;0f2a	7e		~
 	cp 0ffh			;0f2b	fe ff		. .
@@ -2443,13 +2458,13 @@ l0f3bh:
 	ld e,(hl)		;0f40	5e		^
 	inc hl			;0f41	23		#
 	ld d,(hl)		;0f42	56		V
-	call SOMETHING_MEM	;0f43	cd 1a 0f	. . .
+	call SETMEMMAP	;0f43	cd 1a 0f	. . .
 	ex de,hl		;0f46	eb		.
 	pop de			;0f47	d1		.
 	cp 0ffh			;0f48	fe ff		. .
 	ret nz			;0f4a	c0		.
 	ld a,000h		;0f4b	3e 00		> .
-	call SOMETHING_MEM	;0f4d	cd 1a 0f	. . .
+	call SETMEMMAP	;0f4d	cd 1a 0f	. . .
 	ld hl,060deh		;0f50	21 de 60	! . `
 	ret			;0f53	c9		.
 sub_0f54h:
@@ -3839,7 +3854,7 @@ l173fh:
 	jr nz,$-39		;178d	20 d7		  .
 l178fh:
 	xor a			;178f	af		.
-	call SOMETHING_MEM	;1790	cd 1a 0f	. . .
+	call SETMEMMAP	;1790	cd 1a 0f	. . .
 l1793h:
 	ld hl,08000h		;1793	21 00 80	! . .
 	ld a,(04f76h)		;1796	3a 76 4f	: v O
@@ -3861,7 +3876,7 @@ SOMETHING_KBD:
 	push hl			;17a9	e5		.
 l17aah:
 	xor a			;17aa	af		.
-	call SOMETHING_MEM	;17ab	cd 1a 0f	. . .
+	call SETMEMMAP	;17ab	cd 1a 0f	. . .
 l17aeh:
 	ld hl,(05bb0h)		;17ae	2a b0 5b	* . [
 	or h			;17b1	b4		.
@@ -3886,7 +3901,7 @@ l17cfh:
 	ld b,a			;17d3	47		G
 	jr l17f5h		;17d4	18 1f		. .
 l17d6h:
-	ld de,040e4h		;17d6	11 e4 40	. . @
+	ld de,KBDBUF		;17d6	11 e4 40	. . @
 	ld a,(04f76h)		;17d9	3a 76 4f	: v O
 	cp 005h			;17dc	fe 05		. .
 	ld b,00ah		;17de	06 0a		. .
@@ -4069,7 +4084,7 @@ l1916h:
 	jp l17aah		;1922	c3 aa 17	. . .
 l1925h:
 	xor a			;1925	af		.
-	call SOMETHING_MEM	;1926	cd 1a 0f	. . .
+	call SETMEMMAP	;1926	cd 1a 0f	. . .
 	call sub_223fh		;1929	cd 3f 22	. ? "
 	call sub_1bddh		;192c	cd dd 1b	. . .
 	call sub_1318h		;192f	cd 18 13	. . .
@@ -4078,7 +4093,7 @@ l1934h:
 	ld hl,FLAGS		;1934	21 79 4f	! y O
 	set 1,(hl)		;1937	cb ce		. .
 	xor a			;1939	af		.
-	jp SOMETHING_MEM	;193a	c3 1a 0f	. . .
+	jp SETMEMMAP	;193a	c3 1a 0f	. . .
 	add a,a			;193d	87		.
 	add a,l			;193e	85		.
 	ld l,a			;193f	6f		o
@@ -4139,7 +4154,7 @@ l19a4h:
 	call sub_2a82h		;19ab	cd 82 2a	. . *
 	call sub_13c8h		;19ae	cd c8 13	. . .
 	ld de,l36ceh+2		;19b1	11 d0 36	. . 6
-	ld de,040e4h		;19b4	11 e4 40	. . @
+	ld de,KBDBUF		;19b4	11 e4 40	. . @
 l19b7h:
 	call sub_0ee1h		;19b7	cd e1 0e	. . .
 	jr nc,l19c1h		;19ba	30 05		0 .
@@ -4976,7 +4991,7 @@ l1f44h:
 l1f48h:
 	ld hl,(0542ah)		;1f48	2a 2a 54	* * T
 	call sub_07f9h		;1f4b	cd f9 07	. . .
-	call SOMETHING_MEM	;1f4e	cd 1a 0f	. . .
+	call SETMEMMAP	;1f4e	cd 1a 0f	. . .
 	cp 0ffh			;1f51	fe ff		. .
 	ret z			;1f53	c8		.
 	push hl			;1f54	e5		.
@@ -5030,7 +5045,7 @@ l1f48h:
 sub_1fb9h:
 	ld hl,(0542ah)		;1fb9	2a 2a 54	* * T
 	call sub_07f9h		;1fbc	cd f9 07	. . .
-	call SOMETHING_MEM	;1fbf	cd 1a 0f	. . .
+	call SETMEMMAP	;1fbf	cd 1a 0f	. . .
 	ld de,16		;1fc2	11 10 00	. . .
 	add hl,de		;1fc5	19		.
 	push hl			;1fc6	e5		.
@@ -5880,7 +5895,7 @@ l2546h:
 	pop af			;2547	f1		.
 	cp 0ffh			;2548	fe ff		. .
 	jr z,l24fch		;254a	28 b0		( .
-	call SOMETHING_MEM	;254c	cd 1a 0f	. . .
+	call SETMEMMAP	;254c	cd 1a 0f	. . .
 	bit 0,(hl)		;254f	cb 46		. F
 	jr nz,l24fch		;2551	20 a9		  .
 	bit 1,(hl)		;2553	cb 4e		. N
@@ -5918,7 +5933,7 @@ l2577h:
 	pop hl			;259b	e1		.
 	cp 0ffh			;259c	fe ff		. .
 	jp z,l261eh		;259e	ca 1e 26	. . &
-	call SOMETHING_MEM	;25a1	cd 1a 0f	. . .
+	call SETMEMMAP	;25a1	cd 1a 0f	. . .
 	bit 1,(hl)		;25a4	cb 4e		. N
 	jr nz,l261eh		;25a6	20 76		  v
 	bit 2,(hl)		;25a8	cb 56		. V
@@ -6222,7 +6237,7 @@ l27cdh:
 	call sub_07f9h		;27d1	cd f9 07	. . .
 	cp 0ffh			;27d4	fe ff		. .
 	jp z,l28dbh		;27d6	ca db 28	. . (
-	call SOMETHING_MEM	;27d9	cd 1a 0f	. . .
+	call SETMEMMAP	;27d9	cd 1a 0f	. . .
 	bit 1,(hl)		;27dc	cb 4e		. N
 	jr nz,l27e6h		;27de	20 06		  .
 	call sub_1f2ah		;27e0	cd 2a 1f	. * .
@@ -6264,7 +6279,7 @@ l2828h:
 	jp z,l28dbh		;2832	ca db 28	. . (
 	call sub_1f2ah		;2835	cd 2a 1f	. * .
 	jp z,l28dbh		;2838	ca db 28	. . (
-	call SOMETHING_MEM	;283b	cd 1a 0f	. . .
+	call SETMEMMAP	;283b	cd 1a 0f	. . .
 	bit 1,(hl)		;283e	cb 4e		. N
 	jp z,l28dbh		;2840	ca db 28	. . (
 l2843h:
@@ -6302,7 +6317,7 @@ l2880h:
 	call sub_07f9h		;2886	cd f9 07	. . .
 	cp 0ffh			;2889	fe ff		. .
 	jp z,l28dbh		;288b	ca db 28	. . (
-	call SOMETHING_MEM	;288e	cd 1a 0f	. . .
+	call SETMEMMAP	;288e	cd 1a 0f	. . .
 	bit 1,(hl)		;2891	cb 4e		. N
 	jp z,l28dbh		;2893	ca db 28	. . (
 l2896h:
@@ -6424,7 +6439,7 @@ l2949h:
 	call sub_2b3fh		;295d	cd 3f 2b	. ? +
 	cp 0ffh			;2960	fe ff		. .
 	jp z,l29ech		;2962	ca ec 29	. . )
-	call SOMETHING_MEM	;2965	cd 1a 0f	. . .
+	call SETMEMMAP	;2965	cd 1a 0f	. . .
 	bit 1,(hl)		;2968	cb 4e		. N
 	jr nz,l297dh		;296a	20 11		  .
 	call sub_1f2ah		;296c	cd 2a 1f	. * .
@@ -6449,7 +6464,7 @@ l297dh:
 	call sub_2b3fh		;2996	cd 3f 2b	. ? +
 	cp 0ffh			;2999	fe ff		. .
 	jr z,l2a06h		;299b	28 69		( i
-	call SOMETHING_MEM	;299d	cd 1a 0f	. . .
+	call SETMEMMAP	;299d	cd 1a 0f	. . .
 	bit 1,(hl)		;29a0	cb 4e		. N
 	jr z,l2a06h		;29a2	28 62		( b
 	call sub_1f2ah		;29a4	cd 2a 1f	. * .
@@ -6469,7 +6484,7 @@ l297dh:
 	call sub_2b3fh		;29c3	cd 3f 2b	. ? +
 	cp 0ffh			;29c6	fe ff		. .
 	jr z,l2a20h		;29c8	28 56		( V
-	call SOMETHING_MEM	;29ca	cd 1a 0f	. . .
+	call SETMEMMAP	;29ca	cd 1a 0f	. . .
 	bit 1,(hl)		;29cd	cb 4e		. N
 	jr z,l2a20h		;29cf	28 4f		( O
 	ld de,16		;29d1	11 10 00	. . .
@@ -6524,7 +6539,7 @@ l2a3ah:
 	call sub_2b73h		;2a41	cd 73 2b	. s +
 	cp 0ffh			;2a44	fe ff		. .
 	jp z,l2b10h		;2a46	ca 10 2b	. . +
-	call SOMETHING_MEM	;2a49	cd 1a 0f	. . .
+	call SETMEMMAP	;2a49	cd 1a 0f	. . .
 	bit 1,(hl)		;2a4c	cb 4e		. N
 	jp z,l2949h		;2a4e	ca 49 29	. I )
 	push hl			;2a51	e5		.
@@ -6540,7 +6555,7 @@ l2a5eh:
 	call sub_2b73h		;2a65	cd 73 2b	. s +
 	cp 0ffh			;2a68	fe ff		. .
 	jp z,l2b10h		;2a6a	ca 10 2b	. . +
-	call SOMETHING_MEM	;2a6d	cd 1a 0f	. . .
+	call SETMEMMAP	;2a6d	cd 1a 0f	. . .
 	bit 1,(hl)		;2a70	cb 4e		. N
 	jp z,l2949h		;2a72	ca 49 29	. I )
 	push hl			;2a75	e5		.
@@ -6617,7 +6632,7 @@ l2adfh:
 	ld a,004h		;2ae3	3e 04		> .
 	call OUTCH		;2ae5	cd 84 10	. . .
 	ld a,000h		;2ae8	3e 00		> .
-	call SOMETHING_MEM	;2aea	cd 1a 0f	. . .
+	call SETMEMMAP	;2aea	cd 1a 0f	. . .
 	ret			;2aed	c9		.
 sub_2aeeh:
 	call sub_13c8h		;2aee	cd c8 13	. . .
@@ -6639,7 +6654,7 @@ sub_2b05h:
 	call sub_07f9h		;2b05	cd f9 07	. . .
 	cp 0ffh			;2b08	fe ff		. .
 	jr z,l2b10h		;2b0a	28 04		( .
-	call SOMETHING_MEM	;2b0c	cd 1a 0f	. . .
+	call SETMEMMAP	;2b0c	cd 1a 0f	. . .
 	ret			;2b0f	c9		.
 l2b10h:
 	call sub_13c8h		;2b10	cd c8 13	. . .
@@ -6806,7 +6821,7 @@ sub_2c54h:
 l2c62h:
 	inc (iy+011h)		;2c62	fd 34 11	. 4 .
 	ld a,(iy+010h)		;2c65	fd 7e 10	. ~ .
-	call SOMETHING_MEM	;2c68	cd 1a 0f	. . .
+	call SETMEMMAP	;2c68	cd 1a 0f	. . .
 	push hl			;2c6b	e5		.
 	ld h,(iy+015h)		;2c6c	fd 66 15	. f .
 	ld l,(iy+014h)		;2c6f	fd 6e 14	. n .
@@ -6866,7 +6881,7 @@ l2cc2h:
 	sub b			;2cc4	90		.
 	push af			;2cc5	f5		.
 	ld a,c			;2cc6	79		y
-	call SOMETHING_MEM	;2cc7	cd 1a 0f	. . .
+	call SETMEMMAP	;2cc7	cd 1a 0f	. . .
 	ld (iy+010h),a		;2cca	fd 77 10	. w .
 	ex de,hl		;2ccd	eb		.
 	res 7,(hl)		;2cce	cb be		. .
@@ -6906,7 +6921,7 @@ l2cfeh:
 	jp l2c2eh		;2cff	c3 2e 2c	. . ,
 sub_2d02h:
 	ld a,(iy+010h)		;2d02	fd 7e 10	. ~ .
-	call SOMETHING_MEM	;2d05	cd 1a 0f	. . .
+	call SETMEMMAP	;2d05	cd 1a 0f	. . .
 	ld a,020h		;2d08	3e 20		>  
 	ld b,(iy+00dh)		;2d0a	fd 46 0d	. F .
 	ld h,(iy+00fh)		;2d0d	fd 66 0f	. f .
@@ -6928,7 +6943,7 @@ l2d1bh:
 	or a			;2d2b	b7		.
 	jp nz,l2e13h		;2d2c	c2 13 2e	. . .
 	ld a,(iy+01ah)		;2d2f	fd 7e 1a	. ~ .
-	call SOMETHING_MEM	;2d32	cd 1a 0f	. . .
+	call SETMEMMAP	;2d32	cd 1a 0f	. . .
 	ld a,(iy+019h)		;2d35	fd 7e 19	. ~ .
 	cp 00ah			;2d38	fe 0a		. .
 	jp nc,l2de4h		;2d3a	d2 e4 2d	. . -
@@ -7074,7 +7089,7 @@ l2e44h:
 	ret			;2e53	c9		.
 l2e54h:
 	ld a,b			;2e54	78		x
-	call SOMETHING_MEM	;2e55	cd 1a 0f	. . .
+	call SETMEMMAP	;2e55	cd 1a 0f	. . .
 	ld a,(de)		;2e58	1a		.
 	bit 0,a			;2e59	cb 47		. G
 	jr nz,l2e34h		;2e5b	20 d7		  .
@@ -7480,7 +7495,7 @@ l3155h:
 	jr nz,l3185h		;3156	20 2d		  -
 	xor a			;3158	af		.
 l3159h:
-	call SOMETHING_MEM	;3159	cd 1a 0f	. . .
+	call SETMEMMAP	;3159	cd 1a 0f	. . .
 	call 0c86ch		;315c	cd 6c c8	. l .
 l315fh:
 	call 0a0c6h		;315f	cd c6 a0	. . .
@@ -7624,7 +7639,7 @@ l325bh:
 	call sub_07f9h		;325c	cd f9 07	. . .
 	cp 0ffh			;325f	fe ff		. .
 	jp z,l328dh		;3261	ca 8d 32	. . 2
-	call SOMETHING_MEM	;3264	cd 1a 0f	. . .
+	call SETMEMMAP	;3264	cd 1a 0f	. . .
 	ld de,0x30		;3267	11 30 00	. 0 .
 	add hl,de		;326a	19		.
 	ld a,(l000dh)		;326b	3a 0d 00	: . .
@@ -7658,7 +7673,7 @@ l3295h:
 	call sub_07f9h		;3296	cd f9 07	. . .
 	cp 0ffh			;3299	fe ff		. .
 	jr z,l32bah		;329b	28 1d		( .
-	call SOMETHING_MEM	;329d	cd 1a 0f	. . .
+	call SETMEMMAP	;329d	cd 1a 0f	. . .
 	ld de,0x30		;32a0	11 30 00	. 0 .
 	add hl,de		;32a3	19		.
 	ex de,hl		;32a4	eb		.
@@ -7928,17 +7943,17 @@ sub_33ffh:
 	ld a,(05fd7h)		;342a	3a d7 5f	: . _
 	bit 4,a			;342d	cb 67		. g
 	ret nz			;342f	c0		.
-	ld hl,040e4h		;3430	21 e4 40	! . @
+	ld hl,KBDBUF		;3430	21 e4 40	! . @
 	ld a,0f9h		;3433	3e f9		> .
 	call sub_0f09h		;3435	cd 09 0f	. . .
-	ld hl,040e4h		;3438	21 e4 40	! . @
+	ld hl,KBDBUF		;3438	21 e4 40	! . @
 	ld a,09ah		;343b	3e 9a		> .
 	call sub_0f09h		;343d	cd 09 0f	. . .
 	ld a,001h		;3440	3e 01		> .
 	ld (05fd8h),a		;3442	32 d8 5f	2 . _
 	ret			;3445	c9		.
 l3446h:
-	ld hl,040e4h		;3446	21 e4 40	! . @
+	ld hl,KBDBUF		;3446	21 e4 40	! . @
 	ld a,(05fd7h)		;3449	3a d7 5f	: . _
 	bit 5,a			;344c	cb 6f		. o
 	jr nz,l3456h		;344e	20 06		  .
@@ -7963,7 +7978,7 @@ l346eh:
 	push bc			;3470	c5		.
 	call sub_0f09h		;3471	cd 09 0f	. . .
 	pop bc			;3474	c1		.
-	ld hl,040e4h		;3475	21 e4 40	! . @
+	ld hl,KBDBUF		;3475	21 e4 40	! . @
 	djnz l346eh		;3478	10 f4		. .
 	ld a,0f8h		;347a	3e f8		> .
 	call sub_0f09h		;347c	cd 09 0f	. . .
@@ -11015,7 +11030,7 @@ l8657h:
 	call sub_07f9h		;865a	cd f9 07 	. . . 
 	cp 0ffh		;865d	fe ff 	. . 
 	jp z,088c4h		;865f	ca c4 88 	. . . 
-	call SOMETHING_MEM		;8662	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8662	cd 1a 0f 	. . . 
 	ex de,hl			;8665	eb 	. 
 	ld hl,05cc6h		;8666	21 c6 5c 	! . \ 
 	ld bc,l0170h		;8669	01 70 01 	. p . 
@@ -11128,7 +11143,7 @@ l8740h:
 	call sub_07f9h		;8751	cd f9 07 	. . . 
 	cp 0ffh		;8754	fe ff 	. . 
 	jp z,l88d0h		;8756	ca d0 88 	. . . 
-	call SOMETHING_MEM		;8759	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8759	cd 1a 0f 	. . . 
 	ld a,(hl)			;875c	7e 	~ 
 	bit 1,a		;875d	cb 4f 	. O 
 	jp z,l88d0h		;875f	ca d0 88 	. . . 
@@ -11147,7 +11162,7 @@ sub_876ch:
 	call sub_07f9h		;877e	cd f9 07 	. . . 
 	cp 0ffh		;8781	fe ff 	. . 
 	ret z			;8783	c8 	. 
-	call SOMETHING_MEM		;8784	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8784	cd 1a 0f 	. . . 
 	ld de,05cc6h		;8787	11 c6 5c 	. . \ 
 	ld bc,l0170h		;878a	01 70 01 	. p . 
 	ldir		;878d	ed b0 	. . 
@@ -11907,7 +11922,7 @@ l8cbbh:
 	call sub_07f9h		;8cc4	cd f9 07 	. . . 
 	cp 0ffh		;8cc7	fe ff 	. . 
 	jp z,l8d4bh		;8cc9	ca 4b 8d 	. K . 
-	call SOMETHING_MEM		;8ccc	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8ccc	cd 1a 0f 	. . . 
 	ld bc,l0170h		;8ccf	01 70 01 	. p . 
 	ld de,05cc6h		;8cd2	11 c6 5c 	. . \ 
 	ldir		;8cd5	ed b0 	. . 
@@ -11916,7 +11931,7 @@ l8cbbh:
 	call sub_07f9h		;8cdb	cd f9 07 	. . . 
 	cp 0ffh		;8cde	fe ff 	. . 
 	jr z,l8cfah		;8ce0	28 18 	( . 
-	call SOMETHING_MEM		;8ce2	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8ce2	cd 1a 0f 	. . . 
 	ld a,(hl)			;8ce5	7e 	~ 
 l8ce6h:
 	ld (05e36h),a		;8ce6	32 36 5e 	2 6 ^ 
@@ -11950,7 +11965,7 @@ l8cfdh:
 	ret			;8d1e	c9 	. 
 sub_8d1fh:
 	ld a,003h		;8d1f	3e 03 	> . 
-	call SOMETHING_MEM		;8d21	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8d21	cd 1a 0f 	. . . 
 	ld de,(05b79h)		;8d24	ed 5b 79 5b 	. [ y [ 
 	call sub_0f20h		;8d28	cd 20 0f 	.   . 
 	ld a,0ffh		;8d2b	3e ff 	> . 
@@ -12073,7 +12088,7 @@ l8e0bh:
 	jr l8e26h		;8e15	18 0f 	. . 
 l8e17h:
 	ld a,0f9h		;8e17	3e f9 	> . 
-	ld hl,040e4h		;8e19	21 e4 40 	! . @ 
+	ld hl,KBDBUF		;8e19	21 e4 40 	! . @ 
 	call sub_0f09h		;8e1c	cd 09 0f 	. . . 
 	ld a,0f8h		;8e1f	3e f8 	> . 
 	call sub_0f09h		;8e21	cd 09 0f 	. . . 
@@ -12131,7 +12146,7 @@ l8e82h:
 	call sub_07f9h		;8e8f	cd f9 07 	. . . 
 	cp 0ffh		;8e92	fe ff 	. . 
 	jr z,l8eafh		;8e94	28 19 	( . 
-	call SOMETHING_MEM		;8e96	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8e96	cd 1a 0f 	. . . 
 	ex de,hl			;8e99	eb 	. 
 	ld hl,05cc6h		;8e9a	21 c6 5c 	! . \ 
 	ld bc,00030h		;8e9d	01 30 00 	. 0 . 
@@ -12224,7 +12239,7 @@ l8f4ah:
 	call sub_07f9h		;8f53	cd f9 07 	. . . 
 	cp 0ffh		;8f56	fe ff 	. . 
 	jp z,l8d4bh		;8f58	ca 4b 8d 	. K . 
-	call SOMETHING_MEM		;8f5b	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8f5b	cd 1a 0f 	. . . 
 	ex de,hl			;8f5e	eb 	. 
 	ld hl,05cc6h		;8f5f	21 c6 5c 	! . \ 
 	ld bc,l0170h		;8f62	01 70 01 	. p . 
@@ -12237,7 +12252,7 @@ l8f4ah:
 	call sub_07f9h		;8f71	cd f9 07 	. . . 
 	cp 0ffh		;8f74	fe ff 	. . 
 	jr z,l8f84h		;8f76	28 0c 	( . 
-	call SOMETHING_MEM		;8f78	cd 1a 0f 	. . . 
+	call SETMEMMAP		;8f78	cd 1a 0f 	. . . 
 	ld a,(hl)			;8f7b	7e 	~ 
 l8f7ch:
 	ld (05cc3h),a		;8f7c	32 c3 5c 	2 . \ 
@@ -12262,7 +12277,7 @@ l8f90h:
 	jp z,COLD_START		;8f93	ca 00 00 	. . . 
 	cp 099h		;8f96	fe 99 	. . 
 	jr z,sub_8fa5h		;8f98	28 0b 	( . 
-	ld hl,040e4h		;8f9a	21 e4 40 	! . @ 
+	ld hl,KBDBUF		;8f9a	21 e4 40 	! . @ 
 	jp sub_0f09h		;8f9d	c3 09 0f 	. . . 
 	ld a,003h		;8fa0	3e 03 	> . 
 	ld (05cbah),a		;8fa2	32 ba 5c 	2 . \ 
@@ -12587,7 +12602,7 @@ l91fch:
 	cp 0aah		;91ff	fe aa 	. . 
 	ret nz			;9201	c0 	. 
 	ld a,003h		;9202	3e 03 	> . 
-	call SOMETHING_MEM		;9204	cd 1a 0f 	. . . 
+	call SETMEMMAP		;9204	cd 1a 0f 	. . . 
 	ld hl,(06034h)		;9207	2a 34 60 	* 4 ` 
 	ld de,(05b79h)		;920a	ed 5b 79 5b 	. [ y [ 
 	ld ix,(06036h)		;920e	dd 2a 36 60 	. * 6 ` 
@@ -12605,12 +12620,12 @@ l9224h:
 	ld a,(ix+004h)		;922c	dd 7e 04 	. ~ . 
 	cp 042h		;922f	fe 42 	. B 
 	jp nz,l9299h		;9231	c2 99 92 	. . . 
-	ld hl,(040e4h)		;9234	2a e4 40 	* . @ 
+	ld hl,(KBDBUF)		;9234	2a e4 40 	* . @ 
 	ld de,(040e6h)		;9237	ed 5b e6 40 	. [ . @ 
 	call sub_0f20h		;923b	cd 20 0f 	.   . 
 	ret nz			;923e	c0 	. 
 	ld a,0f4h		;923f	3e f4 	> . 
-	ld hl,040e4h		;9241	21 e4 40 	! . @ 
+	ld hl,KBDBUF		;9241	21 e4 40 	! . @ 
 	call sub_0f09h		;9244	cd 09 0f 	. . . 
 	ld a,0f4h		;9247	3e f4 	> . 
 	call sub_0f09h		;9249	cd 09 0f 	. . . 
@@ -12658,7 +12673,7 @@ sub_92abh:
 	ld de,04f7ah		;92ab	11 7a 4f 	. z O 
 	ld c,004h		;92ae	0e 04 	. . 
 	call sub_0f9eh		;92b0	cd 9e 0f 	. . . 
-	ld hl,040e4h		;92b3	21 e4 40 	! . @ 
+	ld hl,KBDBUF		;92b3	21 e4 40 	! . @ 
 	ld de,04f7ah		;92b6	11 7a 4f 	. z O 
 	ld b,004h		;92b9	06 04 	. . 
 l92bbh:
@@ -12950,7 +12965,7 @@ sub_949bh:
 	cp 0aah		;94b8	fe aa 	. . 
 	ret nz			;94ba	c0 	. 
 	ld a,003h		;94bb	3e 03 	> . 
-	call SOMETHING_MEM		;94bd	cd 1a 0f 	. . . 
+	call SETMEMMAP		;94bd	cd 1a 0f 	. . . 
 	ld hl,(05fa8h)		;94c0	2a a8 5f 	* . _ 
 	ld de,(05b79h)		;94c3	ed 5b 79 5b 	. [ y [ 
 	ld ix,(05faah)		;94c7	dd 2a aa 5f 	. * . _ 
@@ -13918,7 +13933,7 @@ sub_9a89h:
 	push hl			;9a89	e5 	. 
 	ld a,(05b7ch)		;9a8a	3a 7c 5b 	: | [ 
 	call sub_07f9h		;9a8d	cd f9 07 	. . . 
-	call SOMETHING_MEM		;9a90	cd 1a 0f 	. . . 
+	call SETMEMMAP		;9a90	cd 1a 0f 	. . . 
 	ld de,000b8h		;9a93	11 b8 00 	. . . 
 	dec c			;9a96	0d 	. 
 	jr z,l9a9ah		;9a97	28 01 	( . 
@@ -14052,7 +14067,7 @@ l9b75h:
 	push hl			;9b75	e5 	. 
 	ld a,(05b7ch)		;9b76	3a 7c 5b 	: | [ 
 	call sub_07f9h		;9b79	cd f9 07 	. . . 
-	call SOMETHING_MEM		;9b7c	cd 1a 0f 	. . . 
+	call SETMEMMAP		;9b7c	cd 1a 0f 	. . . 
 	push hl			;9b7f	e5 	. 
 	pop ix		;9b80	dd e1 	. . 
 	ld b,002h		;9b82	06 02 	. . 
@@ -14104,7 +14119,7 @@ l9bcah:
 	push hl			;9bca	e5 	. 
 	ld a,(05b7ch)		;9bcb	3a 7c 5b 	: | [ 
 	call sub_07f9h		;9bce	cd f9 07 	. . . 
-	call SOMETHING_MEM		;9bd1	cd 1a 0f 	. . . 
+	call SETMEMMAP		;9bd1	cd 1a 0f 	. . . 
 	push hl			;9bd4	e5 	. 
 	pop ix		;9bd5	dd e1 	. . 
 	ld b,002h		;9bd7	06 02 	. . 
@@ -14135,7 +14150,7 @@ l9c02h:
 	push de			;9c03	d5 	. 
 	ld a,(05b7ch)		;9c04	3a 7c 5b 	: | [ 
 	call sub_07f9h		;9c07	cd f9 07 	. . . 
-	call SOMETHING_MEM		;9c0a	cd 1a 0f 	. . . 
+	call SETMEMMAP		;9c0a	cd 1a 0f 	. . . 
 	pop de			;9c0d	d1 	. 
 	push hl			;9c0e	e5 	. 
 	pop ix		;9c0f	dd e1 	. . 
@@ -14511,7 +14526,7 @@ l9f18h:
 	call sub_0334h		;9f1f	cd 34 03 	. 4 . 
 	jr l9f18h		;9f22	18 f4 	. . 
 l9f24h:
-	call SOMETHING_MEM		;9f24	cd 1a 0f 	. . . 
+	call SETMEMMAP		;9f24	cd 1a 0f 	. . . 
 	ld de,00030h		;9f27	11 30 00 	. 0 . 
 	add hl,de			;9f2a	19 	. 
 	push hl			;9f2b	e5 	. 
@@ -14780,7 +14795,7 @@ la10bh:
 la123h:
 	push af			;a123	f5 	. 
 	ld a,(05bc3h)		;a124	3a c3 5b 	: . [ 
-	call SOMETHING_MEM		;a127	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a127	cd 1a 0f 	. . . 
 	pop af			;a12a	f1 	. 
 	ld hl,(05bc1h)		;a12b	2a c1 5b 	* . [ 
 	ld (hl),a			;a12e	77 	w 
@@ -14807,7 +14822,7 @@ la155h:
 	ld hl,05bb9h		;a155	21 b9 5b 	! . [ 
 	ld (hl),002h		;a158	36 02 	6 . 
 	ld a,(05bc3h)		;a15a	3a c3 5b 	: . [ 
-	call SOMETHING_MEM		;a15d	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a15d	cd 1a 0f 	. . . 
 	ld hl,(05bbdh)		;a160	2a bd 5b 	* . [ 
 	ld a,l			;a163	7d 	} 
 	or h			;a164	b4 	. 
@@ -14896,7 +14911,7 @@ la192h:
 	jr z,la21fh		;a1ea	28 33 	( 3 
 	ld (05bc3h),a		;a1ec	32 c3 5b 	2 . [ 
 	ld (05bbdh),hl		;a1ef	22 bd 5b 	" . [ 
-	call SOMETHING_MEM		;a1f2	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a1f2	cd 1a 0f 	. . . 
 	set 0,(hl)		;a1f5	cb c6 	. . 
 	ld de,00030h		;a1f7	11 30 00 	. 0 . 
 	add hl,de			;a1fa	19 	. 
@@ -15114,7 +15129,7 @@ la346h:
 	ret			;a366	c9 	. 
 la367h:
 	ld a,(05bc2h)		;a367	3a c2 5b 	: . [ 
-	call SOMETHING_MEM		;a36a	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a36a	cd 1a 0f 	. . . 
 	ld a,(05bbbh)		;a36d	3a bb 5b 	: . [ 
 	ld b,a			;a370	47 	G 
 	bit 0,(iy+000h)		;a371	fd cb 00 46 	. . . F 
@@ -15221,7 +15236,7 @@ la41ch:
 	ld hl,(05bbeh)		;a41c	2a be 5b 	* . [ 
 	call sub_07f9h		;a41f	cd f9 07 	. . . 
 	ld (05bc2h),a		;a422	32 c2 5b 	2 . [ 
-	call SOMETHING_MEM		;a425	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a425	cd 1a 0f 	. . . 
 	set 0,(hl)		;a428	cb c6 	. . 
 	ld de,00030h		;a42a	11 30 00 	. 0 . 
 	add hl,de			;a42d	19 	. 
@@ -15253,7 +15268,7 @@ la41ch:
 sub_a468h:
 	ld hl,(05bbeh)		;a468	2a be 5b 	* . [ 
 	call sub_07f9h		;a46b	cd f9 07 	. . . 
-	call SOMETHING_MEM		;a46e	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a46e	cd 1a 0f 	. . . 
 	res 0,(hl)		;a471	cb 86 	. . 
 	set 3,(hl)		;a473	cb de 	. . 
 	ld a,000h		;a475	3e 00 	> . 
@@ -15299,7 +15314,7 @@ sub_a468h:
 la4c8h:
 	push af			;a4c8	f5 	. 
 	ld a,(05be9h)		;a4c9	3a e9 5b 	: . [ 
-	call SOMETHING_MEM		;a4cc	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a4cc	cd 1a 0f 	. . . 
 	pop af			;a4cf	f1 	. 
 	ld hl,(05be7h)		;a4d0	2a e7 5b 	* . [ 
 	ld (hl),a			;a4d3	77 	w 
@@ -15370,7 +15385,7 @@ la54fh:
 	ret			;a550	c9 	. 
 sub_a551h:
 	ld a,(05be9h)		;a551	3a e9 5b 	: . [ 
-	call SOMETHING_MEM		;a554	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a554	cd 1a 0f 	. . . 
 	ld hl,(05be3h)		;a557	2a e3 5b 	* . [ 
 	res 0,(hl)		;a55a	cb 86 	. . 
 	set 3,(hl)		;a55c	cb de 	. . 
@@ -15435,7 +15450,7 @@ la5a5h:
 	jr z,la5eeh		;a5bd	28 2f 	( / 
 	ld (05be9h),a		;a5bf	32 e9 5b 	2 . [ 
 	ld (05be3h),hl		;a5c2	22 e3 5b 	" . [ 
-	call SOMETHING_MEM		;a5c5	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a5c5	cd 1a 0f 	. . . 
 	set 0,(hl)		;a5c8	cb c6 	. . 
 	ld de,00030h		;a5ca	11 30 00 	. 0 . 
 	add hl,de			;a5cd	19 	. 
@@ -15678,7 +15693,7 @@ sub_a75fh:
 	ret			;a772	c9 	. 
 sub_a773h:
 	ld (iy+00ah),a		;a773	fd 77 0a 	. w . 
-	call SOMETHING_MEM		;a776	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a776	cd 1a 0f 	. . . 
 	set 0,(hl)		;a779	cb c6 	. . 
 	ld de,0002fh		;a77b	11 2f 00 	. / . 
 	add hl,de			;a77e	19 	. 
@@ -15701,7 +15716,7 @@ la79eh:
 	jp la6e8h		;a7a1	c3 e8 a6 	. . . 
 sub_a7a4h:
 	ld a,(iy+00ah)		;a7a4	fd 7e 0a 	. ~ . 
-	call SOMETHING_MEM		;a7a7	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a7a7	cd 1a 0f 	. . . 
 	ld l,(iy+006h)		;a7aa	fd 6e 06 	. n . 
 	ld h,(iy+007h)		;a7ad	fd 66 07 	. f . 
 	ld de,0fe91h		;a7b0	11 91 fe 	. . . 
@@ -15711,7 +15726,7 @@ sub_a7a4h:
 	ret			;a7b8	c9 	. 
 la7b9h:
 	ld a,(iy+00ah)		;a7b9	fd 7e 0a 	. ~ . 
-	call SOMETHING_MEM		;a7bc	cd 1a 0f 	. . . 
+	call SETMEMMAP		;a7bc	cd 1a 0f 	. . . 
 	ld a,(05541h)		;a7bf	3a 41 55 	: A U 
 	cp 044h		;a7c2	fe 44 	. D 
 	jr nz,la7cbh		;a7c4	20 05 	  . 
@@ -16064,7 +16079,7 @@ laa38h:
 	ret			;aa4c	c9 	. 
 sub_aa4dh:
 	ld a,(iy+00ah)		;aa4d	fd 7e 0a 	. ~ . 
-	call SOMETHING_MEM		;aa50	cd 1a 0f 	. . . 
+	call SETMEMMAP		;aa50	cd 1a 0f 	. . . 
 	ld a,c			;aa53	79 	y 
 	cp 020h		;aa54	fe 20 	.   
 	ret c			;aa56	d8 	. 
@@ -16162,7 +16177,7 @@ laad2h:
 	add hl,de			;ab04	19 	. 
 lab05h:
 	ld a,(hl)			;ab05	7e 	~ 
-	call SOMETHING_MEM		;ab06	cd 1a 0f 	. . . 
+	call SETMEMMAP		;ab06	cd 1a 0f 	. . . 
 	inc hl			;ab09	23 	# 
 	ld e,(hl)			;ab0a	5e 	^ 
 	inc hl			;ab0b	23 	# 
@@ -16177,7 +16192,7 @@ lab18h:
 	ld b,a			;ab18	47 	G 
 	push bc			;ab19	c5 	. 
 	call sub_abfah		;ab1a	cd fa ab 	. . . 
-	call SOMETHING_MEM		;ab1d	cd 1a 0f 	. . . 
+	call SETMEMMAP		;ab1d	cd 1a 0f 	. . . 
 	pop bc			;ab20	c1 	. 
 	ld (hl),0c8h		;ab21	36 c8 	6 . 
 	ld hl,(06050h)		;ab23	2a 50 60 	* P ` 
@@ -16228,7 +16243,7 @@ lab6fh:
 lab79h:
 	ld (06049h),a		;ab79	32 49 60 	2 I ` 
 	call sub_abfah		;ab7c	cd fa ab 	. . . 
-	call SOMETHING_MEM		;ab7f	cd 1a 0f 	. . . 
+	call SETMEMMAP		;ab7f	cd 1a 0f 	. . . 
 	ld (06048h),a		;ab82	32 48 60 	2 H ` 
 	ld a,(hl)			;ab85	7e 	~ 
 	and 080h		;ab86	e6 80 	. . 
@@ -16269,7 +16284,7 @@ lab91h:
 sub_abcah:
 	ld hl,(06046h)		;abca	2a 46 60 	* F ` 
 	ld a,(06048h)		;abcd	3a 48 60 	: H ` 
-	call SOMETHING_MEM		;abd0	cd 1a 0f 	. . . 
+	call SETMEMMAP		;abd0	cd 1a 0f 	. . . 
 	ld a,(0604eh)		;abd3	3a 4e 60 	: N ` 
 	ld (hl),a			;abd6	77 	w 
 	inc hl			;abd7	23 	# 
@@ -16880,7 +16895,7 @@ lb02dh:
 	call sub_b05ch		;b02d	cd 5c b0 	. \ . 
 lb030h:
 	xor a			;b030	af 	. 
-	call SOMETHING_MEM		;b031	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b031	cd 1a 0f 	. . . 
 	call 0b0a5h		;b034	cd a5 b0 	. . . 
 	call sub_13c8h		;b037	cd c8 13 	. . . 
 	adc a,d			;b03a	8a 	. 
@@ -16893,14 +16908,14 @@ lb040h:
 	jr laff5h		;b044	18 af 	. . 
 	push hl			;b046	e5 	. 
 	xor a			;b047	af 	. 
-	call SOMETHING_MEM		;b048	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b048	cd 1a 0f 	. . . 
 	call sub_22f0h		;b04b	cd f0 22 	. . " 
 	call sub_2318h		;b04e	cd 18 23 	. . # 
 	pop hl			;b051	e1 	. 
 	ld de,007cfh		;b052	11 cf 07 	. . . 
 	call sub_b05ch		;b055	cd 5c b0 	. \ . 
 	xor a			;b058	af 	. 
-	jp SOMETHING_MEM		;b059	c3 1a 0f 	. . . 
+	jp SETMEMMAP		;b059	c3 1a 0f 	. . . 
 sub_b05ch:
 	ex de,hl			;b05c	eb 	. 
 	call sub_0f20h		;b05d	cd 20 0f 	.   . 
@@ -16914,7 +16929,7 @@ sub_b05ch:
 	call sub_07f9h		;b06c	cd f9 07 	. . . 
 	cp 0ffh		;b06f	fe ff 	. . 
 	jr z,lb080h		;b071	28 0d 	( . 
-	call SOMETHING_MEM		;b073	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b073	cd 1a 0f 	. . . 
 	call sub_b0b4h		;b076	cd b4 b0 	. . . 
 	pop de			;b079	d1 	. 
 	pop hl			;b07a	e1 	. 
@@ -17011,7 +17026,7 @@ lb120h:
 	call sub_b139h		;b120	cd 39 b1 	. 9 . 
 lb123h:
 	xor a			;b123	af 	. 
-	call SOMETHING_MEM		;b124	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b124	cd 1a 0f 	. . . 
 	call sub_22f0h		;b127	cd f0 22 	. . " 
 	call sub_2318h		;b12a	cd 18 23 	. . # 
 	call 0b0a5h		;b12d	cd a5 b0 	. . . 
@@ -17061,12 +17076,12 @@ lb157h:
 	ld (ix+002h),002h		;b176	dd 36 02 02 	. 6 . . 
 lb17ah:
 	ld a,(ix+000h)		;b17a	dd 7e 00 	. ~ . 
-	call SOMETHING_MEM		;b17d	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b17d	cd 1a 0f 	. . . 
 	ld de,053cch		;b180	11 cc 53 	. . S 
 	ld bc,000b8h		;b183	01 b8 00 	. . . 
 	ldir		;b186	ed b0 	. . 
 	ld a,(ix+001h)		;b188	dd 7e 01 	. ~ . 
-	call SOMETHING_MEM		;b18b	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b18b	cd 1a 0f 	. . . 
 	ex (sp),hl			;b18e	e3 	. 
 	ex de,hl			;b18f	eb 	. 
 	ld hl,053cch		;b190	21 cc 53 	! . S 
@@ -17218,7 +17233,7 @@ lb2a9h:
 	call sub_07f9h		;b2aa	cd f9 07 	. . . 
 	cp 0ffh		;b2ad	fe ff 	. . 
 	jp z,lb2d2h		;b2af	ca d2 b2 	. . . 
-	call SOMETHING_MEM		;b2b2	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b2b2	cd 1a 0f 	. . . 
 	push hl			;b2b5	e5 	. 
 	pop ix		;b2b6	dd e1 	. . 
 	ld (ix+000h),000h		;b2b8	dd 36 00 00 	. 6 . . 
@@ -18256,7 +18271,7 @@ lb991h:
 	jr lb991h		;b9a0	18 ef 	. . 
 lb9a2h:
 	ld a,003h		;b9a2	3e 03 	> . 
-	call SOMETHING_MEM		;b9a4	cd 1a 0f 	. . . 
+	call SETMEMMAP		;b9a4	cd 1a 0f 	. . . 
 	ld (05fa4h),hl		;b9a7	22 a4 5f 	" . _ 
 	call sub_bf2fh		;b9aa	cd 2f bf 	. / . 
 lb9adh:
@@ -18881,7 +18896,7 @@ lbe44h:
 	ld e,a			;be48	5f 	_ 
 	inc de			;be49	13 	. 
 	ld a,003h		;be4a	3e 03 	> . 
-	call SOMETHING_MEM		;be4c	cd 1a 0f 	. . . 
+	call SETMEMMAP		;be4c	cd 1a 0f 	. . . 
 	ld hl,(05fa4h)		;be4f	2a a4 5f 	* . _ 
 	ld a,(05cbah)		;be52	3a ba 5c 	: . \ 
 	cp 005h		;be55	fe 05 	. . 
