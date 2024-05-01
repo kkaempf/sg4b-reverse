@@ -24,7 +24,7 @@ COLD_START:
 	di
 	jp BOOT
 VERSION:
-	db 0x57			;	Version number?
+	db 0x57			;	Version number
 l0005h:
 	db 0xff
 l0006h:
