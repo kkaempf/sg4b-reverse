@@ -28930,19 +28930,7 @@ leca0h:
 	ld sp,hl			;eccc	f9 	. 
 	inc de			;eccd	13 	. 
 	ld (bc),a			;ecce	02 	. 
-	ld c,e			;eccf	4b 	K 
-	ld b,l			;ecd0	45 	E 
-	ld e,c			;ecd1	59 	Y 
-	ld b,d			;ecd2	42 	B 
-	ld c,a			;ecd3	4f 	O 
-	ld b,c			;ecd4	41 	A 
-	ld d,d			;ecd5	52 	R 
-	ld b,h			;ecd6	44 	D 
-	jr nz,led1ch		;ecd7	20 43 	  C 
-	ld d,d			;ecd9	52 	R 
-	ld b,c			;ecda	41 	A 
-	ld d,a			;ecdb	57 	W 
-	ld c,h			;ecdc	4c 	L 
+	db "KEYBOARD CRAWL" ; eccf
 	call po,02020h		;ecdd	e4 20 20 	.     
 	ld a,(bc)			;ece0	0a 	. 
 	ld a,(bc)			;ece1	0a 	. 
@@ -28960,10 +28948,8 @@ leca0h:
 	ld a,(bc)			;ecef	0a 	. 
 	ld sp,00a30h		;ecf0	31 30 0a 	1 0 . 
 	ld sp,hl			;ecf3	f9 	. 
-	ld de,05211h		;ecf4	11 11 52 	. . R 
-	ld c,a			;ecf7	4f 	O 
-	ld c,h			;ecf8	4c 	L 
-	ld c,h			;ecf9	4c 	L 
+	db 0x11,0x11
+	db "ROLL"
 	inc bc			;ecfa	03 	. 
 	dec b			;ecfb	05 	. 
 	ld (03305h),a		;ecfc	32 05 33 	2 . 3 
@@ -28993,39 +28979,12 @@ leca0h:
 led1ch:
 	ld (00a30h),a		;ed1c	32 30 0a 	2 0 . 
 	ld sp,hl			;ed1f	f9 	. 
-	ld de,04d03h		;ed20	11 03 4d 	. . M 
-	ld b,l			;ed23	45 	E 
-	ld c,l			;ed24	4d 	M 
-	ld c,a			;ed25	4f 	O 
-	ld d,d			;ed26	52 	R 
-	ld e,c			;ed27	59 	Y 
-	dec b			;ed28	05 	. 
-	dec b			;ed29	05 	. 
-	dec b			;ed2a	05 	. 
-	dec b			;ed2b	05 	. 
-	dec b			;ed2c	05 	. 
-	dec b			;ed2d	05 	. 
-	dec b			;ed2e	05 	. 
-	inc bc			;ed2f	03 	. 
-	jr z,led3ah		;ed30	28 08 	( . 
-	ld d,b			;ed32	50 	P 
-	ld c,h			;ed33	4c 	L 
-	ld b,l			;ed34	45 	E 
-	ld b,c			;ed35	41 	A 
-	ld d,e			;ed36	53 	S 
-	ld b,l			;ed37	45 	E 
-	jr nz,led8ah		;ed38	20 50 	  P 
-led3ah:
-	ld d,d			;ed3a	52 	R 
-	ld b,l			;ed3b	45 	E 
-	ld d,e			;ed3c	53 	S 
-	ld d,e			;ed3d	53 	S 
-	jr nz,led62h		;ed3e	20 22 	  " 
-	ld b,l			;ed40	45 	E 
-	ld b,h			;ed41	44 	D 
-	ld c,c			;ed42	49 	I 
-	ld d,h			;ed43	54 	T 
-	ld (00c05h),hl		;ed44	22 05 0c 	" . . 
+	db 0x11, 0x03
+	db "MEMORY"			;ed22
+	db 5,5,5,5,5,5,5,3	;ed28
+	db "(",8			;ed30
+	db "PLEASE PRESS \"EDIT\"" ; ed32
+	db 05, 0xc			; ed46
 	add hl,bc			;ed47	09 	. 
 	ld l,h			;ed48	6c 	l 
 	ld h,l			;ed49	65 	e 
@@ -29061,33 +29020,11 @@ led62h:
 	ex af,af'			;ed67	08 	. 
 	ex af,af'			;ed68	08 	. 
 	ex af,af'			;ed69	08 	. 
-	ld l,l			;ed6a	6d 	m 
-	ld h,c			;ed6b	61 	a 
-	ld l,c			;ed6c	69 	i 
-	ld l,(hl)			;ed6d	6e 	n 
-	jr nz,led74h		;ed6e	20 04 	  . 
-	ld c,l			;ed70	4d 	M 
-	ld b,c			;ed71	41 	A 
-	ld c,c			;ed72	49 	I 
-	ld c,(hl)			;ed73	4e 	N 
+	db "main "			;ed6a
+	db 4				;ed6f
+	db "MAIN"			;ed70
 led74h:
-	jr nz,ledb8h		;ed74	20 42 	  B 
-	ld c,a			;ed76	4f 	O 
-	ld b,h			;ed77	44 	D 
-	ld e,c			;ed78	59 	Y 
-	jr nz,ledcfh		;ed79	20 54 	  T 
-	ld b,l			;ed7b	45 	E 
-	ld e,b			;ed7c	58 	X 
-	ld d,h			;ed7d	54 	T 
-	jr nz,$+42		;ed7e	20 28 	  ( 
-	ld d,d			;ed80	52 	R 
-	ld b,l			;ed81	45 	E 
-	ld b,a			;ed82	47 	G 
-	ld c,c			;ed83	49 	I 
-	ld c,a			;ed84	4f 	O 
-	ld c,(hl)			;ed85	4e 	N 
-	jr nz,ledbbh		;ed86	20 33 	  3 
-	add hl,hl			;ed88	29 	) 
+	db " BODY TEXT (REGION 3)"
 	add a,h			;ed89	84 	. 
 led8ah:
 	sub (hl)			;ed8a	96 	. 
@@ -29116,23 +29053,7 @@ leda2h:
 	ei			;edab	fb 	. 
 	ld sp,ldc08h+2		;edac	31 0a dc 	1 . . 
 	inc bc			;edaf	03 	. 
-	ld d,h			;edb0	54 	T 
-	ld c,c			;edb1	49 	I 
-	ld d,h			;edb2	54 	T 
-	ld c,h			;edb3	4c 	L 
-	ld b,l			;edb4	45 	E 
-	ld d,e			;edb5	53 	S 
-	jr nz,lede0h		;edb6	20 28 	  ( 
-ledb8h:
-	ld d,d			;edb8	52 	R 
-	ld b,l			;edb9	45 	E 
-	ld b,a			;edba	47 	G 
-ledbbh:
-	ld c,c			;edbb	49 	I 
-	ld c,a			;edbc	4f 	O 
-	ld c,(hl)			;edbd	4e 	N 
-	jr nz,ledf1h		;edbe	20 31 	  1 
-	add hl,hl			;edc0	29 	) 
+	db "TITLES (REGION 1)" ; edb0
 	add a,h			;edc1	84 	. 
 	defb 0fdh,00ah,0fbh	;illegal sequence		;edc2	fd 0a fb 	. . . 
 	inc sp			;edc5	33 	3 
@@ -29152,15 +29073,7 @@ ledcfh:
 	add hl,bc			;edd2	09 	. 
 	add hl,bc			;edd3	09 	. 
 	add hl,bc			;edd4	09 	. 
-	jr nz,$+42		;edd5	20 28 	  ( 
-	ld d,d			;edd7	52 	R 
-	ld b,l			;edd8	45 	E 
-	ld b,a			;edd9	47 	G 
-	ld c,c			;edda	49 	I 
-	ld c,a			;eddb	4f 	O 
-	ld c,(hl)			;eddc	4e 	N 
-	jr nz,lee13h		;eddd	20 34 	  4 
-	add hl,hl			;eddf	29 	) 
+	db " (REGION 4)" ; edd5
 lede0h:
 	sub (hl)			;ede0	96 	. 
 	inc sp			;ede1	33 	3 
