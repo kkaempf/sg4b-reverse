@@ -1,0 +1,5 @@
+ROMs is the concatenation of U20, ZERO, U21 and U22
+
+U20 = 0x0000 0x3fff
+U21 = 0x8000 0xbfff
+U22 = 0xc000 0xffff
