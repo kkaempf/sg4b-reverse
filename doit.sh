@@ -11,7 +11,7 @@ while true; do
     pasmo --alocal rom-57.asm rom-57.bin rom-57.sys
     echo "done"
 
-    if [ -f rom.bin ]; then
+    if [ -f rom-57.bin ]; then
         if ! diff -q rom-57.bin ROMs/ROM-57.BIN; then
             echo "ERROR!"
             hexdump ROMs/ROM-57.BIN > /tmp/a.hex
