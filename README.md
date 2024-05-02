@@ -15,11 +15,11 @@ U22.BIN : ?
 
 # How to use
 
-Under linux, install ``pasmo``. Run the ``doit.sh`` script and start hacking the u20.asm file. Any discrepancy in generation will immediately be highligted in the terminal.
+Under linux, install ``pasmo``. Run the ``doit.sh`` script and start hacking the ``rom-57.asm`` file. Any discrepancy in generation will immediately be highligted in the terminal.
 
 
 
-# Generation of assembly files
+# Personal notes on the initial generation of assembly files
 
 First, generation of a simple assembly file at correct address
 Then assembly of this file to generate the correct symbol file
