@@ -1,7 +1,7 @@
 # sg4b-reverse
 Texscan MSI SpectraGen 4B ROM reverse engineering
 
-Supports reverse engineering of the Textscan MSI SpectraGen 4B ROM, to understand how to connect with it (does not aim at full reverse).
+Supports reverse engineering of the Texscan MSI SpectraGen 4B ROM version 5.7, to understand how to connect with it (does not aim at full reverse).
 
 # Texscan
 
@@ -10,8 +10,8 @@ https://cg-wiki.org/texscan_msi/sg4b
 # ROMs:
 
 U20.BIN : Main Boot ROM, 16K, mapped 0x0000 - 0x3fff
-U21.BIN : ?
-U22.BIN : ?
+U21.BIN : 16K, mapped 0x8000 - 0x7fff
+U22.BIN : Mostly data, 16K, mapped 0xc000 - 0xffff
 
 # How to use
 
