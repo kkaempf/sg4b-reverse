@@ -14,8 +14,8 @@ while true; do
     if [ -f rom-57.bin ]; then
         if ! diff -q rom-57.bin ROMs/ROM-57.BIN; then
             echo "ERROR!"
-            hexdump ROMs/ROM-57.BIN > /tmp/a.hex
-            hexdump rom-57.bin > /tmp/b.hex
+            hexdump -C ROMs/ROM-57.BIN > /tmp/a.hex
+            hexdump -C rom-57.bin > /tmp/b.hex
             # git diff -U0  --no-index --no-prefix --word-diff=plain --word-diff --word-diff-regex=. /tmp/a.hex /tmp/b.hex
             diff /tmp/a.hex /tmp/b.hex | head -10
         else
