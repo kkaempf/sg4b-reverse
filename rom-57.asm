@@ -1,5 +1,6 @@
-; z80dasm 1.2.0
-; command line: z80dasm -l -a -t -g 0 -S U20.SYM --sym-comments U20.BIN
+; TODO:
+;   Continue fixing OUTCH_INLINE call sites
+;	Replace COLD_START by 0 where appropriate (most places)
 
 ; RAM base
 RAM_BASE:	equ 0x4000
@@ -1208,7 +1209,7 @@ l083dh:
 	ld de,0c000h		;083d	11 00 c0	. . .
 l0840h:
 	pop hl			;0840	e1		.
-	call sub_0958h		;0841	cd 58 09	. X .
+	call MUL368
 	pop af			;0844	f1		.
 	add hl,de		;0845	19		.
 l0846h:
@@ -1350,7 +1351,7 @@ l08edh:
 	ld hl,(0602ch)		;0918	2a 2c 60	* , `
 	inc (hl)		;091b	34		4
 	ld a,(hl)		;091c	7e		~
-	cp 004h			;091d	fe 04		. .
+	cp 4			;091d	fe 04		. .
 	pop hl			;091f	e1		.
 	jr nc,l0941h		;0920	30 1f		0 .
 	ld hl,(05fe2h)		;0922	2a e2 5f	* . _
@@ -1380,23 +1381,26 @@ sub_094dh:
 	ld a,031h		;0952	3e 31		> 1
 	ld (05cc0h),a		;0954	32 c0 5c	2 . \
 	ret			;0957	c9		.
-sub_0958h:
-	push de			;0958	d5		.
-	ld d,h			;0959	54		T
-	ld e,l			;095a	5d		]
-	add hl,hl		;095b	29		)
-	add hl,hl		;095c	29		)
-	add hl,de		;095d	19		.
-	add hl,hl		;095e	29		)
-	add hl,de		;095f	19		.
-	add hl,hl		;0960	29		)
-	add hl,de		;0961	19		.
-	add hl,hl		;0962	29		)
-	add hl,hl		;0963	29		)
-	add hl,hl		;0964	29		)
-	add hl,hl		;0965	29		)
-	pop de			;0966	d1		.
-	ret			;0967	c9		.
+
+; Multiplies HL by 368
+MUL368:
+	push de
+	ld d,h
+	ld e,l
+	add hl,hl	; *2
+	add hl,hl	; *4
+	add hl,de	; *5
+	add hl,hl	; *10
+	add hl,de	; *11
+	add hl,hl	; *22
+	add hl,de	; *23
+	add hl,hl	; *46
+	add hl,hl	; *92
+	add hl,hl	; *184
+	add hl,hl	; *368
+	pop de
+	ret
+
 sub_0968h:
 	push bc			;0968	c5		.
 	push de			;0969	d5		.
@@ -2724,7 +2728,9 @@ l1314h:
 	pop de			;1315	d1		.
 	pop bc			;1316	c1		.
 	ret			;1317	c9		.
-sub_1318h:
+
+; Out character inlined by caller
+OUTCH_INLINE:
 	ex (sp),hl		;1318	e3		.
 	ld a,(hl)		;1319	7e		~
 	inc hl			;131a	23		#
@@ -2809,27 +2815,26 @@ l1372h:
 	inc e			;1389	1c		.
 	jr l136fh		;138a	18 e3		. .
 l138ch:
-	call sub_1318h		;138c	cd 18 13	. . .
-	rrca			;138f	0f		.
+	call OUTCH_INLINE
+	db 0x0f
 	ld a,(hl)		;1390	7e		~
 	call OUTCH		;1391	cd 84 10	. . .
 	call sub_156ch		;1394	cd 6c 15	. l .
 	ld bc,01918h		;1397	01 18 19	. . .
 l139ah:
 	ld (hl),020h		;139a	36 20		6  
-	call sub_1318h		;139c	cd 18 13	. . .
-	rrca			;139f	0f		.
-	call sub_1318h		;13a0	cd 18 13	. . .
-	jr nz,l1372h		;13a3	20 cd		  .
-	ld l,h			;13a5	6c		l
-	dec d			;13a6	15		.
+	call OUTCH_INLINE
+	db 0x0f
+	call OUTCH_INLINE
+	db ' ' 
+	call sub_156ch
 	ld bc,0fe7bh		;13a7	01 7b fe	. { .
 	ld bc,00628h		;13aa	01 28 06	. ( .
 	call sub_156ch		;13ad	cd 6c 15	. l .
 	ld bc,01d2bh		;13b0	01 2b 1d	. + .
-	call sub_1318h		;13b3	cd 18 13	. . .
-	ld c,018h		;13b6	0e 18		. .
-	or (hl)			;13b8	b6		.
+	call OUTCH_INLINE
+	db 0x0e
+	jr l136fh
 l13b9h:
 	ld a,020h		;13b9	3e 20		>  
 	cp (hl)			;13bb	be		.
@@ -2985,8 +2990,8 @@ l146ch:
 	ret			;147a	c9		.
 sub_147bh:
 	push af			;147b	f5		.
-	call sub_1318h		;147c	cd 18 13	. . .
-	rrca			;147f	0f		.
+	call OUTCH_INLINE
+	db 0x0f
 	dec d			;1480	15		.
 	jr nz,l1495h		;1481	20 12		  .
 	ld a,c			;1483	79		y
@@ -3070,12 +3075,13 @@ sub_14e5h:
 	ld a,c			;14eb	79		y
 	add a,010h		;14ec	c6 10		. .
 	ld c,a			;14ee	4f		O
-	call sub_1318h		;14ef	cd 18 13	. . .
-	rrca			;14f2	0f		.
+	call OUTCH_INLINE
+	db 0x0f
 	ld e,0feh		;14f3	1e fe		. .
 	call sub_1501h		;14f5	cd 01 15	. . .
-	call sub_1318h		;14f8	cd 18 13	. . .
-	ld c,0f1h		;14fb	0e f1		. .
+	call OUTCH_INLINE
+	db 0x0e
+	pop af
 	pop bc			;14fd	c1		.
 	pop de			;14fe	d1		.
 	ex (sp),hl		;14ff	e3		.
@@ -3102,11 +3108,12 @@ sub_1501h:
 	dec d			;1524	15		.
 	db 0x01
 	ret 
+; #### THIS IS CALLED FROM *A LOT OF PLACES* (131 callers)
 sub_1527h:
-	call sub_1318h
-	rrca			;152a	0f		.
-	call sub_1318h		;152b	cd 18 13	. . .
-	inc b			;152e	04		.
+	call OUTCH_INLINE
+	db 0x0f
+	call OUTCH_INLINE
+	db 0x04
 	ex (sp),hl		;152f	e3		.
 	push bc			;1530	c5		.
 	ld a,00bh		;1531	3e 0b		> .
@@ -3117,19 +3124,19 @@ sub_1527h:
 	ld a,009h		;1539	3e 09		> .
 	ld b,(hl)		;153b	46		F
 	inc hl			;153c	23		#
-l153dh:
 	dec b			;153d	05		.
 	call nz,sub_157ch	;153e	c4 7c 15	. | .
 	pop bc			;1541	c1		.
 	ex (sp),hl		;1542	e3		.
-	call sub_1318h		;1543	cd 18 13	. . .
-	ld c,0c9h		;1546	0e c9		. .
+	call OUTCH_INLINE
+	db 0x0e
+	ret
 sub_1548h:
-	push af			;1548	f5		.
-	call sub_1318h		;1549	cd 18 13	. . .
-	rrca			;154c	0f		.
-	call sub_1318h		;154d	cd 18 13	. . .
-	inc b			;1550	04		.
+	push af
+	call OUTCH_INLINE
+	db 0x0f
+	call OUTCH_INLINE
+	db 0x04
 	ld a,00bh		;1551	3e 0b		> .
 	dec b			;1553	05		.
 	call nz,sub_157ch	;1554	c4 7c 15	. | .
@@ -3137,9 +3144,12 @@ sub_1548h:
 	ld b,c			;1559	41		A
 	dec b			;155a	05		.
 	call nz,sub_157ch	;155b	c4 7c 15	. | .
-	call sub_1318h		;155e	cd 18 13	. . .
-	ld c,0f1h		;1561	0e f1		. .
-	ret			;1563	c9		.
+	call OUTCH_INLINE
+	db 0x0e
+	pop af
+	ret
+
+
 sub_1564h:
 	ld a,00ch		;1564	3e 0c		> .
 	jr l1572h		;1566	18 0a		. .
@@ -3421,13 +3431,13 @@ sub_1704h:
 	ld (0602eh),a		;1715	32 2e 60	2 . `
 	ret			;1718	c9		.
 	call sub_2a82h		;1719	cd 82 2a	. . *
-	call 01527h		;171c	cd 27 15	. ' .
+	call sub_1527h		;171c	cd 27 15	. ' .
 	dec b			;171f	05		.
 	ld bc,0c221h		;1720	01 21 c2	. ! .
 	ld d,e			;1723	53		S
 	ld (hl),000h		;1724	36 00		6 .
 	call sub_15b0h		;1726	cd b0 15	. . .
-	call 01527h		;1729	cd 27 15	. ' .
+	call sub_1527h		;1729	cd 27 15	. ' .
 	dec b			;172c	05		.
 	ld bc,l2bcdh		;172d	01 cd 2b	. . +
 	ld d,03ah		;1730	16 3a		. :
@@ -3678,10 +3688,9 @@ l18f7h:
 	res 1,(hl)		;18fb	cb 8e		. .
 	call sub_2295h		;18fd	cd 95 22	. . "
 	call sub_1bddh		;1900	cd dd 1b	. . .
-	call sub_1318h		;1903	cd 18 13	. . .
-	ld c,03ah		;1906	0e 3a		. :
-	halt			;1908	76		v
-	ld c,a			;1909	4f		O
+	call OUTCH_INLINE
+	db 0x0e
+	ld a,(04f76h)
 l190ah:
 	pop hl			;190a	e1		.
 	pop de			;190b	d1		.
@@ -3704,8 +3713,9 @@ l1925h:
 	call SETMEMMAP	;1926	cd 1a 0f	. . .
 	call sub_223fh		;1929	cd 3f 22	. ? "
 	call sub_1bddh		;192c	cd dd 1b	. . .
-	call sub_1318h		;192f	cd 18 13	. . .
-	ld c,0c9h		;1932	0e c9		. .
+	call OUTCH_INLINE
+	db 0x0e
+	ret
 l1934h:
 	ld hl,FLAGS		;1934	21 79 4f	! y O
 	set 1,(hl)		;1937	cb ce		. .
@@ -5102,8 +5112,8 @@ l2288h:
 	ld (04f82h),a		;228c	32 82 4f	2 . O
 	ret			;228f	c9		.
 sub_2290h:
-	call sub_1318h		;2290	cd 18 13	. . .
-	ld a,(bc)		;2293	0a		.
+	call OUTCH_INLINE
+	db "\n"
 	ret			;2294	c9		.
 sub_2295h:
 	ld bc,1		;2295	01 01 00	. . .
@@ -7682,7 +7692,7 @@ l34bdh:
 	ld (ix+003h),001h	;351e	dd 36 03 01	. 6 . .
 l3522h:
 	call 03b0ch		;3522	cd 0c 3b	. . ;
-	call 01527h		;3525	cd 27 15	. ' .
+	call sub_1527h		;3525	cd 27 15	. ' .
 	ld (bc),a		;3528	02		.
 	rrca			;3529	0f		.
 	ld a,(ix+002h)		;352a	dd 7e 02	. ~ .
@@ -7717,7 +7727,7 @@ l3555h:
 	ld (ix+002h),a		;3559	dd 77 02	. w .
 l355ch:
 	call 03b0ch		;355c	cd 0c 3b	. . ;
-	call 01527h		;355f	cd 27 15	. ' .
+	call sub_1527h		;355f	cd 27 15	. ' .
 	inc bc			;3562	03		.
 	rrca			;3563	0f		.
 	push bc			;3564	c5		.
@@ -7733,19 +7743,19 @@ l355ch:
 l3576h:
 	call sub_1431h		;3576	cd 31 14	. 1 .
 	jp 04253h		;3579	c3 53 42	. S B
-	call 01527h		;357c	cd 27 15	. ' .
+	call sub_1527h		;357c	cd 27 15	. ' .
 	inc b			;357f	04		.
 	rrca			;3580	0f		.
 	ld a,001h		;3581	3e 01		> .
 	and (ix+000h)		;3583	dd a6 00	. . .
 	call sub_3b79h		;3586	cd 79 3b	. y ;
-	call 01527h		;3589	cd 27 15	. ' .
+	call sub_1527h		;3589	cd 27 15	. ' .
 	dec b			;358c	05		.
 	rrca			;358d	0f		.
 	ld a,002h		;358e	3e 02		> .
 	and (ix+000h)		;3590	dd a6 00	. . .
 	call sub_3b79h		;3593	cd 79 3b	. y ;
-	call 01527h		;3596	cd 27 15	. ' .
+	call sub_1527h		;3596	cd 27 15	. ' .
 	ld b,00fh		;3599	06 0f		. .
 	ld a,004h		;359b	3e 04		> .
 	and (ix+000h)		;359d	dd a6 00	. . .
@@ -7859,24 +7869,24 @@ l364ch:
 	ld a,(ix+005h)		;3656	dd 7e 05	. ~ .
 	ld (ix+008h),a		;3659	dd 77 08	. w .
 l365ch:
-	call 01527h		;365c	cd 27 15	. ' .
+	call sub_1527h		;365c	cd 27 15	. ' .
 	ld a,(bc)		;365f	0a		.
 	rrca			;3660	0f		.
 	call sub_3879h		;3661	cd 79 38	. y 8
 	ld b,006h		;3664	06 06		. .
 	call sub_3866h		;3666	cd 66 38	. f 8
-	call 01527h		;3669	cd 27 15	. ' .
+	call sub_1527h		;3669	cd 27 15	. ' .
 	inc de			;366c	13		.
 	rrca			;366d	0f		.
 	ld hl,053d6h		;366e	21 d6 53	! . S
 	call 0b86dh		;3671	cd 6d b8	. m .
-	call 01527h		;3674	cd 27 15	. ' .
+	call sub_1527h		;3674	cd 27 15	. ' .
 	ld d,001h		;3677	16 01		. .
 	ld hl,053ceh		;3679	21 ce 53	! . S
 	call sub_15b0h		;367c	cd b0 15	. . .
 	ld b,000h		;367f	06 00		. .
 	call sub_3866h		;3681	cd 66 38	. f 8
-	call 01527h		;3684	cd 27 15	. ' .
+	call sub_1527h		;3684	cd 27 15	. ' .
 	ld bc,0fd0fh		;3687	01 0f fd	. . .
 	ld hl,0d161h		;368a	21 61 d1	! a .
 	ld b,(ix+003h)		;368d	dd 46 03	. F .
@@ -7916,7 +7926,7 @@ l36b2h:
 	jp nz,l3691h		;36bb	c2 91 36	. . 6
 	inc b			;36be	04		.
 	ld (ix+003h),b		;36bf	dd 70 03	. p .
-	call 01527h		;36c2	cd 27 15	. ' .
+	call sub_1527h		;36c2	cd 27 15	. ' .
 	ld (bc),a		;36c5	02		.
 	rrca			;36c6	0f		.
 	ld iy,0d183h		;36c7	fd 21 83 d1	. ! . .
@@ -7976,7 +7986,7 @@ l370ah:
 	ld (ix+002h),d		;3716	dd 72 02	. r .
 	ld b,001h		;3719	06 01		. .
 	call sub_3866h		;371b	cd 66 38	. f 8
-	call 01527h		;371e	cd 27 15	. ' .
+	call sub_1527h		;371e	cd 27 15	. ' .
 	inc bc			;3721	03		.
 	djnz l36f1h		;3722	10 cd		. .
 	call po,0c313h		;3724	e4 13 c3	. . .
@@ -7984,24 +7994,24 @@ l370ah:
 	ld b,d			;3728	42		B
 	ld b,002h		;3729	06 02		. .
 	call sub_3866h		;372b	cd 66 38	. f 8
-	call 01527h		;372e	cd 27 15	. ' .
+	call sub_1527h		;372e	cd 27 15	. ' .
 	inc b			;3731	04		.
 	rrca			;3732	0f		.
 	ld hl,053c2h		;3733	21 c2 53	! . S
 	ld b,001h		;3736	06 01		. .
 	call sub_3ae0h		;3738	cd e0 3a	. . :
-	call 01527h		;373b	cd 27 15	. ' .
+	call sub_1527h		;373b	cd 27 15	. ' .
 	dec b			;373e	05		.
 	rrca			;373f	0f		.
 	ld b,002h		;3740	06 02		. .
 	call sub_3ae0h		;3742	cd e0 3a	. . :
-	call 01527h		;3745	cd 27 15	. ' .
+	call sub_1527h		;3745	cd 27 15	. ' .
 	ld b,00fh		;3748	06 0f		. .
 	ld b,004h		;374a	06 04		. .
 	call sub_3ae0h		;374c	cd e0 3a	. . :
 	ld b,000h		;374f	06 00		. .
 	call sub_3866h		;3751	cd 66 38	. f 8
-	call 01527h		;3754	cd 27 15	. ' .
+	call sub_1527h		;3754	cd 27 15	. ' .
 	ld a,(bc)		;3757	0a		.
 	rrca			;3758	0f		.
 	ld iy,0d27ah		;3759	fd 21 7a d2	. ! z .
@@ -8074,7 +8084,7 @@ l37b5h:
 	pop bc			;37c0	c1		.
 	jp nz,l37dah		;37c1	c2 da 37	. . 7
 	ld (053c9h),a		;37c4	32 c9 53	2 . S
-	call 01527h		;37c7	cd 27 15	. ' .
+	call sub_1527h		;37c7	cd 27 15	. ' .
 	rrca			;37ca	0f		.
 	rrca			;37cb	0f		.
 	ld c,00bh		;37cc	0e 0b		. .
@@ -8089,7 +8099,7 @@ l37dah:
 	jp c,l37f1h		;37e0	da f1 37	. . 7
 	ld a,b			;37e3	78		x
 	ld (053c9h),a		;37e4	32 c9 53	2 . S
-	call 01527h		;37e7	cd 27 15	. ' .
+	call sub_1527h		;37e7	cd 27 15	. ' .
 	rrca			;37ea	0f		.
 	rrca			;37eb	0f		.
 	ld c,00bh		;37ec	0e 0b		. .
@@ -8098,7 +8108,7 @@ l37f1h:
 	call sub_38fbh		;37f1	cd fb 38	. . 8
 	ld b,000h		;37f4	06 00		. .
 	call sub_3866h		;37f6	cd 66 38	. f 8
-	call 01527h		;37f9	cd 27 15	. ' .
+	call sub_1527h		;37f9	cd 27 15	. ' .
 	rrca			;37fc	0f		.
 	rrca			;37fd	0f		.
 	ld iy,0d27ah		;37fe	fd 21 7a d2	. ! z .
@@ -8143,13 +8153,13 @@ l3827h:
 l383ah:
 	ld b,006h		;383a	06 06		. .
 	call sub_3866h		;383c	cd 66 38	. f 8
-	call 01527h		;383f	cd 27 15	. ' .
+	call sub_1527h		;383f	cd 27 15	. ' .
 	inc de			;3842	13		.
 	rrca			;3843	0f		.
 	ld hl,053d6h		;3844	21 d6 53	! . S
 	call 0b87bh		;3847	cd 7b b8	. { .
 	ld (053cch),a		;384a	32 cc 53	2 . S
-	call 01527h		;384d	cd 27 15	. ' .
+	call sub_1527h		;384d	cd 27 15	. ' .
 	ld d,001h		;3850	16 01		. .
 	ld hl,053ceh		;3852	21 ce 53	! . S
 	call sub_162bh		;3855	cd 2b 16	. + .
@@ -8162,7 +8172,7 @@ sub_3866h:
 	push iy			;3866	fd e5		. .
 	ld iy,0d194h		;3868	fd 21 94 d1	. ! . .
 	ld c,020h		;386c	0e 20		.  
-	call 01527h		;386e	cd 27 15	. ' .
+	call sub_1527h		;386e	cd 27 15	. ' .
 	add hl,de		;3871	19		.
 	ld bc,l0ccdh		;3872	01 cd 0c	. . .
 	dec sp			;3875	3b		;
@@ -8182,8 +8192,10 @@ l387eh:
 	ld (053d2h),a		;3890	32 d2 53	2 . S
 	call sub_1431h		;3893	cd 31 14	. 1 .
 	jp nc,04253h		;3896	d2 53 42	. S B
-	call sub_1318h		;3899	cd 18 13	. . .
-	ld a,(07e23h)		;389c	3a 23 7e	: # ~
+	call OUTCH_INLINE
+	db ':'
+	inc hl
+	ld a,(hl)
 	push bc			;389f	c5		.
 	ld c,a			;38a0	4f		O
 	ld b,a			;38a1	47		G
@@ -8247,7 +8259,7 @@ l38ech:
 sub_38fbh:
 	ld b,003h		;38fb	06 03		. .
 	call sub_3866h		;38fd	cd 66 38	. f 8
-	call 01527h		;3900	cd 27 15	. ' .
+	call sub_1527h		;3900	cd 27 15	. ' .
 	dec bc			;3903	0b		.
 	djnz $+35		;3904	10 21		. !
 	rst 0			;3906	c7		.
@@ -8322,7 +8334,7 @@ l3959h:
 	ld bc,0c821h		;396f	01 21 c8	. ! .
 	ld d,e			;3972	53		S
 	call sub_38c7h		;3973	cd c7 38	. . 8
-	call 01527h		;3976	cd 27 15	. ' .
+	call sub_1527h		;3976	cd 27 15	. ' .
 	djnz l398ah		;3979	10 0f		. .
 	call sub_1431h		;397b	cd 31 14	. 1 .
 	jp nc,04253h		;397e	d2 53 42	. S B
@@ -8352,7 +8364,7 @@ l399ah:
 	inc hl			;39a8	23		#
 	xor a			;39a9	af		.
 	ld (hl),a		;39aa	77		w
-	call 01527h		;39ab	cd 27 15	. ' .
+	call sub_1527h		;39ab	cd 27 15	. ' .
 	djnz l39bfh		;39ae	10 0f		. .
 	xor a			;39b0	af		.
 	ld (053d2h),a		;39b1	32 d2 53	2 . S
@@ -8379,7 +8391,7 @@ l39cbh:
 	jp z,l3a3ch		;39d2	ca 3c 3a	. < :
 	ld b,005h		;39d5	06 05		. .
 	call sub_3866h		;39d7	cd 66 38	. f 8
-	call 01527h		;39da	cd 27 15	. ' .
+	call sub_1527h		;39da	cd 27 15	. ' .
 	djnz l39efh		;39dd	10 10		. .
 	ld hl,053cah		;39df	21 ca 53	! . S
 	ld a,(hl)		;39e2	7e		~
@@ -8498,9 +8510,9 @@ l3a79h:
 	ld (hl),a		;3a87	77		w
 	call sub_156ch		;3a88	cd 6c 15	. l .
 	ld (bc),a		;3a8b	02		.
-	call sub_1318h		;3a8c	cd 18 13	. . .
-	ld a,(070cdh)		;3a8f	3a cd 70	: . p
-	dec d			;3a92	15		.
+	call OUTCH_INLINE
+	db ':'
+	call sub_1570h
 	inc bc			;3a93	03		.
 	dec hl			;3a94	2b		+
 	call sub_3b86h		;3a95	cd 86 3b	. . ;
@@ -8761,14 +8773,14 @@ l3bf2h:
 	add iy,de		;3c2d	fd 19		. .
 	ex (sp),iy		;3c2f	fd e3		. .
 	inc (iy+000h)		;3c31	fd 34 00	. 4 .
-	call sub_1318h		;3c34	cd 18 13	. . .
-	dec b			;3c37	05		.
+	call OUTCH_INLINE
+	db 0x05
 	jp l3bf2h		;3c38	c3 f2 3b	. . ;
 l3c3bh:
 	pop hl			;3c3b	e1		.
 	ld hl,COLD_START	;3c3c	21 00 00	! . .
 	ld (053c7h),hl		;3c3f	22 c7 53	" . S
-	call 01527h		;3c42	cd 27 15	. ' .
+	call sub_1527h		;3c42	cd 27 15	. ' .
 	ld b,001h		;3c45	06 01		. .
 	push iy			;3c47	fd e5		. .
 	ld iy,053c9h		;3c49	fd 21 c9 53	. ! . S
@@ -8820,8 +8832,8 @@ l3c4fh:
 	push af			;3c9b	f5		.
 	ld (053c6h),a		;3c9c	32 c6 53	2 . S
 l3c9fh:
-	call sub_1318h		;3c9f	cd 18 13	. . .
-	dec b			;3ca2	05		.
+	call OUTCH_INLINE
+	db 0x05
 	ld de,8		;3ca3	11 08 00	. . .
 	add iy,de		;3ca6	fd 19		. .
 	pop af			;3ca8	f1		.
@@ -8999,13 +9011,13 @@ l3dc6h:
 	call 097d9h		;3ddb	cd d9 97	. . .
 	jp l3e88h		;3dde	c3 88 3e	. . >
 l3de1h:
-	call 01527h		;3de1	cd 27 15	. ' .
+	call sub_1527h		;3de1	cd 27 15	. ' .
 	inc bc			;3de4	03		.
 	djnz $-49		;3de5	10 cd		. .
 	rra			;3de7	1f		.
 	inc de			;3de8	13		.
 	jp nz,04253h		;3de9	c2 53 42	. S B
-	call 01527h		;3dec	cd 27 15	. ' .
+	call sub_1527h		;3dec	cd 27 15	. ' .
 	rlca			;3def	07		.
 	djnz $+8		;3df0	10 06		. .
 	ld bc,01a11h		;3df2	01 11 1a	. . .
@@ -9647,7 +9659,7 @@ l80b1h:
 	ld h,c			;8228	61 	a 
 	push de			;8229	d5 	. 
 	cp d			;822a	ba 	. 
-	call 01527h		;822b	cd 27 15 	. ' . 
+	call sub_1527h		;822b	cd 27 15 	. ' . 
 	ld bc,02109h		;822e	01 09 21 	. . ! 
 	ld a,c			;8231	79 	y 
 	add a,d			;8232	82 	. 
@@ -10153,13 +10165,13 @@ sub_84f9h:
 	ld a,(009d6h)		;8528	3a d6 09 	: . . 
 	ld a,003h		;852b	3e 03 	> . 
 	ld (05cbah),a		;852d	32 ba 5c 	2 . \ 
-	call 01527h		;8530	cd 27 15 	. ' . 
+	call sub_1527h		;8530	cd 27 15 	. ' . 
 	dec b			;8533	05 	. 
 	ld bc,lc8cdh		;8534	01 cd c8 	. . . 
 	inc de			;8537	13 	. 
 	adc a,l			;8538	8d 	. 
 	sub 07eh		;8539	d6 7e 	. ~ 
-	call 01527h		;853b	cd 27 15 	. ' . 
+	call sub_1527h		;853b	cd 27 15 	. ' . 
 	dec b			;853e	05 	. 
 	inc c			;853f	0c 	. 
 l8540h:
@@ -10172,7 +10184,7 @@ l8540h:
 l854dh:
 	ld (053c4h),a		;854d	32 c4 53 	2 . S 
 	call OUTCH		;8550	cd 84 10 	. . . 
-	call 01527h		;8553	cd 27 15 	. ' . 
+	call sub_1527h		;8553	cd 27 15 	. ' . 
 	add hl,bc			;8556	09 	. 
 	dec b			;8557	05 	. 
 	ld hl,053c6h		;8558	21 c6 53 	! . S 
@@ -11699,7 +11711,7 @@ l907dh:
 	ld de,10		;90ae	11 0a 00 	. . . 
 	add iy,de		;90b1	fd 19 	. . 
 	djnz $-39		;90b3	10 d7 	. . 
-	call 01527h		;90b5	cd 27 15 	. ' . 
+	call sub_1527h		;90b5	cd 27 15 	. ' . 
 	ld bc,0cd17h		;90b8	01 17 cd 	. . . 
 	and a			;90bb	a7 	. 
 	rla			;90bc	17 	. 
@@ -11721,7 +11733,7 @@ l90d2h:
 l90dbh:
 	cp 00ah		;90db	fe 0a 	. . 
 	jr nz,$-35		;90dd	20 db 	  . 
-	call 01527h		;90df	cd 27 15 	. ' . 
+	call sub_1527h		;90df	cd 27 15 	. ' . 
 	inc bc			;90e2	03 	. 
 	rlca			;90e3	07 	. 
 	ld b,018h		;90e4	06 18 	. . 
@@ -11753,8 +11765,8 @@ l90feh:
 	inc b			;9118	04 	. 
 	jr l90feh		;9119	18 e3 	. . 
 l911bh:
-	call sub_1318h		;911b	cd 18 13 	. . . 
-	dec b			;911e	05 	. 
+	call OUTCH_INLINE
+	db 0x05
 	call sub_1570h		;911f	cd 70 15 	. p . 
 	ld b,011h		;9122	06 11 	. . 
 	ld a,(bc)			;9124	0a 	. 
@@ -11990,33 +12002,33 @@ l92f3h:
 	sub 02bh		;92fd	d6 2b 	. + 
 	call sub_13c8h		;92ff	cd c8 13 	. . . 
 	call z,018d6h		;9302	cc d6 18 	. . . 
-	call 01527h		;9305	cd 27 15 	. ' . 
+	call sub_1527h		;9305	cd 27 15 	. ' . 
 	djnz $+4		;9308	10 02 	. . 
 l930ah:
 	call sub_1431h		;930a	cd 31 14 	. 1 . 
 	ret nc			;930d	d0 	. 
 	ld d,e			;930e	53 	S 
 	inc b			;930f	04 	. 
-	call 01527h		;9310	cd 27 15 	. ' . 
+	call sub_1527h		;9310	cd 27 15 	. ' . 
 	djnz $+12		;9313	10 0a 	. . 
 	call sub_1431h		;9315	cd 31 14 	. 1 . 
 	jp nc,00453h		;9318	d2 53 04 	. S . 
-	call 01527h		;931b	cd 27 15 	. ' . 
+	call sub_1527h		;931b	cd 27 15 	. ' . 
 	djnz $+20		;931e	10 12 	. . 
 	call sub_1431h		;9320	cd 31 14 	. 1 . 
 	call nc,00453h		;9323	d4 53 04 	. S . 
-	call 01527h		;9326	cd 27 15 	. ' . 
+	call sub_1527h		;9326	cd 27 15 	. ' . 
 	ld a,(bc)			;9329	0a 	. 
 	rra			;932a	1f 	. 
 	ret			;932b	c9 	. 
-	call 01527h		;932c	cd 27 15 	. ' . 
+	call sub_1527h		;932c	cd 27 15 	. ' . 
 	ld a,(bc)			;932f	0a 	. 
 	rra			;9330	1f 	. 
 	call sub_131fh		;9331	cd 1f 13 	. . . 
 	rst 0			;9334	c7 	. 
 	ld d,e			;9335	53 	S 
 	ld b,d			;9336	42 	B 
-	call 01527h		;9337	cd 27 15 	. ' . 
+	call sub_1527h		;9337	cd 27 15 	. ' . 
 	dec bc			;933a	0b 	. 
 	djnz l930ah		;933b	10 cd 	. . 
 	rra			;933d	1f 	. 
@@ -12025,7 +12037,7 @@ l930ah:
 	ld d,e			;9340	53 	S 
 	ld b,(hl)			;9341	46 	F 
 l9342h:
-	call 01527h		;9342	cd 27 15 	. ' . 
+	call sub_1527h		;9342	cd 27 15 	. ' . 
 	inc c			;9345	0c 	. 
 	inc c			;9346	0c 	. 
 l9347h:
@@ -12042,18 +12054,18 @@ l9358h:
 	call OUTCH		;935b	cd 84 10 	. . . 
 	jr l9342h		;935e	18 e2 	. . 
 l9360h:
-	call 01527h		;9360	cd 27 15 	. ' . 
+	call sub_1527h		;9360	cd 27 15 	. ' . 
 	djnz l936ah		;9363	10 05 	. . 
 	call sub_13e4h		;9365	cd e4 13 	. . . 
 	ret nc			;9368	d0 	. 
 	ld d,e			;9369	53 	S 
 l936ah:
 	inc b			;936a	04 	. 
-	call 01527h		;936b	cd 27 15 	. ' . 
+	call sub_1527h		;936b	cd 27 15 	. ' . 
 	djnz $+15		;936e	10 0d 	. . 
 	call sub_13e4h		;9370	cd e4 13 	. . . 
 	jp nc,00453h		;9373	d2 53 04 	. S . 
-	call 01527h		;9376	cd 27 15 	. ' . 
+	call sub_1527h		;9376	cd 27 15 	. ' . 
 	djnz l9390h		;9379	10 15 	. . 
 	call sub_13e4h		;937b	cd e4 13 	. . . 
 	call nc,00453h		;937e	d4 53 04 	. S . 
@@ -12788,7 +12800,7 @@ sub_978dh:
 	ld a,(053dbh)		;978d	3a db 53 	: . S 
 	cp 0aah		;9790	fe aa 	. . 
 	ret nz			;9792	c0 	. 
-	call 01527h		;9793	cd 27 15 	. ' . 
+	call sub_1527h		;9793	cd 27 15 	. ' . 
 	dec d			;9796	15 	. 
 	ld bc,lc8cdh		;9797	01 cd c8 	. . . 
 	inc de			;979a	13 	. 
@@ -12796,7 +12808,7 @@ sub_978dh:
 	sub l			;979c	95 	. 
 	dec d			;979d	15 	. 
 	ld ix,053ceh		;979e	dd 21 ce 53 	. ! . S 
-	call 01527h		;97a2	cd 27 15 	. ' . 
+	call sub_1527h		;97a2	cd 27 15 	. ' . 
 	dec d			;97a5	15 	. 
 	ld d,0ddh		;97a6	16 dd 	. . 
 	ld a,(hl)			;97a8	7e 	~ 
@@ -12813,7 +12825,7 @@ l97bah:
 	cp 0aah		;97ba	fe aa 	. . 
 	ret nz			;97bc	c0 	. 
 l97bdh:
-	call 01527h		;97bd	cd 27 15 	. ' . 
+	call sub_1527h		;97bd	cd 27 15 	. ' . 
 	dec d			;97c0	15 	. 
 	ld d,006h		;97c1	16 06 	. . 
 	ld bc,0ce21h		;97c3	01 21 ce 	. ! . 
@@ -12837,7 +12849,7 @@ l97d9h:
 	and 0c7h		;97ed	e6 c7 	. . 
 	ld (053ceh),a		;97ef	32 ce 53 	2 . S 
 	call sub_2a82h		;97f2	cd 82 2a 	. . * 
-	call 01527h		;97f5	cd 27 15 	. ' . 
+	call sub_1527h		;97f5	cd 27 15 	. ' . 
 	ld bc,0cd01h		;97f8	01 01 cd 	. . . 
 	ret z			;97fb	c8 	. 
 	inc de			;97fc	13 	. 
@@ -12847,7 +12859,7 @@ l97d9h:
 	ld e,h			;9802	5c 	\ 
 	cp 005h		;9803	fe 05 	. . 
 	jr nz,l9814h		;9805	20 0d 	  . 
-	call 01527h		;9807	cd 27 15 	. ' . 
+	call sub_1527h		;9807	cd 27 15 	. ' . 
 	ld bc,lcd14h		;980a	01 14 cd 	. . . 
 	ret z			;980d	c8 	. 
 	inc de			;980e	13 	. 
@@ -12859,54 +12871,54 @@ l9814h:
 	ld a,(053ceh)		;9814	3a ce 53 	: . S 
 	or 010h		;9817	f6 10 	. . 
 	ld (053ceh),a		;9819	32 ce 53 	2 . S 
-	call 01527h		;981c	cd 27 15 	. ' . 
+	call sub_1527h		;981c	cd 27 15 	. ' . 
 	ld bc,l3a14h		;981f	01 14 3a 	. . : 
 	adc a,053h		;9822	ce 53 	. S 
 	and 010h		;9824	e6 10 	. . 
 	call sub_3b79h		;9826	cd 79 3b 	. y ; 
 l9829h:
-	call 01527h		;9829	cd 27 15 	. ' . 
+	call sub_1527h		;9829	cd 27 15 	. ' . 
 	inc bc			;982c	03 	. 
 	inc de			;982d	13 	. 
 	ld a,(053ceh)		;982e	3a ce 53 	: . S 
 	and 002h		;9831	e6 02 	. . 
 	call sub_3b79h		;9833	cd 79 3b 	. y ; 
-	call 01527h		;9836	cd 27 15 	. ' . 
+	call sub_1527h		;9836	cd 27 15 	. ' . 
 	dec b			;9839	05 	. 
 	inc e			;983a	1c 	. 
 	call sub_1431h		;983b	cd 31 14 	. 1 . 
 	rst 8			;983e	cf 	. 
 	ld d,e			;983f	53 	S 
 	ld b,c			;9840	41 	A 
-	call 01527h		;9841	cd 27 15 	. ' . 
+	call sub_1527h		;9841	cd 27 15 	. ' . 
 	ld b,019h		;9844	06 19 	. . 
 	call sub_1431h		;9846	cd 31 14 	. 1 . 
 	ret nc			;9849	d0 	. 
 	ld d,e			;984a	53 	S 
 	inc b			;984b	04 	. 
-	call 01527h		;984c	cd 27 15 	. ' . 
+	call sub_1527h		;984c	cd 27 15 	. ' . 
 	rlca			;984f	07 	. 
 	add hl,de			;9850	19 	. 
 	call sub_1431h		;9851	cd 31 14 	. 1 . 
 	jp nc,00453h		;9854	d2 53 04 	. S . 
-	call 01527h		;9857	cd 27 15 	. ' . 
+	call sub_1527h		;9857	cd 27 15 	. ' . 
 	add hl,bc			;985a	09 	. 
 	inc e			;985b	1c 	. 
 	call sub_1431h		;985c	cd 31 14 	. 1 . 
 	call nc,04153h		;985f	d4 53 41 	. S A 
-	call 01527h		;9862	cd 27 15 	. ' . 
+	call sub_1527h		;9862	cd 27 15 	. ' . 
 	ld a,(bc)			;9865	0a 	. 
 	ld d,0cdh		;9866	16 cd 	. . 
 	ld sp,0d514h		;9868	31 14 d5 	1 . . 
 	ld d,e			;986b	53 	S 
 	inc b			;986c	04 	. 
-	call 01527h		;986d	cd 27 15 	. ' . 
+	call sub_1527h		;986d	cd 27 15 	. ' . 
 	rrca			;9870	0f 	. 
 	inc d			;9871	14 	. 
 	ld a,(053ceh)		;9872	3a ce 53 	: . S 
 	and 008h		;9875	e6 08 	. . 
 	call sub_3b79h		;9877	cd 79 3b 	. y ; 
-	call 01527h		;987a	cd 27 15 	. ' . 
+	call sub_1527h		;987a	cd 27 15 	. ' . 
 	ld de,03a17h		;987d	11 17 3a 	. . : 
 	adc a,053h		;9880	ce 53 	. S 
 	and 020h		;9882	e6 20 	.   
@@ -12915,7 +12927,7 @@ l9887h:
 	ld a,(05cbah)		;9887	3a ba 5c 	: . \ 
 	cp 005h		;988a	fe 05 	. . 
 	jr z,l98a1h		;988c	28 13 	( . 
-	call 01527h		;988e	cd 27 15 	. ' . 
+	call sub_1527h		;988e	cd 27 15 	. ' . 
 	ld bc,00614h		;9891	01 14 06 	. . . 
 	djnz l98b7h		;9894	10 21 	. ! 
 	adc a,053h		;9896	ce 53 	. S 
@@ -12924,13 +12936,13 @@ l9887h:
 	and 010h		;989e	e6 10 	. . 
 	ret nz			;98a0	c0 	. 
 l98a1h:
-	call 01527h		;98a1	cd 27 15 	. ' . 
+	call sub_1527h		;98a1	cd 27 15 	. ' . 
 	inc bc			;98a4	03 	. 
 	inc de			;98a5	13 	. 
 	ld b,002h		;98a6	06 02 	. . 
 	ld hl,053ceh		;98a8	21 ce 53 	! . S 
 	call sub_3ae0h		;98ab	cd e0 3a 	. . : 
-	call 01527h		;98ae	cd 27 15 	. ' . 
+	call sub_1527h		;98ae	cd 27 15 	. ' . 
 	dec b			;98b1	05 	. 
 	inc e			;98b2	1c 	. 
 	call sub_13e4h		;98b3	cd e4 13 	. . . 
@@ -12939,13 +12951,13 @@ l98b7h:
 	ld d,e			;98b7	53 	S 
 	ld b,c			;98b8	41 	A 
 l98b9h:
-	call 01527h		;98b9	cd 27 15 	. ' . 
+	call sub_1527h		;98b9	cd 27 15 	. ' . 
 	ld b,01ch		;98bc	06 1c 	. . 
 	call sub_13e4h		;98be	cd e4 13 	. . . 
 	ret nc			;98c1	d0 	. 
 	ld d,e			;98c2	53 	S 
 	inc b			;98c3	04 	. 
-	call 01527h		;98c4	cd 27 15 	. ' . 
+	call sub_1527h		;98c4	cd 27 15 	. ' . 
 	rlca			;98c7	07 	. 
 	inc e			;98c8	1c 	. 
 	call sub_13e4h		;98c9	cd e4 13 	. . . 
@@ -12954,19 +12966,19 @@ l98b9h:
 	ld de,(053d0h)		;98d2	ed 5b d0 53 	. [ . S 
 	call sub_0f20h		;98d6	cd 20 0f 	.   . 
 	jr c,l98b9h		;98d9	38 de 	8 . 
-	call 01527h		;98db	cd 27 15 	. ' . 
+	call sub_1527h		;98db	cd 27 15 	. ' . 
 	add hl,bc			;98de	09 	. 
 	inc e			;98df	1c 	. 
 	call sub_13e4h		;98e0	cd e4 13 	. . . 
 	call nc,04153h		;98e3	d4 53 41 	. S A 
-	call 01527h		;98e6	cd 27 15 	. ' . 
+	call sub_1527h		;98e6	cd 27 15 	. ' . 
 	ld a,(bc)			;98e9	0a 	. 
 	add hl,de			;98ea	19 	. 
 	call sub_13e4h		;98eb	cd e4 13 	. . . 
 	push de			;98ee	d5 	. 
 	ld d,e			;98ef	53 	S 
 	inc b			;98f0	04 	. 
-	call 01527h		;98f1	cd 27 15 	. ' . 
+	call sub_1527h		;98f1	cd 27 15 	. ' . 
 	inc c			;98f4	0c 	. 
 	ld a,(de)			;98f5	1a 	. 
 	ld hl,053ceh		;98f6	21 ce 53 	! . S 
@@ -12975,14 +12987,14 @@ l98b9h:
 	call sub_3ae0h		;98fd	cd e0 3a 	. . : 
 	bit 2,(hl)		;9900	cb 56 	. V 
 	ret z			;9902	c8 	. 
-	call 01527h		;9903	cd 27 15 	. ' . 
+	call sub_1527h		;9903	cd 27 15 	. ' . 
 	dec c			;9906	0d 	. 
 	ld bc,lc8cdh		;9907	01 cd c8 	. . . 
 	inc de			;990a	13 	. 
 	cpl			;990b	2f 	/ 
 	sub a			;990c	97 	. 
 	rrca			;990d	0f 	. 
-	call 01527h		;990e	cd 27 15 	. ' . 
+	call sub_1527h		;990e	cd 27 15 	. ' . 
 	dec c			;9911	0d 	. 
 	djnz $+35		;9912	10 21 	. ! 
 	nop			;9914	00 	. 
@@ -12990,7 +13002,7 @@ l98b9h:
 	ld (053dch),hl		;9916	22 dc 53 	" . S 
 	call sub_1431h		;9919	cd 31 14 	. 1 . 
 	call c,00353h		;991c	dc 53 03 	. S . 
-	call 01527h		;991f	cd 27 15 	. ' . 
+	call sub_1527h		;991f	cd 27 15 	. ' . 
 	dec c			;9922	0d 	. 
 	ld (de),a			;9923	12 	. 
 	call sub_13e4h		;9924	cd e4 13 	. . . 
@@ -13010,7 +13022,7 @@ l9941h:
 	call sub_0f20h		;9948	cd 20 0f 	.   . 
 	ret nz			;994b	c0 	. 
 l994ch:
-	call 01527h		;994c	cd 27 15 	. ' . 
+	call sub_1527h		;994c	cd 27 15 	. ' . 
 	rrca			;994f	0f 	. 
 	inc d			;9950	14 	. 
 	ld b,008h		;9951	06 08 	. . 
@@ -13018,7 +13030,7 @@ l994ch:
 	call sub_3ae0h		;9956	cd e0 3a 	. . : 
 	bit 3,(hl)		;9959	cb 5e 	. ^ 
 	ret nz			;995b	c0 	. 
-	call 01527h		;995c	cd 27 15 	. ' . 
+	call sub_1527h		;995c	cd 27 15 	. ' . 
 	ld de,00617h		;995f	11 17 06 	. . . 
 	jr nz,l9985h		;9962	20 21 	  ! 
 	adc a,053h		;9964	ce 53 	. S 
@@ -13026,7 +13038,7 @@ l994ch:
 	ld a,(053ceh)		;9969	3a ce 53 	: . S 
 	and 020h		;996c	e6 20 	.   
 	ret z			;996e	c8 	. 
-	call 01527h		;996f	cd 27 15 	. ' . 
+	call sub_1527h		;996f	cd 27 15 	. ' . 
 	inc de			;9972	13 	. 
 	ld bc,lc8cdh		;9973	01 cd c8 	. . . 
 	inc de			;9976	13 	. 
@@ -13041,18 +13053,18 @@ l994ch:
 	ld d,e			;9983	53 	S 
 	inc bc			;9984	03 	. 
 l9985h:
-	call 01527h		;9985	cd 27 15 	. ' . 
+	call sub_1527h		;9985	cd 27 15 	. ' . 
 	inc d			;9988	14 	. 
 	inc de			;9989	13 	. 
 	call sub_1431h		;998a	cd 31 14 	. 1 . 
 	jp po,00353h		;998d	e2 53 03 	. S . 
-	call 01527h		;9990	cd 27 15 	. ' . 
+	call sub_1527h		;9990	cd 27 15 	. ' . 
 	inc de			;9993	13 	. 
 	ld d,0cdh		;9994	16 cd 	. . 
 	call po,0e013h		;9996	e4 13 e0 	. . . 
 	ld d,e			;9999	53 	S 
 	inc bc			;999a	03 	. 
-	call 01527h		;999b	cd 27 15 	. ' . 
+	call sub_1527h		;999b	cd 27 15 	. ' . 
 	inc d			;999e	14 	. 
 	dec d			;999f	15 	. 
 	call sub_13e4h		;99a0	cd e4 13 	. . . 
@@ -13081,7 +13093,7 @@ sub_99a7h:
 	jp nz,sub_9c4ah		;99d8	c2 4a 9c 	. J . 
 	ret			;99db	c9 	. 
 l99dch:
-	call 01527h		;99dc	cd 27 15 	. ' . 
+	call sub_1527h		;99dc	cd 27 15 	. ' . 
 	ld (bc),a			;99df	02 	. 
 	ld bc,lc8cdh		;99e0	01 cd c8 	. . . 
 	inc de			;99e3	13 	. 
@@ -13096,7 +13108,7 @@ l99dch:
 	rst 0			;99ef	c7 	. 
 	ld h,b			;99f0	60 	` 
 	inc bc			;99f1	03 	. 
-	call 01527h		;99f2	cd 27 15 	. ' . 
+	call sub_1527h		;99f2	cd 27 15 	. ' . 
 	ld (bc),a			;99f5	02 	. 
 	add hl,de			;99f6	19 	. 
 	call sub_13e4h		;99f7	cd e4 13 	. . . 
@@ -13108,7 +13120,7 @@ l99dch:
 	ld a,c			;9a03	79 	y 
 	cp 0ffh		;9a04	fe ff 	. . 
 	jr nz,l9a16h		;9a06	20 0e 	  . 
-	call 01527h		;9a08	cd 27 15 	. ' . 
+	call sub_1527h		;9a08	cd 27 15 	. ' . 
 	inc bc			;9a0b	03 	. 
 	ld bc,lc8cdh		;9a0c	01 cd c8 	. . . 
 	inc de			;9a0f	13 	. 
@@ -15615,7 +15627,7 @@ lac34h:
 	ld a,d			;ac37	7a 	z 
 	rst 10h			;ac38	d7 	. 
 	ld d,l			;ac39	55 	U 
-	call 01527h		;ac3a	cd 27 15 	. ' . 
+	call sub_1527h		;ac3a	cd 27 15 	. ' . 
 	ld bc,02616h		;ac3d	01 16 26 	. . & 
 	rlca			;ac40	07 	. 
 	call sub_3d48h		;ac41	cd 48 3d 	. H = 
@@ -15723,8 +15735,8 @@ lac5dh:
 	ld d,a			;acf2	57 	W 
 	ret c			;acf3	d8 	. 
 	ld a,(bc)			;acf4	0a 	. 
-	call sub_1318h		;acf5	cd 18 13 	. . . 
-	cpl			;acf8	2f 	/ 
+	call OUTCH_INLINE
+	db '/' 
 	call sub_13c8h		;acf9	cd c8 13 	. . . 
 	ld l,c			;acfc	69 	i 
 	ret c			;acfd	d8 	. 
@@ -15853,14 +15865,14 @@ ladf3h:
 	jr lade5h		;adf3	18 f0 	. . 
 sub_adf5h:
 	push iy		;adf5	fd e5 	. . 
-	call 01527h		;adf7	cd 27 15 	. ' . 
+	call sub_1527h		;adf7	cd 27 15 	. ' . 
 	inc bc			;adfa	03 	. 
 ladfbh:
 	ld bc,lc8cdh		;adfb	01 cd c8 	. . . 
 	inc de			;adfe	13 	. 
 	or 0d7h		;adff	f6 d7 	. . 
 	inc d			;ae01	14 	. 
-	call 01527h		;ae02	cd 27 15 	. ' . 
+	call sub_1527h		;ae02	cd 27 15 	. ' . 
 	inc b			;ae05	04 	. 
 	dec b			;ae06	05 	. 
 	call sub_aec5h		;ae07	cd c5 ae 	. . . 
@@ -15916,7 +15928,7 @@ lae5ch:
 	ld bc,068cdh		;ae62	01 cd 68 	. . h 
 	dec d			;ae65	15 	. 
 	ld bc,0e810h		;ae66	01 10 e8 	. . . 
-	call 01527h		;ae69	cd 27 15 	. ' . 
+	call sub_1527h		;ae69	cd 27 15 	. ' . 
 	inc bc			;ae6c	03 	. 
 	ld (de),a			;ae6d	12 	. 
 	ld b,c			;ae6e	41 	A 
@@ -15994,11 +16006,11 @@ sub_aed9h:
 laeefh:
 	call sub_af44h		;aeef	cd 44 af 	. D . 
 	djnz laeefh		;aef2	10 fb 	. . 
-	call 01527h		;aef4	cd 27 15 	. ' . 
+	call sub_1527h		;aef4	cd 27 15 	. ' . 
 	rrca			;aef7	0f 	. 
 	ld (bc),a			;aef8	02 	. 
-	call sub_1318h		;aef9	cd 18 13 	. . . 
-	rrca			;aefc	0f 	. 
+	call OUTCH_INLINE
+	db 0x0f 
 	call sub_13c8h		;aefd	cd c8 13 	. . . 
 	ld e,e			;af00	5b 	[ 
 	exx			;af01	d9 	. 
@@ -16016,16 +16028,16 @@ laf0eh:
 	ld h,d			;af17	62 	b 
 	exx			;af18	d9 	. 
 	ld (de),a			;af19	12 	. 
-	call 01527h		;af1a	cd 27 15 	. ' . 
+	call sub_1527h		;af1a	cd 27 15 	. ' . 
 	ld b,005h		;af1d	06 05 	. . 
-	call sub_1318h		;af1f	cd 18 13 	. . . 
+	call OUTCH_INLINE		;af1f	cd 18 13 	. . . 
 	ld c,0fdh		;af22	0e fd 	. . 
 	ld hl,05417h		;af24	21 17 54 	! . T 
 	ld b,008h		;af27	06 08 	. . 
 laf29h:
 	call sub_af7fh		;af29	cd 7f af 	.  . 
 	djnz laf29h		;af2c	10 fb 	. . 
-	call 01527h		;af2e	cd 27 15 	. ' . 
+	call sub_1527h		;af2e	cd 27 15 	. ' . 
 	rrca			;af31	0f 	. 
 	add hl,bc			;af32	09 	. 
 laf33h:
@@ -16067,7 +16079,7 @@ laf68h:
 	dec b			;af72	05 	. 
 	nop			;af73	00 	. 
 	inc b			;af74	04 	. 
-	call sub_1318h		;af75	cd 18 13 	. . . 
+	call OUTCH_INLINE		;af75	cd 18 13 	. . . 
 	dec b			;af78	05 	. 
 	ld de,00009h		;af79	11 09 00 	. . . 
 	add iy,de		;af7c	fd 19 	. . 
@@ -16114,7 +16126,7 @@ lafb8h:
 	dec b			;afc2	05 	. 
 	nop			;afc3	00 	. 
 	ld b,h			;afc4	44 	D 
-	call sub_1318h		;afc5	cd 18 13 	. . . 
+	call OUTCH_INLINE		;afc5	cd 18 13 	. . . 
 	dec b			;afc8	05 	. 
 	call sub_1570h		;afc9	cd 70 15 	. p . 
 	inc b			;afcc	04 	. 
@@ -16231,7 +16243,7 @@ lb086h:
 	ld bc,0cdc9h		;b0a3	01 c9 cd 	. . . 
 	jr lb0bbh		;b0a6	18 13 	. . 
 	inc b			;b0a8	04 	. 
-	call sub_1318h		;b0a9	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b0a9	cd 18 13 	. . . 
 	inc bc			;b0ac	03 	. 
 	ret			;b0ad	c9 	. 
 	call sub_07f9h		;b0ae	cd f9 07 	. . . 
@@ -16403,9 +16415,9 @@ lb1dfh:
 	ld (053c5h),a		;b1e7	32 c5 53 	2 . S 
 lb1eah:
 	call sub_2a82h		;b1ea	cd 82 2a 	. . * 
-	call sub_1318h		;b1ed	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b1ed	cd 18 13 	. . . 
 	rrca			;b1f0	0f 	. 
-	call 01527h		;b1f1	cd 27 15 	. ' . 
+	call sub_1527h		;b1f1	cd 27 15 	. ' . 
 	inc bc			;b1f4	03 	. 
 	ld bc,021fdh		;b1f5	01 fd 21 	. . ! 
 	jp z,0cd53h		;b1f8	ca 53 cd 	. S . 
@@ -16415,7 +16427,7 @@ lb1fdh:
 	ld a,(05b9fh)		;b1fd	3a 9f 5b 	: . [ 
 	cp 000h		;b200	fe 00 	. . 
 	jr z,$+13		;b202	28 0b 	( . 
-	call 01527h		;b204	cd 27 15 	. ' . 
+	call sub_1527h		;b204	cd 27 15 	. ' . 
 	dec b			;b207	05 	. 
 	ld bc,lc8cdh		;b208	01 cd c8 	. . . 
 	inc de			;b20b	13 	. 
@@ -16430,9 +16442,9 @@ lb218h:
 	ld bc,053c2h		;b218	01 c2 53 	. . S 
 	ld de,053ceh		;b21b	11 ce 53 	. . S 
 	call sub_b3b5h		;b21e	cd b5 b3 	. . . 
-	call sub_1318h		;b221	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b221	cd 18 13 	. . . 
 	rrca			;b224	0f 	. 
-	call sub_1318h		;b225	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b225	cd 18 13 	. . . 
 	inc b			;b228	04 	. 
 	call sub_13c8h		;b229	cd c8 13 	. . . 
 	adc a,053h		;b22c	ce 53 	. S 
@@ -16447,7 +16459,7 @@ lb218h:
 	ld b,(hl)			;b23d	46 	F 
 	ld a,009h		;b23e	3e 09 	> . 
 	call sub_157ch		;b240	cd 7c 15 	. | . 
-	call sub_1318h		;b243	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b243	cd 18 13 	. . . 
 	ld c,0cdh		;b246	0e cd 	. . 
 	and a			;b248	a7 	. 
 	rla			;b249	17 	. 
@@ -16467,7 +16479,7 @@ lb25fh:
 	inc a			;b266	3c 	< 
 	cp 008h		;b267	fe 08 	. . 
 	jr c,lb215h		;b269	38 aa 	8 . 
-	call 01527h		;b26b	cd 27 15 	. ' . 
+	call sub_1527h		;b26b	cd 27 15 	. ' . 
 	inc bc			;b26e	03 	. 
 	ld c,0cdh		;b26f	0e cd 	. . 
 	nop			;b271	00 	. 
@@ -16661,14 +16673,14 @@ sub_b3b5h:
 	call sub_2a82h		;b3bb	cd 82 2a 	. . * 
 	call sub_13c8h		;b3be	cd c8 13 	. . . 
 	ld (033dbh),a		;b3c1	32 db 33 	2 . 3 
-	call 01527h		;b3c4	cd 27 15 	. ' . 
+	call sub_1527h		;b3c4	cd 27 15 	. ' . 
 	ld bc,02615h		;b3c7	01 15 26 	. . & 
 	ld (bc),a			;b3ca	02 	. 
 	call sub_3d48h		;b3cb	cd 48 3d 	. H = 
 	ld a,l			;b3ce	7d 	} 
 	ld (05466h),a		;b3cf	32 66 54 	2 f T 
 	call sub_2a82h		;b3d2	cd 82 2a 	. . * 
-	call sub_1318h		;b3d5	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b3d5	cd 18 13 	. . . 
 	rrca			;b3d8	0f 	. 
 	ld a,(05466h)		;b3d9	3a 66 54 	: f T 
 	bit 0,a		;b3dc	cb 47 	. G 
@@ -16770,11 +16782,11 @@ lb469h:
 	inc ix		;b472	dd 23 	. # 
 	djnz lb41dh		;b474	10 a7 	. . 
 	ld (hl),0ffh		;b476	36 ff 	6 . 
-	call 01527h		;b478	cd 27 15 	. ' . 
+	call sub_1527h		;b478	cd 27 15 	. ' . 
 	ld b,001h		;b47b	06 01 	. . 
 	ld iy,053c2h		;b47d	fd 21 c2 53 	. ! . S 
 	call sub_b5e7h		;b481	cd e7 b5 	. . . 
-	call sub_1318h		;b484	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b484	cd 18 13 	. . . 
 	inc b			;b487	04 	. 
 	pop hl			;b488	e1 	. 
 	pop de			;b489	d1 	. 
@@ -16788,7 +16800,7 @@ lb48ah:
 	call OUTCH		;b494	cd 84 10 	. . . 
 	jr lb48ah		;b497	18 f1 	. . 
 lb499h:
-	call sub_1318h		;b499	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b499	cd 18 13 	. . . 
 	add hl,bc			;b49c	09 	. 
 	jr lb48ah		;b49d	18 eb 	. . 
 lb49fh:
@@ -16801,11 +16813,11 @@ lb4a0h:
 	cp 030h		;b4a6	fe 30 	. 0 
 	jr nz,lb4b0h		;b4a8	20 06 	  . 
 lb4aah:
-	call sub_1318h		;b4aa	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b4aa	cd 18 13 	. . . 
 	add hl,bc			;b4ad	09 	. 
 	jr lb4a0h		;b4ae	18 f0 	. . 
 lb4b0h:
-	call sub_1318h		;b4b0	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b4b0	cd 18 13 	. . . 
 	ld c,0d1h		;b4b3	0e d1 	. . 
 lb4b5h:
 	push hl			;b4b5	e5 	. 
@@ -16829,7 +16841,7 @@ lb4ceh:
 	jr nc,lb4b7h		;b4d4	30 e1 	0 . 
 lb4d6h:
 	ld c,a			;b4d6	4f 	O 
-	call sub_1318h		;b4d7	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b4d7	cd 18 13 	. . . 
 	rrca			;b4da	0f 	. 
 lb4dbh:
 	inc hl			;b4db	23 	# 
@@ -16863,7 +16875,7 @@ lb4f3h:
 	ld (hl),a			;b500	77 	w 
 	inc hl			;b501	23 	# 
 lb502h:
-	call sub_1318h		;b502	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b502	cd 18 13 	. . . 
 	ex af,af'			;b505	08 	. 
 	jr lb4f3h		;b506	18 eb 	. . 
 lb508h:
@@ -16891,18 +16903,18 @@ lb521h:
 	inc de			;b524	13 	. 
 	jr lb516h		;b525	18 ef 	. . 
 lb527h:
-	call sub_1318h		;b527	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b527	cd 18 13 	. . . 
 	ex af,af'			;b52a	08 	. 
-	call sub_1318h		;b52b	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b52b	cd 18 13 	. . . 
 	ld c,0d1h		;b52e	0e d1 	. . 
 	pop hl			;b530	e1 	. 
 	jp lb4b5h		;b531	c3 b5 b4 	. . . 
 lb534h:
 	pop de			;b534	d1 	. 
 	pop hl			;b535	e1 	. 
-	call sub_1318h		;b536	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b536	cd 18 13 	. . . 
 	rrca			;b539	0f 	. 
-	call sub_1318h		;b53a	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b53a	cd 18 13 	. . . 
 	add hl,bc			;b53d	09 	. 
 lb53eh:
 	inc hl			;b53e	23 	# 
@@ -16916,7 +16928,7 @@ lb53fh:
 	ld a,(hl)			;b549	7e 	~ 
 	cp 0ffh		;b54a	fe ff 	. . 
 	jp nz,lb48ah		;b54c	c2 8a b4 	. . . 
-	call 01527h		;b54f	cd 27 15 	. ' . 
+	call sub_1527h		;b54f	cd 27 15 	. ' . 
 	ld b,00eh		;b552	06 0e 	. . 
 	ld iy,053c2h		;b554	fd 21 c2 53 	. ! . S 
 	call sub_b600h		;b558	cd 00 b6 	. . . 
@@ -16996,7 +17008,7 @@ sub_b5d8h:
 	cp 030h		;b5de	fe 30 	. 0 
 	ret nz			;b5e0	c0 	. 
 lb5e1h:
-	call sub_1318h		;b5e1	cd 18 13 	. . . 
+	call OUTCH_INLINE		;b5e1	cd 18 13 	. . . 
 	ex af,af'			;b5e4	08 	. 
 	jr sub_b5d8h		;b5e5	18 f1 	. . 
 sub_b5e7h:
@@ -17043,7 +17055,7 @@ lb60bh:
 	add hl,sp			;b62a	39 	9 
 	ld a,04ch		;b62b	3e 4c 	> L 
 	ld (053c2h),a		;b62d	32 c2 53 	2 . S 
-	call 01527h		;b630	cd 27 15 	. ' . 
+	call sub_1527h		;b630	cd 27 15 	. ' . 
 	ld bc,0cd09h		;b633	01 09 cd 	. . . 
 	rra			;b636	1f 	. 
 	inc de			;b637	13 	. 
@@ -17475,7 +17487,7 @@ lb8fbh:
 	inc bc			;b90d	03 	. 
 	call sub_1431h		;b90e	cd 31 14 	. 1 . 
 	call nz,00453h		;b911	c4 53 04 	. S . 
-	call 01527h		;b914	cd 27 15 	. ' . 
+	call sub_1527h		;b914	cd 27 15 	. ' . 
 	ld b,005h		;b917	06 05 	. . 
 	call sub_13e4h		;b919	cd e4 13 	. . . 
 	jp nz,01453h		;b91c	c2 53 14 	. S . 
@@ -17570,7 +17582,7 @@ sub_b9d1h:
 	nop			;b9dc	00 	. 
 	cp 0aah		;b9dd	fe aa 	. . 
 	jr nz,$+13		;b9df	20 0b 	  . 
-	call 01527h		;b9e1	cd 27 15 	. ' . 
+	call sub_1527h		;b9e1	cd 27 15 	. ' . 
 	ex af,af'			;b9e4	08 	. 
 	inc c			;b9e5	0c 	. 
 	call sub_13c8h		;b9e6	cd c8 13 	. . . 
@@ -17579,14 +17591,14 @@ sub_b9d1h:
 	ld c,000h		;b9ed	0e 00 	. . 
 	cp 0aah		;b9ef	fe aa 	. . 
 	ret nz			;b9f1	c0 	. 
-	call 01527h		;b9f2	cd 27 15 	. ' . 
+	call sub_1527h		;b9f2	cd 27 15 	. ' . 
 	ex af,af'			;b9f5	08 	. 
 	dec d			;b9f6	15 	. 
 	call sub_13c8h		;b9f7	cd c8 13 	. . . 
 	inc h			;b9fa	24 	$ 
 	defb 0ddh,00ch,0c9h	;illegal sequence		;b9fb	dd 0c c9 	. . . 
 sub_b9feh:
-	call 01527h		;b9fe	cd 27 15 	. ' . 
+	call sub_1527h		;b9fe	cd 27 15 	. ' . 
 	ld bc,0cd08h		;ba01	01 08 cd 	. . . 
 	ld sp,la414h		;ba04	31 14 a4 	1 . . 
 	ld e,a			;ba07	5f 	_ 
@@ -17600,7 +17612,7 @@ sub_b9feh:
 lba16h:
 	ld (iy+000h),a		;ba16	fd 77 00 	. w . 
 	call OUTCH		;ba19	cd 84 10 	. . . 
-	call 01527h		;ba1c	cd 27 15 	. ' . 
+	call sub_1527h		;ba1c	cd 27 15 	. ' . 
 	inc bc			;ba1f	03 	. 
 	add hl,bc			;ba20	09 	. 
 	ld a,(iy+001h)		;ba21	fd 7e 01 	. ~ . 
@@ -17707,11 +17719,11 @@ lbae1h:
 	call OUTCH		;bae1	cd 84 10 	. . . 
 	ret			;bae4	c9 	. 
 sub_bae5h:
-	call 01527h		;bae5	cd 27 15 	. ' . 
+	call sub_1527h		;bae5	cd 27 15 	. ' . 
 	add hl,bc			;bae8	09 	. 
 	ld bc,00e0eh		;bae9	01 0e 0e 	. . . 
 	call sub_bf24h		;baec	cd 24 bf 	. $ . 
-	call 01527h		;baef	cd 27 15 	. ' . 
+	call sub_1527h		;baef	cd 27 15 	. ' . 
 	add hl,bc			;baf2	09 	. 
 	ld bc,07efdh		;baf3	01 fd 7e 	. . ~ 
 	inc b			;baf6	04 	. 
@@ -17730,14 +17742,14 @@ lbb0ah:
 lbb0eh:
 	pop de			;bb0e	d1 	. 
 	inc c			;bb0f	0c 	. 
-	call 01527h		;bb10	cd 27 15 	. ' . 
+	call sub_1527h		;bb10	cd 27 15 	. ' . 
 	dec bc			;bb13	0b 	. 
 	ld a,(bc)			;bb14	0a 	. 
 	call sub_13c8h		;bb15	cd c8 13 	. . . 
 	ld d,a			;bb18	57 	W 
 	pop de			;bb19	d1 	. 
 	ld a,(bc)			;bb1a	0a 	. 
-	call 01527h		;bb1b	cd 27 15 	. ' . 
+	call sub_1527h		;bb1b	cd 27 15 	. ' . 
 	dec c			;bb1e	0d 	. 
 	ld a,(bc)			;bb1f	0a 	. 
 	ld hl,053c7h		;bb20	21 c7 53 	! . S 
@@ -17750,7 +17762,7 @@ lbb2ch:
 	call sub_13c8h		;bb2c	cd c8 13 	. . . 
 	jr nc,lbb0eh		;bb2f	30 dd 	0 . 
 	ld d,b			;bb31	50 	P 
-	call 01527h		;bb32	cd 27 15 	. ' . 
+	call sub_1527h		;bb32	cd 27 15 	. ' . 
 	add hl,bc			;bb35	09 	. 
 	ex af,af'			;bb36	08 	. 
 	ld a,(iy+005h)		;bb37	fd 7e 05 	. ~ . 
@@ -17786,11 +17798,11 @@ lbb70h:
 lbb75h:
 	add a,030h		;bb75	c6 30 	. 0 
 	call OUTCH		;bb77	cd 84 10 	. . . 
-	call 01527h		;bb7a	cd 27 15 	. ' . 
+	call sub_1527h		;bb7a	cd 27 15 	. ' . 
 	dec c			;bb7d	0d 	. 
 	ld bc,00a0eh		;bb7e	01 0e 0a 	. . . 
 	call sub_bf24h		;bb81	cd 24 bf 	. $ . 
-	call 01527h		;bb84	cd 27 15 	. ' . 
+	call sub_1527h		;bb84	cd 27 15 	. ' . 
 	dec c			;bb87	0d 	. 
 	ld bc,07efdh		;bb88	01 fd 7e 	. . ~ 
 	dec b			;bb8b	05 	. 
@@ -17804,7 +17816,7 @@ lbb94h:
 	call sub_13c8h		;bb97	cd c8 13 	. . . 
 	add a,b			;bb9a	80 	. 
 	defb 0ddh,045h	;ld b,ixl		;bb9b	dd 45 	. E 
-	call 01527h		;bb9d	cd 27 15 	. ' . 
+	call sub_1527h		;bb9d	cd 27 15 	. ' . 
 	djnz lbbaah		;bba0	10 08 	. . 
 	push iy		;bba2	fd e5 	. . 
 	ld iy,053cah		;bba4	fd 21 ca 53 	. ! . S 
@@ -17838,13 +17850,13 @@ sub_bbcbh:
 	inc b			;bbd6	04 	. 
 	ret			;bbd7	c9 	. 
 sub_bbd8h:
-	call 01527h		;bbd8	cd 27 15 	. ' . 
+	call sub_1527h		;bbd8	cd 27 15 	. ' . 
 	dec c			;bbdb	0d 	. 
 	ld bc,lc8cdh		;bbdc	01 cd c8 	. . . 
 	inc de			;bbdf	13 	. 
 	push bc			;bbe0	c5 	. 
 	defb 0ddh,025h	;dec ixh		;bbe1	dd 25 	. % 
-	call 01527h		;bbe3	cd 27 15 	. ' . 
+	call sub_1527h		;bbe3	cd 27 15 	. ' . 
 	djnz $+10		;bbe6	10 08 	. . 
 	push iy		;bbe8	fd e5 	. . 
 	ld iy,053cah		;bbea	fd 21 ca 53 	. ! . S 
@@ -17871,7 +17883,7 @@ sub_bc13h:
 	ld b,007h		;bc16	06 07 	. . 
 	call sub_3866h		;bc18	cd 66 38 	. f 8 
 sub_bc1bh:
-	call 01527h		;bc1b	cd 27 15 	. ' . 
+	call sub_1527h		;bc1b	cd 27 15 	. ' . 
 	ld bc,0cd08h		;bc1e	01 08 cd 	. . . 
 	ld sp,la414h		;bc21	31 14 a4 	1 . . 
 	ld e,a			;bc24	5f 	_ 
@@ -17888,7 +17900,7 @@ lbc31h:
 	cp 0aah		;bc34	fe aa 	. . 
 	ret nz			;bc36	c0 	. 
 	ld hl,053c9h		;bc37	21 c9 53 	! . S 
-	call 01527h		;bc3a	cd 27 15 	. ' . 
+	call sub_1527h		;bc3a	cd 27 15 	. ' . 
 	ld a,(bc)			;bc3d	0a 	. 
 	ld bc,lb0c3h		;bc3e	01 c3 b0 	. . . 
 	dec d			;bc41	15 	. 
@@ -17896,12 +17908,12 @@ lbc42h:
 	ld a,(0000eh)		;bc42	3a 0e 00 	: . . 
 	cp 0aah		;bc45	fe aa 	. . 
 	ret nz			;bc47	c0 	. 
-	call 01527h		;bc48	cd 27 15 	. ' . 
+	call sub_1527h		;bc48	cd 27 15 	. ' . 
 	ld a,(bc)			;bc4b	0a 	. 
 	ld bc,0ccc3h		;bc4c	01 c3 cc 	. . . 
 	sub d			;bc4f	92 	. 
 sub_bc50h:
-	call 01527h		;bc50	cd 27 15 	. ' . 
+	call sub_1527h		;bc50	cd 27 15 	. ' . 
 	ld bc,02115h		;bc53	01 15 21 	. . ! 
 	jp nz,0cd53h		;bc56	c2 53 cd 	. S . 
 	and a			;bc59	a7 	. 
@@ -18061,12 +18073,12 @@ sub_bd75h:
 	jr z,lbd8fh		;bd82	28 0b 	( . 
 	cp 042h		;bd84	fe 42 	. B 
 	ret nz			;bd86	c0 	. 
-	call 01527h		;bd87	cd 27 15 	. ' . 
+	call sub_1527h		;bd87	cd 27 15 	. ' . 
 	ld a,(bc)			;bd8a	0a 	. 
 	ld bc,02cc3h		;bd8b	01 c3 2c 	. . , 
 	sub e			;bd8e	93 	. 
 lbd8fh:
-	call 01527h		;bd8f	cd 27 15 	. ' . 
+	call sub_1527h		;bd8f	cd 27 15 	. ' . 
 	ld a,(bc)			;bd92	0a 	. 
 	ld bc,0c921h		;bd93	01 21 c9 	. ! . 
 	ld d,e			;bd96	53 	S 
@@ -18074,7 +18086,7 @@ lbd8fh:
 lbd9ah:
 	ld b,006h		;bd9a	06 06 	. . 
 	call sub_3866h		;bd9c	cd 66 38 	. f 8 
-	call 01527h		;bd9f	cd 27 15 	. ' . 
+	call sub_1527h		;bd9f	cd 27 15 	. ' . 
 	dec c			;bda2	0d 	. 
 	ld a,(bc)			;bda3	0a 	. 
 	ld hl,053c8h		;bda4	21 c8 53 	! . S 
@@ -18083,7 +18095,7 @@ lbd9ah:
 	call sub_bec1h		;bdad	cd c1 be 	. . . 
 	ret			;bdb0	c9 	. 
 lbdb1h:
-	call 01527h		;bdb1	cd 27 15 	. ' . 
+	call sub_1527h		;bdb1	cd 27 15 	. ' . 
 	add hl,bc			;bdb4	09 	. 
 	ex af,af'			;bdb5	08 	. 
 	ld c,(iy+005h)		;bdb6	fd 4e 05 	. N . 
@@ -18106,7 +18118,7 @@ lbdd4h:
 	cp c			;bdd7	b9 	. 
 	ld (iy+005h),c		;bdd8	fd 71 05 	. q . 
 	call nz,sub_bae5h		;bddb	c4 e5 ba 	. . . 
-	call 01527h		;bdde	cd 27 15 	. ' . 
+	call sub_1527h		;bdde	cd 27 15 	. ' . 
 	ld a,(bc)			;bde1	0a 	. 
 	ex af,af'			;bde2	08 	. 
 lbde3h:
@@ -18142,7 +18154,7 @@ lbe21h:
 	call sub_bed4h		;be21	cd d4 be 	. . . 
 	ret			;be24	c9 	. 
 sub_be25h:
-	call 01527h		;be25	cd 27 15 	. ' . 
+	call sub_1527h		;be25	cd 27 15 	. ' . 
 	jr $+3		;be28	18 01 	. . 
 	call sub_13c8h		;be2a	cd c8 13 	. . . 
 	jp pe,012ddh		;be2d	ea dd 12 	. . . 
@@ -18193,7 +18205,7 @@ lbe76h:
 	ldir		;be89	ed b0 	. . 
 	ret			;be8b	c9 	. 
 sub_be8ch:
-	call 01527h		;be8c	cd 27 15 	. ' . 
+	call sub_1527h		;be8c	cd 27 15 	. ' . 
 	jr $+3		;be8f	18 01 	. . 
 	call sub_13c8h		;be91	cd c8 13 	. . . 
 	call m,01eddh		;be94	fc dd 1e 	. . . 
@@ -18203,7 +18215,7 @@ sub_be8ch:
 	and h			;be9e	a4 	. 
 	ld e,a			;be9f	5f 	_ 
 	inc bc			;bea0	03 	. 
-	call 01527h		;bea1	cd 27 15 	. ' . 
+	call sub_1527h		;bea1	cd 27 15 	. ' . 
 	ld bc,0c908h		;bea4	01 08 c9 	. . . 
 lbea7h:
 	call SOMETHING_KBD		;bea7	cd a7 17 	. . . 
@@ -18220,7 +18232,7 @@ lbeb7h:
 	call sub_156ch		;bebb	cd 6c 15 	. l . 
 	ld bc,0e618h		;bebe	01 18 e6 	. . . 
 sub_bec1h:
-	call 01527h		;bec1	cd 27 15 	. ' . 
+	call sub_1527h		;bec1	cd 27 15 	. ' . 
 	add hl,de			;bec4	19 	. 
 	ld bc,0203eh		;bec5	01 3e 20 	. >   
 	ld b,020h		;bec8	06 20 	.   
@@ -18234,7 +18246,7 @@ sub_beceh:
 	add hl,hl			;bed2	29 	) 
 	ret			;bed3	c9 	. 
 sub_bed4h:
-	call 01527h		;bed4	cd 27 15 	. ' . 
+	call sub_1527h		;bed4	cd 27 15 	. ' . 
 	djnz $+13		;bed7	10 0b 	. . 
 	ld a,(iy+005h)		;bed9	fd 7e 05 	. ~ . 
 	cp 046h		;bedc	fe 46 	. F 
@@ -18631,7 +18643,7 @@ sub_c21dh:
 	ld a,(CFG7)		;c21d	3a 3c 00 	: < . 
 	cp 0bbh		;c220	fe bb 	. . 
 	jr nz,$+13		;c222	20 0b 	  . 
-	call 01527h		;c224	cd 27 15 	. ' . 
+	call sub_1527h		;c224	cd 27 15 	. ' . 
 	add hl,de			;c227	19 	. 
 	ld bc,lc8cdh		;c228	01 cd c8 	. . . 
 	inc de			;c22b	13 	. 
@@ -18639,7 +18651,7 @@ sub_c21dh:
 	call nz,03e1bh		;c22d	c4 1b 3e 	. . > 
 	sbc a,b			;c230	98 	. 
 	ld (04f76h),a		;c231	32 76 4f 	2 v O 
-	call 01527h		;c234	cd 27 15 	. ' . 
+	call sub_1527h		;c234	cd 27 15 	. ' . 
 	inc bc			;c237	03 	. 
 	ld bc,lc8cdh		;c238	01 cd c8 	. . . 
 	inc de			;c23b	13 	. 
@@ -18651,13 +18663,13 @@ sub_c21dh:
 	rrca			;c243	0f 	. 
 	call sub_13c8h		;c244	cd c8 13 	. . . 
 	jp nz,00253h		;c247	c2 53 02 	. S . 
-	call 01527h		;c24a	cd 27 15 	. ' . 
+	call sub_1527h		;c24a	cd 27 15 	. ' . 
 	ld b,001h		;c24d	06 01 	. . 
 	ld iy,053c4h		;c24f	fd 21 c4 53 	. ! . S 
 	ld b,000h		;c253	06 00 	. . 
 lc255h:
 	inc b			;c255	04 	. 
-	call sub_1318h		;c256	cd 18 13 	. . . 
+	call OUTCH_INLINE		;c256	cd 18 13 	. . . 
 	dec b			;c259	05 	. 
 	call sub_1570h		;c25a	cd 70 15 	. p . 
 	inc bc			;c25d	03 	. 
@@ -18712,7 +18724,7 @@ lc26ch:
 	jp z,00453h		;c2ad	ca 53 04 	. S . 
 	ret			;c2b0	c9 	. 
 sub_c2b1h:
-	call 01527h		;c2b1	cd 27 15 	. ' . 
+	call sub_1527h		;c2b1	cd 27 15 	. ' . 
 	rrca			;c2b4	0f 	. 
 	ld e,0cdh		;c2b5	1e cd 	. . 
 	ret z			;c2b7	c8 	. 
@@ -18738,7 +18750,7 @@ sub_c2c1h:
 lc2dbh:
 	ld hl,(053cch)		;c2db	2a cc 53 	* . S 
 	ld (05426h),hl		;c2de	22 26 54 	" & T 
-	call 01527h		;c2e1	cd 27 15 	. ' . 
+	call sub_1527h		;c2e1	cd 27 15 	. ' . 
 	ld de,03a16h		;c2e4	11 16 3a 	. . : 
 	rst 10h			;c2e7	d7 	. 
 	ld d,e			;c2e8	53 	S 
@@ -18751,7 +18763,7 @@ lc2f5h:
 	ld hl,00200h		;c2f5	21 00 02 	! . . 
 	ld (053cch),hl		;c2f8	22 cc 53 	" . S 
 	push hl			;c2fb	e5 	. 
-	call 01527h		;c2fc	cd 27 15 	. ' . 
+	call sub_1527h		;c2fc	cd 27 15 	. ' . 
 	ld de,lcd13h		;c2ff	11 13 cd 	. . . 
 	ld sp,lcc14h		;c302	31 14 cc 	1 . . 
 	ld d,e			;c305	53 	S 
@@ -18780,7 +18792,7 @@ lc324h:
 	ld (053d8h),hl		;c332	22 d8 53 	" . S 
 	ld (053cah),hl		;c335	22 ca 53 	" . S 
 	ld (053cch),de		;c338	ed 53 cc 53 	. S . S 
-	call 01527h		;c33c	cd 27 15 	. ' . 
+	call sub_1527h		;c33c	cd 27 15 	. ' . 
 	inc de			;c33f	13 	. 
 	inc de			;c340	13 	. 
 	call sub_1431h		;c341	cd 31 14 	. 1 . 
