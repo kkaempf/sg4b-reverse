@@ -76,7 +76,7 @@ CFG2:
 CFG3:
 	db 0xff
 CFG4:
-	db 0xff
+	db 0xff				;	0xaa for German
 CFG5:
 	db 0xaa
 CFG6:
@@ -2231,130 +2231,56 @@ sub_0fe7h:
 	ld (iy+000h),a		;0fec	fd 77 00	. w .
 	inc iy			;0fef	fd 23		. #
 	ret			;0ff1	c9		.
-	and 03fh		;0ff2	e6 3f		. ?
-	push hl			;0ff4	e5		.
-	push de			;0ff5	d5		.
-	ld hl,l1001h		;0ff6	21 01 10	! . .
-	ld d,000h		;0ff9	16 00		. .
-	ld e,a			;0ffb	5f		_
-	add hl,de		;0ffc	19		.
-	ld a,(hl)		;0ffd	7e		~
-	pop de			;0ffe	d1		.
-	pop hl			;0fff	e1		.
-	ret			;1000	c9		.
-l1001h:
-	jr nz,$+71		;1001	20 45		  E
-	ld l,041h		;1003	2e 41		. A
-	adc a,e			;1005	8b		.
-	ld d,e			;1006	53		S
-l1007h:
-	ld c,c			;1007	49		I
-	ld d,l			;1008	55		U
-	adc a,d			;1009	8a		.
-	ld b,h			;100a	44		D
-	ld d,d			;100b	52		R
-	ld c,d			;100c	4a		J
-	ld c,(hl)		;100d	4e		N
-	ld b,(hl)		;100e	46		F
-	ld b,e			;100f	43		C
-	ld c,e			;1010	4b		K
-	ld d,h			;1011	54		T
-	ld e,d			;1012	5a		Z
-	ld c,h			;1013	4c		L
-	ld d,a			;1014	57		W
-	ld c,b			;1015	48		H
-	ld e,c			;1016	59		Y
-	ld d,b			;1017	50		P
-	ld d,c			;1018	51		Q
-	ld c,a			;1019	4f		O
-	ld b,d			;101a	42		B
-	ld b,a			;101b	47		G
-	ld h,04dh		;101c	26 4d		& M
-	ld e,b			;101e	58		X
-	ld d,(hl)		;101f	56		V
-	adc a,b			;1020	88		.
-	jr nz,$-106		;1021	20 94		  .
-	add a,h			;1023	84		.
-	sub c			;1024	91		.
-	sbc a,(hl)		;1025	9e		.
-	sub e			;1026	93		.
-	adc a,a			;1027	8f		.
-	jr nz,l0fbah		;1028	20 90		  .
-	sub d			;102a	92		.
-	sbc a,(hl)		;102b	9e		.
-	sbc a,(hl)		;102c	9e		.
-	jr nz,l0fc8h		;102d	20 99		  .
-	add a,l			;102f	85		.
-	sbc a,(hl)		;1030	9e		.
-	sbc a,d			;1031	9a		.
-	adc a,l			;1032	8d		.
-	add a,(hl)		;1033	86		.
-	sub (hl)		;1034	96		.
-	adc a,c			;1035	89		.
-	adc a,(hl)		;1036	8e		.
-	add a,a			;1037	87		.
-	sbc a,b			;1038	98		.
-	sbc a,h			;1039	9c		.
-	sub a			;103a	97		.
-	sub l			;103b	95		.
-	add a,c			;103c	81		.
-	adc a,h			;103d	8c		.
-	add a,d			;103e	82		.
-	add a,e			;103f	83		.
-	jr nz,l1007h		;1040	20 c5		  .
-	push hl			;1042	e5		.
-	ld b,a			;1043	47		G
-	ld a,(CFG4)		;1044	3a 0b 00	: . .
-	cp 0aah			;1047	fe aa		. .
-	ld a,b			;1049	78		x
-	jr nz,l105bh		;104a	20 0f		  .
-	ld b,013h		;104c	06 13		. .
-	ld hl,l105eh		;104e	21 5e 10	! ^ .
-l1051h:
-	cp (hl)			;1051	be		.
-	inc hl			;1052	23		#
-	jr z,l105ah		;1053	28 05		( .
-	inc hl			;1055	23		#
-	djnz l1051h		;1056	10 f9		. .
-	jr l105bh		;1058	18 01		. .
-l105ah:
-	ld a,(hl)		;105a	7e		~
-l105bh:
-	pop hl			;105b	e1		.
-	pop bc			;105c	c1		.
-	ret			;105d	c9		.
-l105eh:
-	ld hl,(l2b5bh)		;105e	2a 5b 2b	* [ +
-	ld e,h			;1061	5c		\
-	ld a,(03b7bh)		;1062	3a 7b 3b	: { ;
-	ld a,h			;1065	7c		|
-	inc a			;1066	3c		<
-	dec sp			;1067	3b		;
-	ld a,03ah		;1068	3e 3a		> :
-	ld b,b			;106a	40		@
-	ld hl,(05a59h)		;106b	2a 59 5a	* Y Z
-	ld e,d			;106e	5a		Z
-	ld e,c			;106f	59		Y
-	ld e,e			;1070	5b		[
-	ld e,l			;1071	5d		]
-	ld e,h			;1072	5c		\
-	ld h,b			;1073	60		`
-	ld e,l			;1074	5d		]
-	ld b,b			;1075	40		@
-	ld h,b			;1076	60		`
-	dec hl			;1077	2b		+
-	ld a,c			;1078	79		y
-	ld a,d			;1079	7a		z
-	ld a,d			;107a	7a		z
-	ld a,c			;107b	79		y
-	ld a,e			;107c	7b		{
-	ld a,l			;107d	7d		}
-	ld a,h			;107e	7c		|
-	inc a			;107f	3c		<
-	ld a,l			;1080	7d		}
-	ld a,(hl)		;1081	7e		~
-	ld a,(hl)		;1082	7e		~
-	db 0x3e
+
+; Find char corresponding to key (probably)
+KEY2CHAR:
+	and 0x3f
+	push hl
+	push de
+	ld hl,KEYTABLE
+	ld d,0
+	ld e,a
+	add hl,de
+	ld a,(hl)
+	pop de
+	pop hl
+	ret
+
+; Looks like the key to char table for the keyboard
+KEYTABLE:
+	db " E.A", 0x8b, "SIU", 0x8a
+	db "DRJNFCKTZLWHYPQOBG&MXV", 0x88, 0x20
+	db 0x94, 0x84, 0x91, 0x9e, 0x93, 0x8f, 0x20, 0x90
+	db 0x92, 0x9e, 0x9e, 0x20, 0x99, 0x85, 0x9e, 0x9a 
+	db 0x8d, 0x86, 0x96, 0x89, 0x8e, 0x87, 0x98, 0x9c
+	db 0x97, 0x95, 0x81, 0x8c, 0x82, 0x83, 0x20, 0xc5
+
+; FReD : to do, find the call site (ld b,d + djnz xxx)
+	push hl
+	ld b,a
+	ld a,(CFG4)
+	cp 0xaa
+	ld a,b
+	jr nz,_skiptranslate
+	ld b,19
+	ld hl,EN2DE
+_loop:
+	cp (hl)
+	inc hl
+	jr z,_notfound
+	inc hl
+	djnz _loop
+	jr _skiptranslate
+_notfound:
+	ld a,(hl)
+_skiptranslate:
+	pop hl
+	pop bc
+	ret
+
+; English to German key translation table
+EN2DE:
+	db "*[+\\:{;|<;>:@*YZZY[]\\`]@`+yzzy{}|<}~~>"
 ; Output characters from A
 ; Chars 0 to 15 are mapped to function from JTABLE
 ; Chars 16 to 31 are ignored
@@ -15504,7 +15430,7 @@ laacch:
 	ld a,b			;aacc	78 	x 
 	jr laad2h		;aacd	18 03 	. . 
 laacfh:
-	call 00ff2h		;aacf	cd f2 0f 	. . . 
+	call KEY2CHAR		;aacf	cd f2 0f 	. . . 
 laad2h:
 	ld b,005h		;aad2	06 05 	. . 
 	call sub_1ae6h		;aad4	cd e6 1a 	. . . 
