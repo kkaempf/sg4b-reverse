@@ -1,5 +1,6 @@
 ; TODO:
-;	Move all inline to macros
+;	Find all inlines ( ex (sp),hl )
+;	Replace all calls to OUT_MSG_INLINE with M_OUT_MSG
 ; 0xc5f3 is a date/time function
 ; 0xc60b just below it pushes date/time/month strings from data into stack locations? 
 ; 0xc5cb is another date/time (RTC setup?) function
@@ -69,13 +70,18 @@ KEYMACRO: equ 0x5bb0
 
 
 ; Some macros to call functions that have inlined arguments
-MACRO MCALL_WITH_MMAP0, ADRS
-	call CALL_WITH_MMAP0
+MACRO M_CALL_WITH_MMAP0, ADRS
+	call CALL_WITH_MMAP0_INLINE
 	dw ADRS
 ENDM
-MACRO MOUTCH_INLINE, CHAR
-	call OUTCH_INLINE
+MACRO M_OUT_CH, CHAR
+	call OUT_CH_INLINE
 	db CHAR
+ENDM
+MACRO M_OUT_MSG, MSG, LEN
+	call OUT_MSG_INLINE
+	dw MSG
+	db LEN
 ENDM
 
 	; ---------------------------------------
@@ -369,7 +375,7 @@ INTER_86:
 INTER_DEFAULT:
 	exx			;0182	d9		.
 	push af			;0183	f5		.
-	MCALL_WITH_MMAP0 INIT
+	M_CALL_WITH_MMAP0 INIT
 	pop af			;0189	f1		.
 	exx			;018a	d9		.
 	ei			;018b	fb		.
@@ -476,7 +482,7 @@ l0230h:
 ; Warm boot
 WARM_BOOT:
 	ld sp,STACK_BASE	;0258	31 ad 52	1 . R
-	MCALL_WITH_MMAP0 INIT
+	M_CALL_WITH_MMAP0 INIT
 
 	;	Init FIFO bffers
 	ld hl,FIFO_BUF_SERIAL
@@ -1516,7 +1522,7 @@ l0997h:
 	ld (05b87h),a		;099d	32 87 5b	2 . [
 	ld c,000h		;09a0	0e 00		. .
 	ld de,0x2c		;09a2	11 2c 00	. , .
-	MCALL_WITH_MMAP0 sub_c0e5h
+	M_CALL_WITH_MMAP0 sub_c0e5h
 	ld de,20		;09aa	11 14 00	. . .
 	add hl,de		;09ad	19		.
 	pop de			;09ae	d1		.
@@ -1525,7 +1531,7 @@ l0997h:
 
 ; Call the inlined address with cleared memory map, then restores the map and returns 
 ; Non-reentrant
-CALL_WITH_MMAP0:
+CALL_WITH_MMAP0_INLINE:
 		; Save registers and MAP
 	ld (CALLMAPSAVE_A),a
 	ld (CALLMAPSAVE_DE),de
@@ -2304,9 +2310,10 @@ _skiptranslate:
 	pop bc
 	ret
 
-; English to German key translation table
+; English to German key translation table for keyboard input
 EN2DE:
 	db "*[+\\:{;|<;>:@*YZZY[]\\`]@`+yzzy{}|<}~~>"
+
 ; Output characters from A
 ; Chars 0 to 15 are mapped to function from JTABLE
 ; Chars 16 to 31 are ignored
@@ -2318,7 +2325,7 @@ OUTCH:
 	ret nz			; Aborts if FLAG_DISP is not set
 	cp ' '  
 	jr nc,OUTPRNT
-	cp 010h
+	cp 0x10
 	ret nc 			; > 0x10-0x1f => aborts
 	ld (TMPHL),hl
 
@@ -2437,7 +2444,7 @@ _loop:
 	pop bc
 	ret
 
-; Complicated. Finds the Ath position in HL where bit 5 is set, looking at every 67 bytes. Returns this location plus 43 or 88
+; Complicated. Finds the Ath position from 04159h where bit 5 is set, looking at every 67 bytes. Returns this location plus 43 or 88
 ; Looks at at most 26 values
 ; => It looks to me that there are 26 control blocs of 67 bytes. Bit 5 is some sort of flag.
 sub_112fh:
@@ -2487,6 +2494,7 @@ TARGET10:
 	pop hl			;1173	e1		.
 	pop af			;1174	f1		.
 	ret			;1175	c9		.
+
 TARGET4:
 	push af			;1176	f5		.
 	push hl			;1177	e5		.
@@ -2503,6 +2511,7 @@ TARGET4:
 	pop hl			;118e	e1		.
 	pop af			;118f	f1		.
 	ret			;1190	c9		.
+
 sub_1191h:
 	ld a,(05b6dh)		;1191	3a 6d 5b	: m [
 	or a			;1194	b7		.
@@ -2511,6 +2520,7 @@ sub_1191h:
 	or 03fh			;1197	f6 3f		. ?
 	ld (hl),a		;1199	77		w
 	ret			;119a	c9		.
+
 TARGET9:
 	push af			;119b	f5		.
 	push hl			;119c	e5		.
@@ -2530,6 +2540,7 @@ TARGET9:
 	pop hl			;11b8	e1		.
 	pop af			;11b9	f1		.
 	ret			;11ba	c9		.
+
 TARGET8:
 	push af			;11bb	f5		.
 	push hl			;11bc	e5		.
@@ -2560,6 +2571,7 @@ l11ebh:
 	pop hl			;11eb	e1		.
 	pop af			;11ec	f1		.
 	ret			;11ed	c9		.
+
 TARGET12:
 	push af			;11ee	f5		.
 	push bc			;11ef	c5		.
@@ -2604,6 +2616,7 @@ l1234h:
 	pop bc			;1236	c1		.
 	pop af			;1237	f1		.
 	ret			;1238	c9		.
+
 TARGET11:
 	push af			;1239	f5		.
 	push bc			;123a	c5		.
@@ -2646,6 +2659,8 @@ l127bh:
 	pop bc			;127d	c1		.
 	pop af			;127e	f1		.
 	ret			;127f	c9		.
+
+; Dead code?
 	ld a,(05fb6h)		;1280	3a b6 5f	: . _
 	xor 0ffh		;1283	ee ff		. .
 	ld (05fb6h),a		;1285	32 b6 5f	2 . _
@@ -2676,6 +2691,7 @@ TARGET15:
 	ld (05b6dh),a		;12ac	32 6d 5b	2 m [
 	pop af			;12af	f1		.
 	ret			;12b0	c9		.
+
 TARGET5:	; new line?
 	push af			;12b1	f5		.
 	push hl			;12b2	e5		.
@@ -2690,6 +2706,7 @@ TARGET5:	; new line?
 	pop hl			;12c5	e1		.
 	pop af			;12c6	f1		.
 	ret			;12c7	c9		.
+
 TARGET3:
 	push af			;12c8	f5		.
 	push bc			;12c9	c5		.
@@ -2748,7 +2765,7 @@ l1314h:
 	ret			;1317	c9		.
 
 ; Out character inlined by caller
-OUTCH_INLINE:
+OUT_CH_INLINE:
 	ex (sp),hl		;1318	e3		.
 	ld a,(hl)		;1319	7e		~
 	inc hl			;131a	23		#
@@ -2834,21 +2851,21 @@ l1372h:
 	inc e			;1389	1c		.
 	jr l136fh		;138a	18 e3		. .
 l138ch:
-	MOUTCH_INLINE 0x0f
+	M_OUT_CH 0x0f
 	ld a,(hl)		;1390	7e		~
 	call OUTCH		;1391	cd 84 10	. . .
 	call sub_156ch		;1394	cd 6c 15	. l .
 	ld bc,01918h		;1397	01 18 19	. . .
 l139ah:
 	ld (hl),020h		;139a	36 20		6  
-	MOUTCH_INLINE 0x0f
-	MOUTCH_INLINE ' ' 
+	M_OUT_CH 0x0f
+	M_OUT_CH ' ' 
 	call sub_156ch
 	ld bc,0fe7bh		;13a7	01 7b fe	. { .
 	ld bc,00628h		;13aa	01 28 06	. ( .
 	call sub_156ch		;13ad	cd 6c 15	. l .
 	ld bc,01d2bh		;13b0	01 2b 1d	. + .
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	jr l136fh
 l13b9h:
 	ld a,020h		;13b9	3e 20		>  
@@ -2872,7 +2889,7 @@ OUT_MSG_INLINE:
 	push af
 	call GET_MSG_AND_LEN	; extract arguments from code at HL
 	push de					; DE is the place where we need to jump back (HL+3)
-	MCALL_WITH_MMAP0 OUTSTR
+	M_CALL_WITH_MMAP0 OUTSTR
 	pop hl
 	pop af
 	pop bc
@@ -3018,7 +3035,7 @@ l146ch:
 	ret			;147a	c9		.
 sub_147bh:
 	push af			;147b	f5		.
-	MOUTCH_INLINE 0x0f
+	M_OUT_CH 0x0f
 	dec d			;1480	15		.
 	jr nz,l1495h		;1481	20 12		  .
 	ld a,c			;1483	79		y
@@ -3102,10 +3119,10 @@ sub_14e5h:
 	ld a,c			;14eb	79		y
 	add a,010h		;14ec	c6 10		. .
 	ld c,a			;14ee	4f		O
-	MOUTCH_INLINE 0x0f
+	M_OUT_CH 0x0f
 	ld e,0feh		;14f3	1e fe		. .
 	call sub_1501h		;14f5	cd 01 15	. . .
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	pop af
 	pop bc			;14fd	c1		.
 	pop de			;14fe	d1		.
@@ -3135,8 +3152,8 @@ sub_1501h:
 	ret 
 ; #### THIS IS CALLED FROM *A LOT OF PLACES* (131 callers)
 sub_1527h:
-	MOUTCH_INLINE 0x0f
-	MOUTCH_INLINE 0x04
+	M_OUT_CH 0x0f
+	M_OUT_CH 0x04
 	ex (sp),hl		;152f	e3		.
 	push bc			;1530	c5		.
 	ld a,00bh		;1531	3e 0b		> .
@@ -3151,12 +3168,12 @@ sub_1527h:
 	call nz,sub_157ch	;153e	c4 7c 15	. | .
 	pop bc			;1541	c1		.
 	ex (sp),hl		;1542	e3		.
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	ret
 sub_1548h:
 	push af
-	MOUTCH_INLINE 0x0f
-	MOUTCH_INLINE 0x04
+	M_OUT_CH 0x0f
+	M_OUT_CH 0x04
 	ld a,00bh		;1551	3e 0b		> .
 	dec b			;1553	05		.
 	call nz,sub_157ch	;1554	c4 7c 15	. | .
@@ -3164,7 +3181,7 @@ sub_1548h:
 	ld b,c			;1559	41		A
 	dec b			;155a	05		.
 	call nz,sub_157ch	;155b	c4 7c 15	. | .
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	pop af
 	ret
 
@@ -3231,9 +3248,7 @@ sub_15b0h:
 	ret nz			;15b5	c0		.
 	push bc			;15b6	c5		.
 	push iy			;15b7	fd e5		. .
-	call OUT_MSG_INLINE		;15b9	cd c8 13	. . .
-	dw MSG_TAPE
-	db 26
+	M_OUT_MSG MSG_TAPE,26
 	ld a,(hl)		;15bf	7e		~
 	push af			;15c0	f5		.
 	or a			;15c1	b7		.
@@ -3712,7 +3727,7 @@ l18f7h:
 	res 1,(hl)		;18fb	cb 8e		. .
 	call sub_2295h		;18fd	cd 95 22	. . "
 	call sub_1bddh		;1900	cd dd 1b	. . .
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	ld a,(04f76h)
 l190ah:
 	pop hl			;190a	e1		.
@@ -3736,7 +3751,7 @@ l1925h:
 	call SETMEMMAP	;1926	cd 1a 0f	. . .
 	call sub_223fh		;1929	cd 3f 22	. ? "
 	call sub_1bddh		;192c	cd dd 1b	. . .
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	ret
 l1934h:
 	ld hl,FLAGS		;1934	21 79 4f	! y O
@@ -5134,7 +5149,7 @@ l2288h:
 	ld (04f82h),a		;228c	32 82 4f	2 . O
 	ret			;228f	c9		.
 sub_2290h:
-	MOUTCH_INLINE "\n"
+	M_OUT_CH "\n"
 	ret			;2294	c9		.
 sub_2295h:
 	ld bc,1		;2295	01 01 00	. . .
@@ -8213,7 +8228,7 @@ l387eh:
 	ld (053d2h),a		;3890	32 d2 53	2 . S
 	call sub_1431h		;3893	cd 31 14	. 1 .
 	jp nc,04253h		;3896	d2 53 42	. S B
-	MOUTCH_INLINE ':'
+	M_OUT_CH ':'
 	inc hl
 	ld a,(hl)
 	push bc			;389f	c5		.
@@ -8530,7 +8545,7 @@ l3a79h:
 	ld (hl),a		;3a87	77		w
 	call sub_156ch		;3a88	cd 6c 15	. l .
 	ld (bc),a		;3a8b	02		.
-	MOUTCH_INLINE ':'
+	M_OUT_CH ':'
 	call sub_1570h
 	inc bc			;3a93	03		.
 	dec hl			;3a94	2b		+
@@ -8792,7 +8807,7 @@ l3bf2h:
 	add iy,de		;3c2d	fd 19		. .
 	ex (sp),iy		;3c2f	fd e3		. .
 	inc (iy+000h)		;3c31	fd 34 00	. 4 .
-	MOUTCH_INLINE 0x05
+	M_OUT_CH 0x05
 	jp l3bf2h		;3c38	c3 f2 3b	. . ;
 l3c3bh:
 	pop hl			;3c3b	e1		.
@@ -8850,7 +8865,7 @@ l3c4fh:
 	push af			;3c9b	f5		.
 	ld (053c6h),a		;3c9c	32 c6 53	2 . S
 l3c9fh:
-	MOUTCH_INLINE 0x05
+	M_OUT_CH 0x05
 	ld de,8		;3ca3	11 08 00	. . .
 	add iy,de		;3ca6	fd 19		. .
 	pop af			;3ca8	f1		.
@@ -9017,7 +9032,7 @@ l3dbbh:
 	ldir			;3dc4	ed b0		. .
 l3dc6h:
 	call sub_2a82h		;3dc6	cd 82 2a	. . *
-	MCALL_WITH_MMAP0 sub_c21dh
+	M_CALL_WITH_MMAP0 sub_c21dh
 	call sub_978dh
 	call sub_1527h		;3dd1	cd 27 15	. ' .
 	ld bc,0cd01h		;3dd4	01 01 cd	. . .
@@ -9128,7 +9143,7 @@ l3e5ah:
 	inc hl			;3e7c	23		#
 	jp l3e5ah		;3e7d	c3 5a 3e	. Z >
 l3e80h:
-	MCALL_WITH_MMAP0 sub_c2c1h
+	M_CALL_WITH_MMAP0 sub_c2c1h
 	call sub_97afh
 l3e88h:
 	ld a,(05cbah)		;3e88	3a ba 5c	: . \
@@ -10545,7 +10560,7 @@ l8825h:
 	jr z,l8844h		;8830	28 12 	( . 
 	cp 058h		;8832	fe 58 	. X 
 	ret nz			;8834	c0 	. 
-	MCALL_WITH_MMAP0 INIT
+	M_CALL_WITH_MMAP0 INIT
 	ret			;883a	c9 	. 
 l883bh:
 	ld a,0ffh		;883b	3e ff 	> . 
@@ -11418,7 +11433,7 @@ l8e26h:
 	jp z,l8f24h		;8e56	ca 24 8f 	. $ . 
 	jp l8f7fh		;8e59	c3 7f 8f 	.  . 
 l8e5ch:
-	MCALL_WITH_MMAP0 INIT
+	M_CALL_WITH_MMAP0 INIT
 l8e61h:
 	jp l8f7fh		;8e61	c3 7f 8f 	.  . 
 l8e64h:
@@ -11499,7 +11514,7 @@ l8efeh:
 	ld de,(05b79h)		;8efe	ed 5b 79 5b 	. [ y [ 
 	call sub_0968h		;8f02	cd 68 09 	. h . 
 	ld a,(05b84h)		;8f05	3a 84 5b 	: . [ 
-	MCALL_WITH_MMAP0 sub_c36ah
+	M_CALL_WITH_MMAP0 sub_c36ah
 	ld (05b77h),hl
 	ld (05b85h),hl		;8f10	22 85 5b 	" . [ 
 	ld (05b79h),de		;8f13	ed 53 79 5b 	. S y [ 
@@ -11777,7 +11792,7 @@ l90feh:
 	inc b			;9118	04 	. 
 	jr l90feh		;9119	18 e3 	. . 
 l911bh:
-	MOUTCH_INLINE 0x05
+	M_OUT_CH 0x05
 	call sub_1570h		;911f	cd 70 15 	. p . 
 	ld b,011h		;9122	06 11 	. . 
 	ld a,(bc)			;9124	0a 	. 
@@ -14057,7 +14072,7 @@ la0bfh:
 	ld a,c			;a0d9	79 	y 
 	jp z,la2afh		;a0da	ca af a2 	. . . 
 	ld hl,05bb8h		;a0dd	21 b8 5b 	! . [ 
-	MCALL_WITH_MMAP0 sub_c103h
+	M_CALL_WITH_MMAP0 sub_c103h
 	ld b,002h		;a0e5	06 02 	. . 
 	call sub_1ae6h		;a0e7	cd e6 1a 	. . . 
 	push af			;a0ea	f5 	. 
@@ -14327,7 +14342,7 @@ sub_a2a4h:
 la2afh:
 	ld hl,05bb8h		;a2af	21 b8 5b 	! . [ 
 	ld a,c			;a2b2	79 	y 
-	MCALL_WITH_MMAP0 sub_c103h
+	M_CALL_WITH_MMAP0 sub_c103h
 	ld b,002h		;a2b8	06 02 	. . 
 	call sub_1ae6h		;a2ba	cd e6 1a 	. . . 
 	cp 01fh		;a2bd	fe 1f 	. . 
@@ -14578,7 +14593,7 @@ sub_a468h:
 	jp z,laaa0h		;a48e	ca a0 aa 	. . . 
 	ld a,c			;a491	79 	y 
 	ld hl,05bdeh		;a492	21 de 5b 	! . [ 
-	MCALL_WITH_MMAP0 sub_c103h
+	M_CALL_WITH_MMAP0 sub_c103h
 	ld b,003h		;a49a	06 03 	. . 
 	call sub_1ae6h		;a49c	cd e6 1a 	. . . 
 	push af			;a49f	f5 	. 
@@ -15088,7 +15103,7 @@ la824h:
 	cp 042h		;a840	fe 42 	. B 
 	ld a,c			;a842	79 	y 
 	jr nz,la84ah		;a843	20 05 	  . 
-	MCALL_WITH_MMAP0 sub_c103h
+	M_CALL_WITH_MMAP0 sub_c103h
 la84ah:
 	res 7,a		;a84a	cb bf 	. . 
 	ld b,005h		;a84c	06 05 	. . 
@@ -15742,7 +15757,7 @@ lac5dh:
 	ld d,a			;acf2	57 	W 
 	ret c			;acf3	d8 	. 
 	ld a,(bc)			;acf4	0a 	. 
-	MOUTCH_INLINE '/' 
+	M_OUT_CH '/' 
 	call OUT_MSG_INLINE		;acf9	cd c8 13 	. . . 
 	ld l,c			;acfc	69 	i 
 	ret c			;acfd	d8 	. 
@@ -15845,7 +15860,7 @@ ladb1h:
 	jp l1925h		;adc9	c3 25 19 	. % . 
 ladcch:
 	ldir		;adcc	ed b0 	. . 
-	MCALL_WITH_MMAP0 INIT
+	M_CALL_WITH_MMAP0 INIT
 	jp l1925h		;add3	c3 25 19 	. % . 
 	call sub_13e4h		;add6	cd e4 13 	. . . 
 	nop			;add9	00 	. 
@@ -16014,7 +16029,7 @@ laeefh:
 	call sub_1527h		;aef4	cd 27 15 	. ' . 
 	rrca			;aef7	0f 	. 
 	ld (bc),a			;aef8	02 	. 
-	MOUTCH_INLINE 0x0f 
+	M_OUT_CH 0x0f 
 	call OUT_MSG_INLINE		;aefd	cd c8 13 	. . . 
 	ld e,e			;af00	5b 	[ 
 	exx			;af01	d9 	. 
@@ -16034,7 +16049,7 @@ laf0eh:
 	ld (de),a			;af19	12 	. 
 	call sub_1527h		;af1a	cd 27 15 	. ' . 
 	ld b,005h		;af1d	06 05 	. . 
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	ld iy,05417h		;af22	fd 21 17 54 	. ! . T
 	ld b,008h		;af27	06 08 	. . 
 laf29h:
@@ -16082,7 +16097,7 @@ laf68h:
 	dec b			;af72	05 	. 
 	nop			;af73	00 	. 
 	inc b			;af74	04 	. 
-	MOUTCH_INLINE 0x05
+	M_OUT_CH 0x05
 	ld de,00009h		;af79	11 09 00 	. . . 
 	add iy,de		;af7c	fd 19 	. . 
 	ret			;af7e	c9 	. 
@@ -16128,7 +16143,7 @@ lafb8h:
 	dec b			;afc2	05 	. 
 	nop			;afc3	00 	. 
 	ld b,h			;afc4	44 	D 
-	MOUTCH_INLINE 0x05
+	M_OUT_CH 0x05
 	call sub_1570h		;afc9	cd 70 15 	. p . 
 	inc b			;afcc	04 	. 
 	pop iy		;afcd	fd e1 	. . 
@@ -16244,7 +16259,7 @@ lb086h:
 	ld bc,0cdc9h		;b0a3	01 c9 cd 	. . . 
 	jr lb0bbh		;b0a6	18 13 	. . 
 	inc b			;b0a8	04 	. 
-	MOUTCH_INLINE 0x03
+	M_OUT_CH 0x03
 	ret			;b0ad	c9 	. 
 	call sub_07f9h		;b0ae	cd f9 07 	. . . 
 	cp 0ffh		;b0b1	fe ff 	. . 
@@ -16415,7 +16430,7 @@ lb1dfh:
 	ld (053c5h),a		;b1e7	32 c5 53 	2 . S 
 lb1eah:
 	call sub_2a82h		;b1ea	cd 82 2a 	. . * 
-	MOUTCH_INLINE 0x0f
+	M_OUT_CH 0x0f
 	call sub_1527h		;b1f1	cd 27 15 	. ' . 
 	inc bc			;b1f4	03 	. 
 	ld bc,021fdh		;b1f5	01 fd 21 	. . ! 
@@ -16441,8 +16456,8 @@ lb218h:
 	ld bc,053c2h		;b218	01 c2 53 	. . S 
 	ld de,053ceh		;b21b	11 ce 53 	. . S 
 	call sub_b3b5h		;b21e	cd b5 b3 	. . . 
-	MOUTCH_INLINE 0x0f
-	MOUTCH_INLINE 0x04
+	M_OUT_CH 0x0f
+	M_OUT_CH 0x04
 	call OUT_MSG_INLINE		;b229	cd c8 13 	. . . 
 	adc a,053h		;b22c	ce 53 	. S 
 	jr nz,lb1fdh		;b22e	20 cd 	  . 
@@ -16456,7 +16471,7 @@ lb218h:
 	ld b,(hl)			;b23d	46 	F 
 	ld a,009h		;b23e	3e 09 	> . 
 	call sub_157ch		;b240	cd 7c 15 	. | . 
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	call NEXT_MACRO_OR_KEY
 	cp 020h		;b24a	fe 20 	.   
 	jr nz,lb25fh		;b24c	20 11 	  . 
@@ -16650,17 +16665,17 @@ lb397h:
 	rra			;b39e	1f 	. 
 	ld e,01fh		;b39f	1e 1f 	. . 
 	ld e,01fh		;b3a1	1e 1f 	. . 
-	MCALL_WITH_MMAP0 sub_c45eh
+	M_CALL_WITH_MMAP0 sub_c45eh
 	ret
 	call 09b1h
 	ld d,h			;b3ac	54 	T 
 	push bc			;b3ad	c5 	. 
 	ret			;b3ae	c9 	. 
 sub_b3afh:
-	MCALL_WITH_MMAP0 sub_c5cbh
+	M_CALL_WITH_MMAP0 sub_c5cbh
 	ret			;b3b4	c9 	. 
 sub_b3b5h:
-	MCALL_WITH_MMAP0 sub_c60bh
+	M_CALL_WITH_MMAP0 sub_c60bh
 	ret
 	call sub_2a82h		;b3bb	cd 82 2a 	. . * 
 	call OUT_MSG_INLINE		;b3be	cd c8 13 	. . . 
@@ -16672,7 +16687,7 @@ sub_b3b5h:
 	ld a,l			;b3ce	7d 	} 
 	ld (05466h),a		;b3cf	32 66 54 	2 f T 
 	call sub_2a82h		;b3d2	cd 82 2a 	. . * 
-	MOUTCH_INLINE 0x0f
+	M_OUT_CH 0x0f
 	ld a,(05466h)		;b3d9	3a 66 54 	: f T 
 	bit 0,a		;b3dc	cb 47 	. G 
 	jp nz,lb3e7h		;b3de	c2 e7 b3 	. . . 
@@ -16777,7 +16792,7 @@ lb469h:
 	ld b,001h		;b47b	06 01 	. . 
 	ld iy,053c2h		;b47d	fd 21 c2 53 	. ! . S 
 	call sub_b5e7h		;b481	cd e7 b5 	. . . 
-	MOUTCH_INLINE 0x04
+	M_OUT_CH 0x04
 	pop hl			;b488	e1 	. 
 	pop de			;b489	d1 	. 
 lb48ah:
@@ -16790,7 +16805,7 @@ lb48ah:
 	call OUTCH		;b494	cd 84 10 	. . . 
 	jr lb48ah		;b497	18 f1 	. . 
 lb499h:
-	MOUTCH_INLINE 0x09
+	M_OUT_CH 0x09
 	jr lb48ah		;b49d	18 eb 	. . 
 lb49fh:
 	push de			;b49f	d5 	. 
@@ -16802,10 +16817,10 @@ lb4a0h:
 	cp 030h		;b4a6	fe 30 	. 0 
 	jr nz,lb4b0h		;b4a8	20 06 	  . 
 lb4aah:
-	MOUTCH_INLINE 0x09
+	M_OUT_CH 0x09
 	jr lb4a0h		;b4ae	18 f0 	. . 
 lb4b0h:
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x0e
 	pop de
 lb4b5h:
 	push hl			;b4b5	e5 	. 
@@ -16829,7 +16844,7 @@ lb4ceh:
 	jr nc,lb4b7h		;b4d4	30 e1 	0 . 
 lb4d6h:
 	ld c,a			;b4d6	4f 	O 
-	MOUTCH_INLINE 0x0f
+	M_OUT_CH 0x0f
 lb4dbh:
 	inc hl			;b4db	23 	# 
 	inc de			;b4dc	13 	. 
@@ -16862,7 +16877,7 @@ lb4f3h:
 	ld (hl),a			;b500	77 	w 
 	inc hl			;b501	23 	# 
 lb502h:
-	MOUTCH_INLINE 0x08
+	M_OUT_CH 0x08
 	jr lb4f3h		;b506	18 eb 	. . 
 lb508h:
 	ld (hl),c			;b508	71 	q 
@@ -16889,16 +16904,16 @@ lb521h:
 	inc de			;b524	13 	. 
 	jr lb516h		;b525	18 ef 	. . 
 lb527h:
-	MOUTCH_INLINE 0x08
-	MOUTCH_INLINE 0x0e
+	M_OUT_CH 0x08
+	M_OUT_CH 0x0e
 	pop de
 	pop hl			;b530	e1 	. 
 	jp lb4b5h		;b531	c3 b5 b4 	. . . 
 lb534h:
 	pop de			;b534	d1 	. 
 	pop hl			;b535	e1 	. 
-	MOUTCH_INLINE 0x0f 
-	MOUTCH_INLINE 0x09
+	M_OUT_CH 0x0f 
+	M_OUT_CH 0x09
 lb53eh:
 	inc hl			;b53e	23 	# 
 lb53fh:
@@ -16991,7 +17006,7 @@ sub_b5d8h:
 	cp 030h		;b5de	fe 30 	. 0 
 	ret nz			;b5e0	c0 	. 
 lb5e1h:
-	MOUTCH_INLINE 0x08
+	M_OUT_CH 0x08
 	jr sub_b5d8h		;b5e5	18 f1 	. . 
 sub_b5e7h:
 	call OUT_MSG_INLINE		;b5e7	cd c8 13 	. . . 
@@ -18656,7 +18671,7 @@ sub_c21dh:
 	ld b,000h		;c253	06 00 	. . 
 lc255h:
 	inc b			;c255	04 	. 
-	MOUTCH_INLINE 0x05
+	M_OUT_CH 0x05
 	call sub_1570h		;c25a	cd 70 15 	. p . 
 	db 0x03
 	ld a,b			;c25e	78 	x 
