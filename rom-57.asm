@@ -1,6 +1,11 @@
 ; TODO:
 ;   Continue fixing OUTCH_INLINE call sites
 ;	Replace COLD_START by 0 where appropriate (most places)
+; 0xc5f3 is a date/time function
+; 0xc60b just below it pushes date/time/month strings from data into stack locations? 
+; 0xc5cb is another date/time (RTC setup?) function
+; 0xc45e - more RTC functions
+
 
 ; RAM base
 RAM_BASE:	equ 0x4000
@@ -19341,20 +19346,20 @@ lc5f3h:
 sub_c60bh:
 	ld a,(CFG4)		;c60b	3a 0b 00 	: . . 
 	cp 0aah		;c60e	fe aa 	. . 
-	ld hl,lc70ah		;c610	21 0a c7 	! . . 
+	ld hl,TIME_LABEL_EN		;c610	21 0a c7 	! . . 
 	push hl			;c613	e5 	. 
-	ld hl,lc6e6h		;c614	21 e6 c6 	! . . 
+	ld hl,MONTH_EN		;c614	21 e6 c6 	! . . 
 	push hl			;c617	e5 	. 
 	ld a,(bc)			;c618	0a 	. 
-	ld hl,lc6d1h		;c619	21 d1 c6 	! . . 
+	ld hl,WEEKDAY_EN		;c619	21 d1 c6 	! . . 
 	jr nz,lc62bh		;c61c	20 0d 	  . 
 	pop hl			;c61e	e1 	. 
 	pop hl			;c61f	e1 	. 
-	ld hl,lc74ch		;c620	21 4c c7 	! L . 
+	ld hl,TIME_LABEL_DE		;c620	21 4c c7 	! L . 
 	push hl			;c623	e5 	. 
-	ld hl,lc728h		;c624	21 28 c7 	! ( . 
+	ld hl,MONTH_DE		;c624	21 28 c7 	! ( . 
 	push hl			;c627	e5 	. 
-	ld hl,0c713h		;c628	21 13 c7 	! . . 
+	ld hl,WEEKDAY_DE		;c628	21 13 c7 	! . . 
 lc62bh:
 	call sub_c6a1h		;c62b	cd a1 c6 	. . . 
 	inc bc			;c62e	03 	. 
@@ -19476,137 +19481,20 @@ lc6c3h:
 	inc hl			;c6ce	23 	# 
 	ex de,hl			;c6cf	eb 	. 
 	ret			;c6d0	c9 	. 
-lc6d1h:
-	ld d,e			;c6d1	53 	S 
-	ld d,l			;c6d2	55 	U 
-	ld c,(hl)			;c6d3	4e 	N 
-	ld c,l			;c6d4	4d 	M 
-	ld c,a			;c6d5	4f 	O 
-	ld c,(hl)			;c6d6	4e 	N 
-	ld d,h			;c6d7	54 	T 
-	ld d,l			;c6d8	55 	U 
-	ld b,l			;c6d9	45 	E 
-	ld d,a			;c6da	57 	W 
-	ld b,l			;c6db	45 	E 
-	ld b,h			;c6dc	44 	D 
-	ld d,h			;c6dd	54 	T 
-	ld c,b			;c6de	48 	H 
-	ld d,l			;c6df	55 	U 
-	ld b,(hl)			;c6e0	46 	F 
-	ld d,d			;c6e1	52 	R 
-	ld c,c			;c6e2	49 	I 
-	ld d,e			;c6e3	53 	S 
-	ld b,c			;c6e4	41 	A 
-	ld d,h			;c6e5	54 	T 
-lc6e6h:
-	ld c,d			;c6e6	4a 	J 
-	ld b,c			;c6e7	41 	A 
-	ld c,(hl)			;c6e8	4e 	N 
-	ld b,(hl)			;c6e9	46 	F 
-	ld b,l			;c6ea	45 	E 
-	ld b,d			;c6eb	42 	B 
-	ld c,l			;c6ec	4d 	M 
-	ld b,c			;c6ed	41 	A 
-	ld d,d			;c6ee	52 	R 
-	ld b,c			;c6ef	41 	A 
-	ld d,b			;c6f0	50 	P 
-	ld d,d			;c6f1	52 	R 
-	ld c,l			;c6f2	4d 	M 
-	ld b,c			;c6f3	41 	A 
-	ld e,c			;c6f4	59 	Y 
-	ld c,d			;c6f5	4a 	J 
-	ld d,l			;c6f6	55 	U 
-	ld c,(hl)			;c6f7	4e 	N 
-	ld c,d			;c6f8	4a 	J 
-	ld d,l			;c6f9	55 	U 
-	ld c,h			;c6fa	4c 	L 
-	ld b,c			;c6fb	41 	A 
-	ld d,l			;c6fc	55 	U 
-	ld b,a			;c6fd	47 	G 
-	ld d,e			;c6fe	53 	S 
-	ld b,l			;c6ff	45 	E 
-	ld d,b			;c700	50 	P 
-	ld c,a			;c701	4f 	O 
-	ld b,e			;c702	43 	C 
-	ld d,h			;c703	54 	T 
-	ld c,(hl)			;c704	4e 	N 
-	ld c,a			;c705	4f 	O 
-	ld d,(hl)			;c706	56 	V 
-	ld b,h			;c707	44 	D 
-	ld b,l			;c708	45 	E 
-	ld b,e			;c709	43 	C 
-lc70ah:
-	inc l			;c70a	2c 	, 
-	ld sp,02039h		;c70b	31 39 20 	1 9   
-	ld d,h			;c70e	54 	T 
-	ld c,c			;c70f	49 	I 
-	ld c,l			;c710	4d 	M 
-	ld b,l			;c711	45 	E 
-	jr nz,lc767h		;c712	20 53 	  S 
-	ld c,a			;c714	4f 	O 
-	ld c,(hl)			;c715	4e 	N 
-	ld c,l			;c716	4d 	M 
-	ld c,a			;c717	4f 	O 
-	ld c,(hl)			;c718	4e 	N 
-	ld b,h			;c719	44 	D 
-	ld c,c			;c71a	49 	I 
-	ld b,l			;c71b	45 	E 
-	ld c,l			;c71c	4d 	M 
-	ld c,c			;c71d	49 	I 
-	ld d,h			;c71e	54 	T 
-	ld b,h			;c71f	44 	D 
-	ld c,a			;c720	4f 	O 
-	ld c,(hl)			;c721	4e 	N 
-	ld b,(hl)			;c722	46 	F 
-	ld d,d			;c723	52 	R 
-	ld b,l			;c724	45 	E 
-	ld d,e			;c725	53 	S 
-	ld b,c			;c726	41 	A 
-	ld c,l			;c727	4d 	M 
-lc728h:
-	ld c,d			;c728	4a 	J 
-	ld b,c			;c729	41 	A 
-	ld c,(hl)			;c72a	4e 	N 
-	ld b,(hl)			;c72b	46 	F 
-	ld b,l			;c72c	45 	E 
-	ld b,d			;c72d	42 	B 
-	ld c,l			;c72e	4d 	M 
-	ld b,c			;c72f	41 	A 
-	ld d,d			;c730	52 	R 
-	ld b,c			;c731	41 	A 
-	ld d,b			;c732	50 	P 
-	ld d,d			;c733	52 	R 
-	ld c,l			;c734	4d 	M 
-	ld b,c			;c735	41 	A 
-	ld c,c			;c736	49 	I 
-	ld c,d			;c737	4a 	J 
-	ld d,l			;c738	55 	U 
-	ld c,(hl)			;c739	4e 	N 
-	ld c,d			;c73a	4a 	J 
-	ld d,l			;c73b	55 	U 
-	ld c,h			;c73c	4c 	L 
-	ld b,c			;c73d	41 	A 
-	ld d,l			;c73e	55 	U 
-	ld b,a			;c73f	47 	G 
-	ld d,e			;c740	53 	S 
-	ld b,l			;c741	45 	E 
-	ld d,b			;c742	50 	P 
-	ld c,a			;c743	4f 	O 
-	ld c,e			;c744	4b 	K 
-	ld d,h			;c745	54 	T 
-	ld c,(hl)			;c746	4e 	N 
-	ld c,a			;c747	4f 	O 
-	ld d,(hl)			;c748	56 	V 
-	ld b,h			;c749	44 	D 
-	ld b,l			;c74a	45 	E 
-	ld e,d			;c74b	5a 	Z 
-lc74ch:
-	inc l			;c74c	2c 	, 
-	ld sp,02039h		;c74d	31 39 20 	1 9   
-	jr nz,$+92		;c750	20 5a 	  Z 
-	ld b,l			;c752	45 	E 
-	ld c,c			;c753	49 	I 
-	ld d,h			;c754	54 	T 
+
+WEEKDAY_EN:
+	db "SUNMONTUEWEDTHUFRISAT"
+MONTH_EN:
+	db "JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC"
+TIME_LABEL_EN:
+	db ",19 TIME "
+WEEKDAY_DE:
+	db "SONMONDIEMITDONFRESAM"
+MONTH_DE:
+	db "JANFEBMARAPRMAIJUNJULAUGSEPOKTNOVDEZ"
+TIME_LABEL_DE:
+	db ",19  ZEIT"
+
 lc755h:
 	ld a,000h		;c755	3e 00 	> . 
 	out (030h),a		;c757	d3 30 	. 0 
