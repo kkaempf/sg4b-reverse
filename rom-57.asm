@@ -1,4 +1,5 @@
 ; TODO:
+;	Move all inline to macros
 ; 0xc5f3 is a date/time function
 ; 0xc60b just below it pushes date/time/month strings from data into stack locations? 
 ; 0xc5cb is another date/time (RTC setup?) function
@@ -72,7 +73,10 @@ MACRO MCALL_WITH_MMAP0, ADRS
 	call CALL_WITH_MMAP0
 	dw ADRS
 ENDM
-
+MACRO MOUTCH_INLINE, CHAR
+	call OUTCH_INLINE
+	db CHAR
+ENDM
 
 	; ---------------------------------------
 	;	16K ROM U20
@@ -2830,25 +2834,21 @@ l1372h:
 	inc e			;1389	1c		.
 	jr l136fh		;138a	18 e3		. .
 l138ch:
-	call OUTCH_INLINE
-	db 0x0f
+	MOUTCH_INLINE 0x0f
 	ld a,(hl)		;1390	7e		~
 	call OUTCH		;1391	cd 84 10	. . .
 	call sub_156ch		;1394	cd 6c 15	. l .
 	ld bc,01918h		;1397	01 18 19	. . .
 l139ah:
 	ld (hl),020h		;139a	36 20		6  
-	call OUTCH_INLINE
-	db 0x0f
-	call OUTCH_INLINE
-	db ' ' 
+	MOUTCH_INLINE 0x0f
+	MOUTCH_INLINE ' ' 
 	call sub_156ch
 	ld bc,0fe7bh		;13a7	01 7b fe	. { .
 	ld bc,00628h		;13aa	01 28 06	. ( .
 	call sub_156ch		;13ad	cd 6c 15	. l .
 	ld bc,01d2bh		;13b0	01 2b 1d	. + .
-	call OUTCH_INLINE
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	jr l136fh
 l13b9h:
 	ld a,020h		;13b9	3e 20		>  
@@ -3018,8 +3018,7 @@ l146ch:
 	ret			;147a	c9		.
 sub_147bh:
 	push af			;147b	f5		.
-	call OUTCH_INLINE
-	db 0x0f
+	MOUTCH_INLINE 0x0f
 	dec d			;1480	15		.
 	jr nz,l1495h		;1481	20 12		  .
 	ld a,c			;1483	79		y
@@ -3103,12 +3102,10 @@ sub_14e5h:
 	ld a,c			;14eb	79		y
 	add a,010h		;14ec	c6 10		. .
 	ld c,a			;14ee	4f		O
-	call OUTCH_INLINE
-	db 0x0f
+	MOUTCH_INLINE 0x0f
 	ld e,0feh		;14f3	1e fe		. .
 	call sub_1501h		;14f5	cd 01 15	. . .
-	call OUTCH_INLINE
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	pop af
 	pop bc			;14fd	c1		.
 	pop de			;14fe	d1		.
@@ -3138,10 +3135,8 @@ sub_1501h:
 	ret 
 ; #### THIS IS CALLED FROM *A LOT OF PLACES* (131 callers)
 sub_1527h:
-	call OUTCH_INLINE
-	db 0x0f
-	call OUTCH_INLINE
-	db 0x04
+	MOUTCH_INLINE 0x0f
+	MOUTCH_INLINE 0x04
 	ex (sp),hl		;152f	e3		.
 	push bc			;1530	c5		.
 	ld a,00bh		;1531	3e 0b		> .
@@ -3156,15 +3151,12 @@ sub_1527h:
 	call nz,sub_157ch	;153e	c4 7c 15	. | .
 	pop bc			;1541	c1		.
 	ex (sp),hl		;1542	e3		.
-	call OUTCH_INLINE
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	ret
 sub_1548h:
 	push af
-	call OUTCH_INLINE
-	db 0x0f
-	call OUTCH_INLINE
-	db 0x04
+	MOUTCH_INLINE 0x0f
+	MOUTCH_INLINE 0x04
 	ld a,00bh		;1551	3e 0b		> .
 	dec b			;1553	05		.
 	call nz,sub_157ch	;1554	c4 7c 15	. | .
@@ -3172,8 +3164,7 @@ sub_1548h:
 	ld b,c			;1559	41		A
 	dec b			;155a	05		.
 	call nz,sub_157ch	;155b	c4 7c 15	. | .
-	call OUTCH_INLINE
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	pop af
 	ret
 
@@ -3721,8 +3712,7 @@ l18f7h:
 	res 1,(hl)		;18fb	cb 8e		. .
 	call sub_2295h		;18fd	cd 95 22	. . "
 	call sub_1bddh		;1900	cd dd 1b	. . .
-	call OUTCH_INLINE
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	ld a,(04f76h)
 l190ah:
 	pop hl			;190a	e1		.
@@ -3746,8 +3736,7 @@ l1925h:
 	call SETMEMMAP	;1926	cd 1a 0f	. . .
 	call sub_223fh		;1929	cd 3f 22	. ? "
 	call sub_1bddh		;192c	cd dd 1b	. . .
-	call OUTCH_INLINE
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	ret
 l1934h:
 	ld hl,FLAGS		;1934	21 79 4f	! y O
@@ -5145,8 +5134,7 @@ l2288h:
 	ld (04f82h),a		;228c	32 82 4f	2 . O
 	ret			;228f	c9		.
 sub_2290h:
-	call OUTCH_INLINE
-	db "\n"
+	MOUTCH_INLINE "\n"
 	ret			;2294	c9		.
 sub_2295h:
 	ld bc,1		;2295	01 01 00	. . .
@@ -8225,8 +8213,7 @@ l387eh:
 	ld (053d2h),a		;3890	32 d2 53	2 . S
 	call sub_1431h		;3893	cd 31 14	. 1 .
 	jp nc,04253h		;3896	d2 53 42	. S B
-	call OUTCH_INLINE
-	db ':'
+	MOUTCH_INLINE ':'
 	inc hl
 	ld a,(hl)
 	push bc			;389f	c5		.
@@ -8543,8 +8530,7 @@ l3a79h:
 	ld (hl),a		;3a87	77		w
 	call sub_156ch		;3a88	cd 6c 15	. l .
 	ld (bc),a		;3a8b	02		.
-	call OUTCH_INLINE
-	db ':'
+	MOUTCH_INLINE ':'
 	call sub_1570h
 	inc bc			;3a93	03		.
 	dec hl			;3a94	2b		+
@@ -8806,8 +8792,7 @@ l3bf2h:
 	add iy,de		;3c2d	fd 19		. .
 	ex (sp),iy		;3c2f	fd e3		. .
 	inc (iy+000h)		;3c31	fd 34 00	. 4 .
-	call OUTCH_INLINE
-	db 0x05
+	MOUTCH_INLINE 0x05
 	jp l3bf2h		;3c38	c3 f2 3b	. . ;
 l3c3bh:
 	pop hl			;3c3b	e1		.
@@ -8865,8 +8850,7 @@ l3c4fh:
 	push af			;3c9b	f5		.
 	ld (053c6h),a		;3c9c	32 c6 53	2 . S
 l3c9fh:
-	call OUTCH_INLINE
-	db 0x05
+	MOUTCH_INLINE 0x05
 	ld de,8		;3ca3	11 08 00	. . .
 	add iy,de		;3ca6	fd 19		. .
 	pop af			;3ca8	f1		.
@@ -11793,8 +11777,7 @@ l90feh:
 	inc b			;9118	04 	. 
 	jr l90feh		;9119	18 e3 	. . 
 l911bh:
-	call OUTCH_INLINE
-	db 0x05
+	MOUTCH_INLINE 0x05
 	call sub_1570h		;911f	cd 70 15 	. p . 
 	ld b,011h		;9122	06 11 	. . 
 	ld a,(bc)			;9124	0a 	. 
@@ -15759,8 +15742,7 @@ lac5dh:
 	ld d,a			;acf2	57 	W 
 	ret c			;acf3	d8 	. 
 	ld a,(bc)			;acf4	0a 	. 
-	call OUTCH_INLINE
-	db '/' 
+	MOUTCH_INLINE '/' 
 	call OUT_MSG_INLINE		;acf9	cd c8 13 	. . . 
 	ld l,c			;acfc	69 	i 
 	ret c			;acfd	d8 	. 
@@ -16032,8 +16014,7 @@ laeefh:
 	call sub_1527h		;aef4	cd 27 15 	. ' . 
 	rrca			;aef7	0f 	. 
 	ld (bc),a			;aef8	02 	. 
-	call OUTCH_INLINE
-	db 0x0f 
+	MOUTCH_INLINE 0x0f 
 	call OUT_MSG_INLINE		;aefd	cd c8 13 	. . . 
 	ld e,e			;af00	5b 	[ 
 	exx			;af01	d9 	. 
@@ -16053,8 +16034,7 @@ laf0eh:
 	ld (de),a			;af19	12 	. 
 	call sub_1527h		;af1a	cd 27 15 	. ' . 
 	ld b,005h		;af1d	06 05 	. . 
-	call OUTCH_INLINE		;af1f	cd 18 13 	. . . 
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	ld iy,05417h		;af22	fd 21 17 54 	. ! . T
 	ld b,008h		;af27	06 08 	. . 
 laf29h:
@@ -16102,8 +16082,7 @@ laf68h:
 	dec b			;af72	05 	. 
 	nop			;af73	00 	. 
 	inc b			;af74	04 	. 
-	call OUTCH_INLINE		;af75	cd 18 13 	. . . 
-	db 0x05
+	MOUTCH_INLINE 0x05
 	ld de,00009h		;af79	11 09 00 	. . . 
 	add iy,de		;af7c	fd 19 	. . 
 	ret			;af7e	c9 	. 
@@ -16149,8 +16128,7 @@ lafb8h:
 	dec b			;afc2	05 	. 
 	nop			;afc3	00 	. 
 	ld b,h			;afc4	44 	D 
-	call OUTCH_INLINE		;afc5	cd 18 13 	. . . 
-	db 0x05
+	MOUTCH_INLINE 0x05
 	call sub_1570h		;afc9	cd 70 15 	. p . 
 	inc b			;afcc	04 	. 
 	pop iy		;afcd	fd e1 	. . 
@@ -16266,8 +16244,7 @@ lb086h:
 	ld bc,0cdc9h		;b0a3	01 c9 cd 	. . . 
 	jr lb0bbh		;b0a6	18 13 	. . 
 	inc b			;b0a8	04 	. 
-	call OUTCH_INLINE		;b0a9	cd 18 13 	. . . 
-	db 0x03
+	MOUTCH_INLINE 0x03
 	ret			;b0ad	c9 	. 
 	call sub_07f9h		;b0ae	cd f9 07 	. . . 
 	cp 0ffh		;b0b1	fe ff 	. . 
@@ -16438,8 +16415,7 @@ lb1dfh:
 	ld (053c5h),a		;b1e7	32 c5 53 	2 . S 
 lb1eah:
 	call sub_2a82h		;b1ea	cd 82 2a 	. . * 
-	call OUTCH_INLINE		;b1ed	cd 18 13 	. . . 
-	db 0x0f
+	MOUTCH_INLINE 0x0f
 	call sub_1527h		;b1f1	cd 27 15 	. ' . 
 	inc bc			;b1f4	03 	. 
 	ld bc,021fdh		;b1f5	01 fd 21 	. . ! 
@@ -16465,10 +16441,8 @@ lb218h:
 	ld bc,053c2h		;b218	01 c2 53 	. . S 
 	ld de,053ceh		;b21b	11 ce 53 	. . S 
 	call sub_b3b5h		;b21e	cd b5 b3 	. . . 
-	call OUTCH_INLINE		;b221	cd 18 13 	. . . 
-	db 0x0f
-	call OUTCH_INLINE		;b225	cd 18 13 	. . . 
-	db 0x04
+	MOUTCH_INLINE 0x0f
+	MOUTCH_INLINE 0x04
 	call OUT_MSG_INLINE		;b229	cd c8 13 	. . . 
 	adc a,053h		;b22c	ce 53 	. S 
 	jr nz,lb1fdh		;b22e	20 cd 	  . 
@@ -16482,8 +16456,7 @@ lb218h:
 	ld b,(hl)			;b23d	46 	F 
 	ld a,009h		;b23e	3e 09 	> . 
 	call sub_157ch		;b240	cd 7c 15 	. | . 
-	call OUTCH_INLINE		;b243	cd 18 13 	. . . 
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	call NEXT_MACRO_OR_KEY
 	cp 020h		;b24a	fe 20 	.   
 	jr nz,lb25fh		;b24c	20 11 	  . 
@@ -16699,8 +16672,7 @@ sub_b3b5h:
 	ld a,l			;b3ce	7d 	} 
 	ld (05466h),a		;b3cf	32 66 54 	2 f T 
 	call sub_2a82h		;b3d2	cd 82 2a 	. . * 
-	call OUTCH_INLINE		;b3d5	cd 18 13 	. . . 
-	db 0x0f
+	MOUTCH_INLINE 0x0f
 	ld a,(05466h)		;b3d9	3a 66 54 	: f T 
 	bit 0,a		;b3dc	cb 47 	. G 
 	jp nz,lb3e7h		;b3de	c2 e7 b3 	. . . 
@@ -16805,8 +16777,7 @@ lb469h:
 	ld b,001h		;b47b	06 01 	. . 
 	ld iy,053c2h		;b47d	fd 21 c2 53 	. ! . S 
 	call sub_b5e7h		;b481	cd e7 b5 	. . . 
-	call OUTCH_INLINE		;b484	cd 18 13 	. . . 
-	db 0x04
+	MOUTCH_INLINE 0x04
 	pop hl			;b488	e1 	. 
 	pop de			;b489	d1 	. 
 lb48ah:
@@ -16819,8 +16790,7 @@ lb48ah:
 	call OUTCH		;b494	cd 84 10 	. . . 
 	jr lb48ah		;b497	18 f1 	. . 
 lb499h:
-	call OUTCH_INLINE		;b499	cd 18 13 	. . . 
-	db 0x09
+	MOUTCH_INLINE 0x09
 	jr lb48ah		;b49d	18 eb 	. . 
 lb49fh:
 	push de			;b49f	d5 	. 
@@ -16832,12 +16802,10 @@ lb4a0h:
 	cp 030h		;b4a6	fe 30 	. 0 
 	jr nz,lb4b0h		;b4a8	20 06 	  . 
 lb4aah:
-	call OUTCH_INLINE		;b4aa	cd 18 13 	. . . 
-	db 0x09
+	MOUTCH_INLINE 0x09
 	jr lb4a0h		;b4ae	18 f0 	. . 
 lb4b0h:
-	call OUTCH_INLINE		;b4b0	cd 18 13 	. . . 
-	db 0x0e
+	MOUTCH_INLINE 0x0e
 	pop de
 lb4b5h:
 	push hl			;b4b5	e5 	. 
@@ -16861,8 +16829,7 @@ lb4ceh:
 	jr nc,lb4b7h		;b4d4	30 e1 	0 . 
 lb4d6h:
 	ld c,a			;b4d6	4f 	O 
-	call OUTCH_INLINE		;b4d7	cd 18 13 	. . . 
-	db 0x0f
+	MOUTCH_INLINE 0x0f
 lb4dbh:
 	inc hl			;b4db	23 	# 
 	inc de			;b4dc	13 	. 
@@ -16895,8 +16862,7 @@ lb4f3h:
 	ld (hl),a			;b500	77 	w 
 	inc hl			;b501	23 	# 
 lb502h:
-	call OUTCH_INLINE		;b502	cd 18 13 	. . . 
-	db 0x08
+	MOUTCH_INLINE 0x08
 	jr lb4f3h		;b506	18 eb 	. . 
 lb508h:
 	ld (hl),c			;b508	71 	q 
@@ -16923,20 +16889,16 @@ lb521h:
 	inc de			;b524	13 	. 
 	jr lb516h		;b525	18 ef 	. . 
 lb527h:
-	call OUTCH_INLINE		;b527	cd 18 13 	. . . 
-	db 0x08
-	call OUTCH_INLINE		;b52b	cd 18 13 	. . . 
-	db 0x0e
+	MOUTCH_INLINE 0x08
+	MOUTCH_INLINE 0x0e
 	pop de
 	pop hl			;b530	e1 	. 
 	jp lb4b5h		;b531	c3 b5 b4 	. . . 
 lb534h:
 	pop de			;b534	d1 	. 
 	pop hl			;b535	e1 	. 
-	call OUTCH_INLINE		;b536	cd 18 13 	. . . 
-	db 0x0f 
-	call OUTCH_INLINE		;b53a	cd 18 13 	. . . 
-	db 0x09
+	MOUTCH_INLINE 0x0f 
+	MOUTCH_INLINE 0x09
 lb53eh:
 	inc hl			;b53e	23 	# 
 lb53fh:
@@ -17029,8 +16991,7 @@ sub_b5d8h:
 	cp 030h		;b5de	fe 30 	. 0 
 	ret nz			;b5e0	c0 	. 
 lb5e1h:
-	call OUTCH_INLINE		;b5e1	cd 18 13 	. . . 
-	db 0x08
+	MOUTCH_INLINE 0x08
 	jr sub_b5d8h		;b5e5	18 f1 	. . 
 sub_b5e7h:
 	call OUT_MSG_INLINE		;b5e7	cd c8 13 	. . . 
@@ -18695,8 +18656,7 @@ sub_c21dh:
 	ld b,000h		;c253	06 00 	. . 
 lc255h:
 	inc b			;c255	04 	. 
-	call OUTCH_INLINE		;c256	cd 18 13 	. . . 
-	db 0x05
+	MOUTCH_INLINE 0x05
 	call sub_1570h		;c25a	cd 70 15 	. p . 
 	db 0x03
 	ld a,b			;c25e	78 	x 
