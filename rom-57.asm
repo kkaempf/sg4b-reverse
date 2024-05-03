@@ -32,7 +32,7 @@ PORT_DATAKBD_CMD: equ 0x03		; Keyboard command port
 PORT_DMA: equ 0x62				; DMA port
 PORT_MEM: equ 0xfe				; Memory mapping
 
-; Various circular buffers (32 bytes) to handle data input
+; Pointers to circular buffers (32 bytes) to handle data input
 ; First two bytes = head, then tail (? checkme)
 FIFO_SERIAL: equ 0x40e0			;	Serial
 FIFO_KBD: equ 0x40e4			;	Keyboard
@@ -44,6 +44,16 @@ FIFO7: equ 0x40f8				;	Not sure if I/O related
 ; For port 0x00, 0x10, 0x14, it seems that 0x38 is written to the port+2 after the data is read
 ; (so 0x02, 0x12 and 0x16)
 
+;	32 bytes buffers
+FIFO_BUF_SERIAL: equ 0x4000
+FIFO_BUF_KBD: equ 0x4020
+FIFO_BUF3: equ 0x4040
+FIFO_BUF4: equ 0x4060
+FIFO_BUF5: equ 0x4080
+FIFO_BUF6: equ 0x40a0
+FIFO_BUF7: equ 0x40c0
+
+
 TMPHL: equ 0x04f87	;	A temporary 2 bytes location to save HL
 
 ; When calling with restored map, registers and current maps are saved here
@@ -51,6 +61,18 @@ CALLMAPSAVE_A: equ 0x5fd9
 CALLMAPSAVE_DE: equ 0x5fdb
 CALLMAPSAVE_HL: equ 0x5fdd
 CALLMAPSAVE_MAP: equ 0x5fdf
+
+
+; If this is set, the macro will be typed as if it was entered from the keyboard
+KEYMACRO: equ 0x5bb0
+
+
+; Some macros to call functions that have inlined arguments
+MACRO MCALL_WITH_MMAP0, ADRS
+	call CALL_WITH_MMAP0
+	dw ADRS
+ENDM
+
 
 	; ---------------------------------------
 	;	16K ROM U20
@@ -343,8 +365,7 @@ INTER_86:
 INTER_DEFAULT:
 	exx			;0182	d9		.
 	push af			;0183	f5		.
-	call CALL_WITH_MMAP0		;0184	cd b1 09	. . .
-	dw INIT
+	MCALL_WITH_MMAP0 INIT
 	pop af			;0189	f1		.
 	exx			;018a	d9		.
 	ei			;018b	fb		.
@@ -440,40 +461,42 @@ l0230h:
 	call sub_0849h		;023b	cd 49 08	. I .
 	xor a			;023e	af		.
 	call SETMEMMAP	;023f	cd 1a 0f	. . .
-	ld hl,(0e000h)		;0242	2a 00 e0	* . .
-	ld de,0aaaah		;0245	11 aa aa	. . .
-	call CMP_HLDE		;0248	cd 20 0f	.   .
-	jr nz,WARM_BOOT		;024b	20 0b		  .
-	ld hl,0e002h		;024d	21 02 e0	! . .
-	ld (05bb0h),hl		;0250	22 b0 5b	" . [
+	ld hl,(ROM_MAGIC)
+	ld de,0aaaah
+	call CMP_HLDE
+	jr nz,WARM_BOOT
+	ld hl,ROM_DEMO
+	ld (KEYMACRO),hl		;0250	22 b0 5b	" . [
 	ld a,0aah		;0253	3e aa		> .
 	ld (04f78h),a		;0255	32 78 4f	2 x O
 ; Warm boot
 WARM_BOOT:
 	ld sp,STACK_BASE	;0258	31 ad 52	1 . R
-	call CALL_WITH_MMAP0		;025b	cd b1 09	. . .
-	dw INIT
-	ld hl,RAM_BASE		;0260	21 00 40	! . @
-	ld (FIFO_SERIAL),hl		;0263	22 e0 40	" . @
-	ld (FIFO_SERIAL+2),hl		;0266	22 e2 40	" . @
-	ld hl,04020h		;0269	21 20 40	!   @
-	ld (FIFO_KBD),hl		;026c	22 e4 40	" . @
-	ld (FIFO_KBD+2),hl		;026f	22 e6 40	" . @
-	ld hl,04040h		;0272	21 40 40	! @ @
-	ld (FIFO3),hl		;0275	22 e8 40	" . @
-	ld (FIFO3+2),hl		;0278	22 ea 40	" . @
-	ld hl,04060h		;027b	21 60 40	! ` @
-	ld (FIFO4),hl		;027e	22 ec 40	" . @
-	ld (FIFO4+2),hl		;0281	22 ee 40	" . @
-	ld hl,04080h		;0284	21 80 40	! . @
-	ld (FIFO5),hl		;0287	22 f0 40	" . @
-	ld (FIFO5+2),hl		;028a	22 f2 40	" . @
-	ld hl,040a0h		;028d	21 a0 40	! . @
-	ld (FIFO6),hl		;0290	22 f4 40	" . @
-	ld (FIFO6+2),hl		;0293	22 f6 40	" . @
-	ld hl,040c0h		;0296	21 c0 40	! . @
-	ld (FIFO7),hl		;0299	22 f8 40	" . @
-	ld (FIFO7+2),hl		;029c	22 fa 40	" . @
+	MCALL_WITH_MMAP0 INIT
+
+	;	Init FIFO bffers
+	ld hl,FIFO_BUF_SERIAL
+	ld (FIFO_SERIAL),hl
+	ld (FIFO_SERIAL+2),hl
+	ld hl,FIFO_BUF_KBD
+	ld (FIFO_KBD),hl
+	ld (FIFO_KBD+2),hl
+	ld hl,FIFO_BUF3
+	ld (FIFO3),hl
+	ld (FIFO3+2),hl
+	ld hl,FIFO_BUF4
+	ld (FIFO4),hl
+	ld (FIFO4+2),hl
+	ld hl,FIFO_BUF5
+	ld (FIFO5),hl
+	ld (FIFO5+2),hl
+	ld hl,FIFO_BUF6
+	ld (FIFO6),hl
+	ld (FIFO6+2),hl
+	ld hl,FIFO_BUF7
+	ld (FIFO7),hl
+	ld (FIFO7+2),hl
+
 	xor a			;029f	af		.
 	ld (05b6eh),a		;02a0	32 6e 5b	2 n [
 	ld (05cbah),a		;02a3	32 ba 5c	2 . \
@@ -1489,8 +1512,7 @@ l0997h:
 	ld (05b87h),a		;099d	32 87 5b	2 . [
 	ld c,000h		;09a0	0e 00		. .
 	ld de,0x2c		;09a2	11 2c 00	. , .
-	call CALL_WITH_MMAP0		;09a5	cd b1 09	. . .
-	dw sub_c0e5h
+	MCALL_WITH_MMAP0 sub_c0e5h
 	ld de,20		;09aa	11 14 00	. . .
 	add hl,de		;09ad	19		.
 	pop de			;09ae	d1		.
@@ -2728,12 +2750,13 @@ OUTCH_INLINE:
 	inc hl			;131a	23		#
 	ex (sp),hl		;131b	e3		.
 	jp OUTCH		;131c	c3 84 10	. . .
+
 sub_131fh:
 	ex (sp),hl		;131f	e3		.
 	push de			;1320	d5		.
 	push bc			;1321	c5		.
 	push af			;1322	f5		.
-	call sub_144dh		;1323	cd 4d 14	. M .
+	call GET_MSG_AND_LEN		;1323	cd 4d 14	. M .
 	push de			;1326	d5		.
 	ld a,c			;1327	79		y
 	and 040h		;1328	e6 40		. @
@@ -2741,7 +2764,7 @@ sub_131fh:
 	ld d,001h		;132c	16 01		. .
 	ld e,020h		;132e	1e 20		.  
 l1330h:
-	call SOMETHING_KBD	;1330	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1330	cd a7 17	. . .
 	cp 00ah			;1333	fe 0a		. .
 	jr z,l1341h		;1335	28 0a		( .
 	call sub_14d1h		;1337	cd d1 14	. . .
@@ -2789,7 +2812,7 @@ l1369h:
 	ld c,a			;136c	4f		O
 	ld e,001h		;136d	1e 01		. .
 l136fh:
-	call SOMETHING_KBD	;136f	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;136f	cd a7 17	. . .
 l1372h:
 	cp 00ah			;1372	fe 0a		. .
 	jr z,l13b9h		;1374	28 43		( C
@@ -2840,22 +2863,22 @@ l13bfh:
 	jr nc,l13b9h		;13c3	30 f4		0 .
 	jp l1363h		;13c5	c3 63 13	. c .
 
-; ### SOMETHING WITH INLINE DATA
-sub_13c8h:
-	ex (sp),hl		;13c8	e3		.
-	push de			;13c9	d5		.
-	push bc			;13ca	c5		.
-	push af			;13cb	f5		.
-	call sub_144dh		;13cc	cd 4d 14	. M .
-	push de			;13cf	d5		.
-	call CALL_WITH_MMAP0		;13d0	cd b1 09	. . .
-	dw OUTSTR
-	pop hl			;13d5	e1		.
-	pop af			;13d6	f1		.
-	pop bc			;13d7	c1		.
-	pop de			;13d8	d1		.
-	ex (sp),hl		;13d9	e3		.
-	ret			;13da	c9		.
+; Print message (inline address + length)
+; If addrs is 0x00nn, then message is at iy+nn
+OUT_MSG_INLINE:
+	ex (sp),hl
+	push de
+	push bc
+	push af
+	call GET_MSG_AND_LEN	; extract arguments from code at HL
+	push de					; DE is the place where we need to jump back (HL+3)
+	MCALL_WITH_MMAP0 OUTSTR
+	pop hl
+	pop af
+	pop bc
+	pop de
+	ex (sp),hl
+	ret
 
 ; OUT c characters from (HL)
 OUTSTR:
@@ -2872,7 +2895,7 @@ sub_13e4h:
 	push de			;13e5	d5		.
 	push bc			;13e6	c5		.
 	push af			;13e7	f5		.
-	call sub_144dh		;13e8	cd 4d 14	. M .
+	call GET_MSG_AND_LEN		;13e8	cd 4d 14	. M .
 	push de			;13eb	d5		.
 	push hl			;13ec	e5		.
 	call sub_145eh		;13ed	cd 5e 14	. ^ .
@@ -2880,7 +2903,7 @@ l13f0h:
 	ld d,001h		;13f0	16 01		. .
 	ld e,030h		;13f2	1e 30		. 0
 l13f4h:
-	call SOMETHING_KBD	;13f4	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;13f4	cd a7 17	. . .
 	cp 00ah			;13f7	fe 0a		. .
 	jr z,l1405h		;13f9	28 0a		( .
 	call sub_14cah		;13fb	cd ca 14	. . .
@@ -2928,40 +2951,46 @@ sub_1431h:
 	push de			;1432	d5		.
 	push bc			;1433	c5		.
 	push af			;1434	f5		.
-	call sub_144dh		;1435	cd 4d 14	. M .
+	call GET_MSG_AND_LEN		;1435	cd 4d 14	. M .
 	push de			;1438	d5		.
 	call sub_145eh		;1439	cd 5e 14	. ^ .
 	ld a,c			;143c	79		y
 	and 007h		;143d	e6 07		. .
 	ld b,a			;143f	47		G
-l1440h:
+_loop:
 	ld a,(hl)		;1440	7e		~
 	call OUTCH		;1441	cd 84 10	. . .
 	inc hl			;1444	23		#
-	djnz l1440h		;1445	10 f9		. .
+	djnz _loop		;1445	10 f9		. .
 	pop hl			;1447	e1		.
 	pop af			;1448	f1		.
 	pop bc			;1449	c1		.
 	pop de			;144a	d1		.
 	ex (sp),hl		;144b	e3		.
 	ret			;144c	c9		.
-sub_144dh:
-	ld e,(hl)		;144d	5e		^
-	inc hl			;144e	23		#
-	ld d,(hl)		;144f	56		V
-	inc hl			;1450	23		#
-	ld c,(hl)		;1451	4e		N
-	inc hl			;1452	23		#
-	ex de,hl		;1453	eb		.
-	dec h			;1454	25		%
-	inc h			;1455	24		$
-	ret nz			;1456	c0		.
-	push de			;1457	d5		.
-	push iy			;1458	fd e5		. .
-	pop de			;145a	d1		.
-	add hl,de		;145b	19		.
-	pop de			;145c	d1		.
-	ret			;145d	c9		.
+
+; hl points to the code, where there is a message address and length
+GET_MSG_AND_LEN:
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	inc hl
+	ld c,(hl)
+	inc hl
+	ex de,hl
+		; Now HL points to the message
+		; C = length
+	dec h
+	inc h
+	ret nz			; Normal case, get out
+
+		; If H=0 we get the message from iy+l
+	push de
+	push iy
+	pop de
+	add hl,de
+	pop de
+	ret
 
 
 sub_145eh:
@@ -3211,10 +3240,9 @@ sub_15b0h:
 	ret nz			;15b5	c0		.
 	push bc			;15b6	c5		.
 	push iy			;15b7	fd e5		. .
-	call sub_13c8h		;15b9	cd c8 13	. . .
-	ld c,h			;15bc	4c		L
-	rla			;15bd	17		.
-	ld a,(de)		;15be	1a		.
+	call OUT_MSG_INLINE		;15b9	cd c8 13	. . .
+	dw MSG_TAPE
+	db 26
 	ld a,(hl)		;15bf	7e		~
 	push af			;15c0	f5		.
 	or a			;15c1	b7		.
@@ -3453,14 +3481,15 @@ l173fh:
 	ldir			;1745	ed b0		. .
 	ld a,044h		;1747	3e 44		> D
 	jp 0893fh		;1749	c3 3f 89	. ? .
-	
+
+MSG_TAPE:
 	db "TAPE ACTION" ; 174c
 	db 5 ; 1757
 	db "PLAYER NUMBER 1" ; 1758
 
 	pop af			;1767	f1		.
 	ld c,a			;1768	4f		O
-	call SOMETHING_KBD	;1769	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1769	cd a7 17	. . .
 	ld hl,FLAGS
 	bit FLAG_DISP,(hl)		;176f	cb 66		. f
 	jr z,l178fh		;1771	28 1c		( .
@@ -3495,8 +3524,9 @@ l1793h:
 	push hl			;17a4	e5		.
 	push de			;17a5	d5		.
 	ret			;17a6	c9		.
-; Seems to be related to keyboard input
-SOMETHING_KBD:
+
+; Enters next macro or typed key
+NEXT_MACRO_OR_KEY:
 	push bc			;17a7	c5		.
 	push de			;17a8	d5		.
 	push hl			;17a9	e5		.
@@ -3504,44 +3534,48 @@ l17aah:
 	xor a			;17aa	af		.
 	call SETMEMMAP	;17ab	cd 1a 0f	. . .
 l17aeh:
-	ld hl,(05bb0h)		;17ae	2a b0 5b	* . [
-	or h			;17b1	b4		.
-	jr z,l17d6h		;17b2	28 22		( "
-	ld a,(hl)		;17b4	7e		~
-	cp 0ffh			;17b5	fe ff		. .
-	jr nz,l17cfh		;17b7	20 16		  .
-	inc hl			;17b9	23		#
-	ld a,(hl)		;17ba	7e		~
-	cp 0ffh			;17bb	fe ff		. .
-	dec hl			;17bd	2b		+
-	ld a,0ffh		;17be	3e ff		> .
-	jr nz,l17cfh		;17c0	20 0d		  .
-	ld hl,0	;17c2	21 00 00	! . .
-	ld (05bb0h),hl		;17c5	22 b0 5b	" . [
-	ld a,000h		;17c8	3e 00		> .
-	ld (04f78h),a		;17ca	32 78 4f	2 x O
-	jr l17d6h		;17cd	18 07		. .
-l17cfh:
-	inc hl			;17cf	23		#
-	ld (05bb0h),hl		;17d0	22 b0 5b	" . [
-	ld b,a			;17d3	47		G
-	jr l17f5h		;17d4	18 1f		. .
-l17d6h:
+	ld hl,(KEYMACRO)
+	or h
+	jr z,NEXT_KEY		; Macro is deactivated
+	ld a,(hl)
+	cp 0xff
+	jr nz,_type_macro	; Type macro
+	inc hl
+	ld a,(hl)
+	cp 0xff
+	dec hl
+	ld a,0xff
+	jr nz,_type_macro	; Sends a 0xff is there is only one (?)
+
+	; Two 0xff, end of macro	
+	ld hl,0
+	ld (KEYMACRO),hl	; Clear macro
+	ld a,0
+	ld (04f78h),a
+	jr NEXT_KEY
+
+_type_macro:
+	inc hl
+	ld (KEYMACRO),HL	; Increment pointer
+	ld b,a
+	jr TYPE_KEY			; Type key
+
+NEXT_KEY:
 	ld de,FIFO_KBD		;17d6	11 e4 40	. . @
 	ld a,(04f76h)		;17d9	3a 76 4f	: v O
 	cp 005h			;17dc	fe 05		. .
 	ld b,00ah		;17de	06 0a		. .
-	jr z,l17f5h		;17e0	28 13		( .
+	jr z,TYPE_KEY		;17e0	28 13		( .
 	call sub_0ee1h		;17e2	cd e1 0e	. . .
 	jr nc,l17ech		;17e5	30 05		0 .
 	call sub_0334h		;17e7	cd 34 03	. 4 .
-	jr l17d6h		;17ea	18 ea		. .
+	jr NEXT_KEY		;17ea	18 ea		. .
 l17ech:
 	ld b,001h		;17ec	06 01		. .
 	call sub_1ae6h		;17ee	cd e6 1a	. . .
 	ld b,a			;17f1	47		G
 	call 082b6h		;17f2	cd b6 82	. . .
-l17f5h:
+TYPE_KEY:
 	in a,(0ffh)		;17f5	db ff		. .
 	ld hl,04f78h		;17f7	21 78 4f	! x O
 	cp 0ffh			;17fa	fe ff		. .
@@ -3555,7 +3589,7 @@ l17f5h:
 	jr nz,l180fh		;1808	20 05		  .
 	ld a,055h		;180a	3e 55		> U
 	ld (hl),a		;180c	77		w
-	jr l17d6h		;180d	18 c7		. .
+	jr NEXT_KEY		;180d	18 c7		. .
 l180fh:
 	ld a,(hl)		;180f	7e		~
 	cp 055h			;1810	fe 55		. U
@@ -3564,25 +3598,25 @@ l180fh:
 	inc (hl)		;1815	34		4
 	ld a,b			;1816	78		x
 	cp d			;1817	ba		.
-	jr nz,l17d6h		;1818	20 bc		  .
+	jr nz,NEXT_KEY		;1818	20 bc		  .
 	ld (hl),0aah		;181a	36 aa		6 .
-	jr l17d6h		;181c	18 b8		. .
+	jr NEXT_KEY		;181c	18 b8		. .
 l181eh:
 	cp 056h			;181e	fe 56		. V
 	jr nz,l1834h		;1820	20 12		  .
 	ld (hl),000h		;1822	36 00		6 .
 	ld a,(05b70h)		;1824	3a 70 5b	: p [
 	cp b			;1827	b8		.
-	jr nz,l17d6h		;1828	20 ac		  .
+	jr nz,NEXT_KEY		;1828	20 ac		  .
 	ld a,(05b6fh)		;182a	3a 6f 5b	: o [
 	cp c			;182d	b9		.
-	jr nz,l17d6h		;182e	20 a6		  .
+	jr nz,NEXT_KEY		;182e	20 a6		  .
 	ld (hl),0aah		;1830	36 aa		6 .
-	jr l17d6h		;1832	18 a2		. .
+	jr NEXT_KEY		;1832	18 a2		. .
 l1834h:
 	ld a,(hl)		;1834	7e		~
 	cp 0aah			;1835	fe aa		. .
-	jr nz,l17d6h		;1837	20 9d		  .
+	jr nz,NEXT_KEY		;1837	20 9d		  .
 l1839h:
 	push bc			;1839	c5		.
 	ld a,(05b7bh)		;183a	3a 7b 5b	: { [
@@ -3652,7 +3686,7 @@ l18b0h:
 	call z,08fa5h		;18ba	cc a5 8f	. . .
 	ld a,b			;18bd	78		x
 	out (014h),a		;18be	d3 14		. .
-	jp l17d6h		;18c0	c3 d6 17	. . .
+	jp NEXT_KEY		;18c0	c3 d6 17	. . .
 l18c3h:
 	ld a,b			;18c3	78		x
 	ld (04f76h),a		;18c4	32 76 4f	2 v O
@@ -3732,7 +3766,7 @@ l1934h:
 	ld l,a			;1947	6f		o
 	ret			;1948	c9		.
 	call sub_1b0dh		;1949	cd 0d 1b	. . .
-	call sub_13c8h		;194c	cd c8 13	. . .
+	call OUT_MSG_INLINE		;194c	cd c8 13	. . .
 	nop			;194f	00		.
 	ret nc			;1950	d0		.
 	ld de,0ba3ah		;1951	11 3a ba	. : .
@@ -3757,11 +3791,11 @@ OUTA44:	; Outputs A as a 4.4 fixed point number
 	ld a,005h		;1979	3e 05		> .
 	call OUTCH		;197b	cd 84 10	. . .
 l197eh:
-	call SOMETHING_KBD	;197e	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;197e	cd a7 17	. . .
 	cp 01bh			;1981	fe 1b		. .
 	jp nz,l1925h		;1983	c2 25 19	. % .
 l1986h:
-	call SOMETHING_KBD	;1986	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1986	cd a7 17	. . .
 	cp 046h			;1989	fe 46		. F
 	jr z,l19e7h		;198b	28 5a		( Z
 	cp 044h			;198d	fe 44		. D
@@ -3778,7 +3812,7 @@ l19a4h:
 	ld hl,01766h		;19a7	21 66 17	! f .
 	push hl			;19aa	e5		.
 	call sub_2a82h		;19ab	cd 82 2a	. . *
-	call sub_13c8h		;19ae	cd c8 13	. . .
+	call OUT_MSG_INLINE		;19ae	cd c8 13	. . .
 	ld de,l36ceh+2		;19b1	11 d0 36	. . 6
 	ld de,FIFO_KBD		;19b4	11 e4 40	. . @
 l19b7h:
@@ -3789,14 +3823,14 @@ l19b7h:
 l19c1h:
 	cp 004h			;19c1	fe 04		. .
 	jr nz,l19d0h		;19c3	20 0b		  .
-	call sub_13c8h		;19c5	cd c8 13	. . .
+	call OUT_MSG_INLINE		;19c5	cd c8 13	. . .
 	ld b,a			;19c8	47		G
 	ret nc			;19c9	d0		.
 	inc hl			;19ca	23		#
 	out (070h),a		;19cb	d3 70		. p
 	jp l1934h		;19cd	c3 34 19	. 4 .
 l19d0h:
-	call sub_13c8h		;19d0	cd c8 13	. . .
+	call OUT_MSG_INLINE		;19d0	cd c8 13	. . .
 	ld l,d			;19d3	6a		j
 	ret nc			;19d4	d0		.
 	djnz $-59		;19d5	10 c3		. .
@@ -3837,10 +3871,10 @@ sub_1a00h:
 	ld b,a			;1a09	47		G
 	ret			;1a0a	c9		.
 sub_1a0bh:
-	call SOMETHING_KBD	;1a0b	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1a0b	cd a7 17	. . .
 	ld b,a			;1a0e	47		G
 	call OUTCH		;1a0f	cd 84 10	. . .
-	call SOMETHING_KBD	;1a12	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1a12	cd a7 17	. . .
 	call OUTCH		;1a15	cd 84 10	. . .
 	ld c,a			;1a18	4f		O
 	call sub_1ac0h		;1a19	cd c0 1a	. . .
@@ -3903,12 +3937,12 @@ sub_1a6ah:
 	ret			;1a77	c9		.
 l1a78h:
 	call sub_1b0dh		;1a78	cd 0d 1b	. . .
-	call SOMETHING_KBD	;1a7b	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1a7b	cd a7 17	. . .
 	call OUTCH		;1a7e	cd 84 10	. . .
 	and 00fh		;1a81	e6 0f		. .
 	ld (05cb9h),a		;1a83	32 b9 5c	2 . \
 l1a86h:
-	call SOMETHING_KBD	;1a86	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1a86	cd a7 17	. . .
 	cp 01bh			;1a89	fe 1b		. .
 	jr nz,l1a86h		;1a8b	20 f9		  .
 	ld a,000h		;1a8d	3e 00		> .
@@ -3919,7 +3953,7 @@ l1a95h:
 	out (020h),a		;1a97	d3 20		.  
 	ld a,000h		;1a99	3e 00		> .
 	out (02fh),a		;1a9b	d3 2f		. /
-	call SOMETHING_KBD	;1a9d	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;1a9d	cd a7 17	. . .
 	jp l1925h		;1aa0	c3 25 19	. % .
 ; Input a = 0xNM
 ; Output (b,c) ascii values of N and M
@@ -5983,7 +6017,7 @@ l2896h:
 	or a			;28d7	b7		.
 	jp nz,l2783h		;28d8	c2 83 27	. . '
 l28dbh:
-	call sub_13c8h		;28db	cd c8 13	. . .
+	call OUT_MSG_INLINE		;28db	cd c8 13	. . .
 	ld a,d			;28de	7a		z
 	ret nc			;28df	d0		.
 	ex af,af'		;28e0	08		.
@@ -6261,7 +6295,7 @@ l2adfh:
 	call SETMEMMAP	;2aea	cd 1a 0f	. . .
 	ret			;2aed	c9		.
 sub_2aeeh:
-	call sub_13c8h		;2aee	cd c8 13	. . .
+	call OUT_MSG_INLINE		;2aee	cd c8 13	. . .
 	add a,d			;2af1	82		.
 	ret nc			;2af2	d0		.
 	dec b			;2af3	05		.
@@ -6283,7 +6317,7 @@ sub_2b05h:
 	call SETMEMMAP	;2b0c	cd 1a 0f	. . .
 	ret			;2b0f	c9		.
 l2b10h:
-	call sub_13c8h		;2b10	cd c8 13	. . .
+	call OUT_MSG_INLINE		;2b10	cd c8 13	. . .
 	add a,a			;2b13	87		.
 	ret nc			;2b14	d0		.
 	inc d			;2b15	14		.
@@ -7668,7 +7702,7 @@ l34bdh:
 	ld hl,053d6h		;34f0	21 d6 53	! . S
 	call 0b845h		;34f3	cd 45 b8	. E .
 	call sub_2a82h		;34f6	cd 82 2a	. . *
-	call sub_13c8h		;34f9	cd c8 13	. . .
+	call OUT_MSG_INLINE		;34f9	cd c8 13	. . .
 	sbc a,e			;34fc	9b		.
 	ret nc			;34fd	d0		.
 	add a,0cdh		;34fe	c6 cd		. .
@@ -7891,7 +7925,7 @@ l365ch:
 	ld b,(ix+003h)		;368d	dd 46 03	. F .
 	dec b			;3690	05		.
 l3691h:
-	call SOMETHING_KBD	;3691	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;3691	cd a7 17	. . .
 	push bc			;3694	c5		.
 	ld c,a			;3695	4f		O
 	ld a,020h		;3696	3e 20		>  
@@ -7931,7 +7965,7 @@ l36b2h:
 	ld iy,0d183h		;36c7	fd 21 83 d1	. ! . .
 	ld d,(ix+002h)		;36cb	dd 56 02	. V .
 l36ceh:
-	call SOMETHING_KBD	;36ce	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;36ce	cd a7 17	. . .
 	push bc			;36d1	c5		.
 	ld c,a			;36d2	4f		O
 	ld a,020h		;36d3	3e 20		>  
@@ -8016,7 +8050,7 @@ l370ah:
 	ld iy,0d27ah		;3759	fd 21 7a d2	. ! z .
 	ld b,(ix+004h)		;375d	dd 46 04	. F .
 l3760h:
-	call SOMETHING_KBD	;3760	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;3760	cd a7 17	. . .
 	push bc			;3763	c5		.
 	ld c,a			;3764	4f		O
 	ld a,020h		;3765	3e 20		>  
@@ -8114,7 +8148,7 @@ l37f1h:
 	ld a,(053c9h)		;3802	3a c9 53	: . S
 	ld b,a			;3805	47		G
 l3806h:
-	call SOMETHING_KBD	;3806	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;3806	cd a7 17	. . .
 	push bc			;3809	c5		.
 	ld c,a			;380a	4f		O
 	ld a,020h		;380b	3e 20		>  
@@ -8304,7 +8338,7 @@ l3938h:
 	ld a,c			;393f	79		y
 	pop bc			;3940	c1		.
 	jp nz,l390eh		;3941	c2 0e 39	. . 9
-	call sub_13c8h		;3944	cd c8 13	. . .
+	call OUT_MSG_INLINE		;3944	cd c8 13	. . .
 	cp e			;3947	bb		.
 	jp nc,07d03h		;3948	d2 03 7d	. . }
 	push bc			;394b	c5		.
@@ -8447,7 +8481,7 @@ l3a24h:
 	ld a,c			;3a2b	79		y
 	pop bc			;3a2c	c1		.
 	jp nz,l39e9h		;3a2d	c2 e9 39	. . 9
-	call sub_13c8h		;3a30	cd c8 13	. . .
+	call OUT_MSG_INLINE		;3a30	cd c8 13	. . .
 	cp e			;3a33	bb		.
 	jp nc,07d03h		;3a34	d2 03 7d	. . }
 	pop hl			;3a37	e1		.
@@ -8526,7 +8560,7 @@ l3a79h:
 	ld iy,0d2abh		;3aa6	fd 21 ab d2	. ! . .
 	ld c,009h		;3aaa	0e 09		. .
 l3aach:
-	call SOMETHING_KBD	;3aac	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;3aac	cd a7 17	. . .
 	push bc			;3aaf	c5		.
 	ld c,a			;3ab0	4f		O
 	ld a,020h		;3ab1	3e 20		>  
@@ -8561,7 +8595,7 @@ l3aceh:
 	ld (hl),a		;3ade	77		w
 	ret			;3adf	c9		.
 sub_3ae0h:
-	call SOMETHING_KBD	;3ae0	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;3ae0	cd a7 17	. . .
 	and 05fh		;3ae3	e6 5f		. _
 	cp 00ah			;3ae5	fe 0a		. .
 	ret z			;3ae7	c8		.
@@ -8701,7 +8735,7 @@ l3ba0h:
 	pop hl			;3ba8	e1		.
 	ret			;3ba9	c9		.
 	call sub_2a82h		;3baa	cd 82 2a	. . *
-	call sub_13c8h		;3bad	cd c8 13	. . .
+	call OUT_MSG_INLINE		;3bad	cd c8 13	. . .
 	cp (hl)			;3bb0	be		.
 	jp nc,0fd17h		;3bb1	d2 17 fd	. . .
 	ld hl,0fffdh		;3bb4	21 fd ff	! . .
@@ -8726,7 +8760,7 @@ l3bcfh:
 	ld bc,00027h		;3bdf	01 27 00	. ' .
 	ldir			;3be2	ed b0		. .
 l3be4h:
-	call sub_13c8h		;3be4	cd c8 13	. . .
+	call OUT_MSG_INLINE		;3be4	cd c8 13	. . .
 	push de			;3be7	d5		.
 	jp nc,02137h		;3be8	d2 37 21	. 7 !
 	ret			;3beb	c9		.
@@ -8923,7 +8957,7 @@ l3d45h:
 sub_3d48h:
 	ld l,0ffh		;3d48	2e ff		. .
 l3d4ah:
-	call SOMETHING_KBD	;3d4a	cd a7 17	. . .
+	call NEXT_MACRO_OR_KEY	;3d4a	cd a7 17	. . .
 	push bc			;3d4d	c5		.
 	ld c,a			;3d4e	4f		O
 	ld a,00ah		;3d4f	3e 0a		> .
@@ -8999,8 +9033,7 @@ l3dbbh:
 	ldir			;3dc4	ed b0		. .
 l3dc6h:
 	call sub_2a82h		;3dc6	cd 82 2a	. . *
-	call CALL_WITH_MMAP0		;3dc9	cd b1 09	. . .
-	dw sub_c21dh
+	MCALL_WITH_MMAP0 sub_c21dh
 	call sub_978dh
 	call sub_1527h		;3dd1	cd 27 15	. ' .
 	ld bc,0cd01h		;3dd4	01 01 cd	. . .
@@ -9111,8 +9144,7 @@ l3e5ah:
 	inc hl			;3e7c	23		#
 	jp l3e5ah		;3e7d	c3 5a 3e	. Z >
 l3e80h:
-	call CALL_WITH_MMAP0		;3e80	cd b1 09	. . .
-	dw sub_c2c1h
+	MCALL_WITH_MMAP0 sub_c2c1h
 	call sub_97afh
 l3e88h:
 	ld a,(05cbah)		;3e88	3a ba 5c	: . \
@@ -9643,7 +9675,7 @@ l80b1h:
 	bit 4,(hl)		;8208	cb 66 	. f 
 	call nz,sub_2326h		;820a	c4 26 23 	. & # 
 	call sub_2a82h		;820d	cd 82 2a 	. . * 
-	call sub_13c8h		;8210	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8210	cd c8 13 	. . . 
 	adc a,b			;8213	88 	. 
 	call nc,0cdd9h		;8214	d4 d9 cd 	. . . 
 	daa			;8217	27 	' 
@@ -9654,7 +9686,7 @@ l80b1h:
 	call sub_8237h		;821e	cd 37 82 	. 7 . 
 	jp (hl)			;8221	e9 	. 
 	call sub_2a82h		;8222	cd 82 2a 	. . * 
-	call sub_13c8h		;8225	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8225	cd c8 13 	. . . 
 	ld h,c			;8228	61 	a 
 	push de			;8229	d5 	. 
 	cp d			;822a	ba 	. 
@@ -9665,7 +9697,7 @@ l80b1h:
 	call sub_8237h		;8233	cd 37 82 	. 7 . 
 	jp (hl)			;8236	e9 	. 
 sub_8237h:
-	call SOMETHING_KBD		;8237	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;8237	cd a7 17 	. . . 
 	and 0dfh		;823a	e6 df 	. . 
 	ld b,00eh		;823c	06 0e 	. . 
 l823eh:
@@ -9759,10 +9791,10 @@ l8278h:
 	jr nz,l82c7h		;82a3	20 22 	  " 
 	add a,d			;82a5	82 	. 
 	call sub_2a82h		;82a6	cd 82 2a 	. . * 
-	call sub_13c8h		;82a9	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;82a9	cd c8 13 	. . . 
 	inc c			;82ac	0c 	. 
 	out (0f6h),a		;82ad	d3 f6 	. . 
-	call sub_13c8h		;82af	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;82af	cd c8 13 	. . . 
 	ld (bc),a			;82b2	02 	. 
 	call nc,0c986h		;82b3	d4 86 c9 	. . . 
 	ld a,(05cbah)		;82b6	3a ba 5c 	: . \ 
@@ -10038,7 +10070,7 @@ l83d5h:
 	ret			;8412	c9 	. 
 	call sub_8441h		;8413	cd 41 84 	. A . 
 	call sub_2a82h		;8416	cd 82 2a 	. . * 
-	call sub_13c8h		;8419	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8419	cd c8 13 	. . . 
 	dec de			;841c	1b 	. 
 	sub 01fh		;841d	d6 1f 	. . 
 	call sub_131fh		;841f	cd 1f 13 	. . . 
@@ -10048,7 +10080,7 @@ l83d5h:
 	ld a,04bh		;842b	3e 4b 	> K 
 	ld (05cc1h),a		;842d	32 c1 5c 	2 . \ 
 	call sub_848eh		;8430	cd 8e 84 	. . . 
-	call sub_13c8h		;8433	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8433	cd c8 13 	. . . 
 	ld a,(009d6h)		;8436	3a d6 09 	: . . 
 	ld a,001h		;8439	3e 01 	> . 
 	ld (05cbah),a		;843b	32 ba 5c 	2 . \ 
@@ -10062,7 +10094,7 @@ sub_8441h:
 	jp l1934h		;844a	c3 34 19 	. 4 . 
 	call sub_8441h		;844d	cd 41 84 	. A . 
 	call sub_2a82h		;8450	cd 82 2a 	. . * 
-	call sub_13c8h		;8453	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8453	cd c8 13 	. . . 
 	ld b,e			;8456	43 	C 
 	sub 01bh		;8457	d6 1b 	. . 
 	call sub_131fh		;8459	cd 1f 13 	. . . 
@@ -10081,7 +10113,7 @@ sub_8441h:
 	ld de,05fb2h		;847d	11 b2 5f 	. . _ 
 	ld bc,FLAG_DISP		;8480	01 04 00 	. . . 
 	ldir		;8483	ed b0 	. . 
-	call sub_13c8h		;8485	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8485	cd c8 13 	. . . 
 	ld a,(009d6h)		;8488	3a d6 09 	: . . 
 	jp l1934h		;848b	c3 34 19 	. 4 . 
 sub_848eh:
@@ -10107,7 +10139,7 @@ l84aah:
 	jr z,l84ddh		;84b3	28 28 	( ( 
 	jr l84a2h		;84b5	18 eb 	. . 
 l84b7h:
-	call sub_13c8h		;84b7	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;84b7	cd c8 13 	. . . 
 	dec bc			;84ba	0b 	. 
 	rst 10h			;84bb	d7 	. 
 	ld de,01fcdh		;84bc	11 cd 1f 	. . . 
@@ -10131,7 +10163,7 @@ l84ddh:
 	pop hl			;84e0	e1 	. 
 	jp l1934h		;84e1	c3 34 19 	. 4 . 
 sub_84e4h:
-	call sub_13c8h		;84e4	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;84e4	cd c8 13 	. . . 
 	inc e			;84e7	1c 	. 
 	rst 10h			;84e8	d7 	. 
 	inc d			;84e9	14 	. 
@@ -10150,7 +10182,7 @@ sub_84f9h:
 	ret			;8504	c9 	. 
 	call sub_8441h		;8505	cd 41 84 	. A . 
 	call sub_2a82h		;8508	cd 82 2a 	. . * 
-	call sub_13c8h		;850b	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;850b	cd c8 13 	. . . 
 	ld l,l			;850e	6d 	m 
 	sub 01eh		;850f	d6 1e 	. . 
 	call sub_131fh		;8511	cd 1f 13 	. . . 
@@ -10160,7 +10192,7 @@ sub_84f9h:
 	ld a,042h		;851d	3e 42 	> B 
 	ld (05cc1h),a		;851f	32 c1 5c 	2 . \ 
 	call sub_848eh		;8522	cd 8e 84 	. . . 
-	call sub_13c8h		;8525	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8525	cd c8 13 	. . . 
 	ld a,(009d6h)		;8528	3a d6 09 	: . . 
 	ld a,003h		;852b	3e 03 	> . 
 	ld (05cbah),a		;852d	32 ba 5c 	2 . \ 
@@ -10174,7 +10206,7 @@ sub_84f9h:
 	dec b			;853e	05 	. 
 	inc c			;853f	0c 	. 
 l8540h:
-	call SOMETHING_KBD		;8540	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;8540	cd a7 17 	. . . 
 	and 0dfh		;8543	e6 df 	. . 
 	cp 053h		;8545	fe 53 	. S 
 	jr z,l854dh		;8547	28 04 	( . 
@@ -10529,8 +10561,7 @@ l8825h:
 	jr z,l8844h		;8830	28 12 	( . 
 	cp 058h		;8832	fe 58 	. X 
 	ret nz			;8834	c0 	. 
-	call CALL_WITH_MMAP0		;8835	cd b1 09 	. . . 
-	dw INIT
+	MCALL_WITH_MMAP0 INIT
 	ret			;883a	c9 	. 
 l883bh:
 	ld a,0ffh		;883b	3e ff 	> . 
@@ -10608,7 +10639,7 @@ sub_88b5h:
 	call sub_8fa5h		;88ca	cd a5 8f 	. . . 
 	jp l1934h		;88cd	c3 34 19 	. 4 . 
 l88d0h:
-	call sub_13c8h		;88d0	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;88d0	cd c8 13 	. . . 
 	ld h,h			;88d3	64 	d 
 	sub 009h		;88d4	d6 09 	. . 
 	call sub_8fa5h		;88d6	cd a5 8f 	. . . 
@@ -11403,8 +11434,7 @@ l8e26h:
 	jp z,l8f24h		;8e56	ca 24 8f 	. $ . 
 	jp l8f7fh		;8e59	c3 7f 8f 	.  . 
 l8e5ch:
-	call CALL_WITH_MMAP0		;8e5c	cd b1 09 	. . . 
-	dw INIT
+	MCALL_WITH_MMAP0 INIT
 l8e61h:
 	jp l8f7fh		;8e61	c3 7f 8f 	.  . 
 l8e64h:
@@ -11485,8 +11515,7 @@ l8efeh:
 	ld de,(05b79h)		;8efe	ed 5b 79 5b 	. [ y [ 
 	call sub_0968h		;8f02	cd 68 09 	. h . 
 	ld a,(05b84h)		;8f05	3a 84 5b 	: . [ 
-	call CALL_WITH_MMAP0		;8f08	cd b1 09 	. . . 
-	dw sub_c36ah
+	MCALL_WITH_MMAP0 sub_c36ah
 	ld (05b77h),hl
 	ld (05b85h),hl		;8f10	22 85 5b 	" . [ 
 	ld (05b79h),de		;8f13	ed 53 79 5b 	. S y [ 
@@ -11585,7 +11614,7 @@ sub_8fa5h:
 	ld (05ea1h),bc		;8fd0	ed 43 a1 5e 	. C . ^ 
 	ld a,099h		;8fd4	3e 99 	> . 
 	out (014h),a		;8fd6	d3 14 	. . 
-	call sub_13c8h		;8fd8	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;8fd8	cd c8 13 	. . . 
 	jr nc,$-39		;8fdb	30 d7 	0 . 
 	ld a,(bc)			;8fdd	0a 	. 
 	jr l8fe3h		;8fde	18 03 	. . 
@@ -11670,7 +11699,7 @@ l905ah:
 	ld hl,0		;9065	21 00 00 	! . . 
 	call sub_88dch		;9068	cd dc 88 	. . . 
 l906bh:
-	call sub_13c8h		;906b	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;906b	cd c8 13 	. . . 
 	ld a,(016d7h)		;906e	3a d7 16 	: . . 
 	ld a,(053c2h)		;9071	3a c2 53 	: . S 
 	or a			;9074	b7 	. 
@@ -11681,7 +11710,7 @@ l907bh:
 	ld a,059h		;907b	3e 59 	> Y 
 l907dh:
 	call OUTCH		;907d	cd 84 10 	. . . 
-	call sub_13c8h		;9080	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;9080	cd c8 13 	. . . 
 	ld d,b			;9083	50 	P 
 	rst 10h			;9084	d7 	. 
 	ld hl,(021fdh)		;9085	2a fd 21 	* . ! 
@@ -11970,18 +11999,18 @@ l92bbh:
 	ld a,00ah		;92c6	3e 0a 	> . 
 	call DATA2FIFO		;92c8	cd 09 0f 	. . . 
 	ret			;92cb	c9 	. 
-	call sub_13c8h		;92cc	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;92cc	cd c8 13 	. . . 
 	ld l,l			;92cf	6d 	m 
 	sub 01dh		;92d0	d6 1d 	. . 
-	call sub_13c8h		;92d2	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;92d2	cd c8 13 	. . . 
 	rst 0			;92d5	c7 	. 
 	ld d,e			;92d6	53 	S 
 	ld (bc),a			;92d7	02 	. 
-	call sub_13c8h		;92d8	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;92d8	cd c8 13 	. . . 
 	dec bc			;92db	0b 	. 
 	rst 10h			;92dc	d7 	. 
 	dec bc			;92dd	0b 	. 
-	call sub_13c8h		;92de	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;92de	cd c8 13 	. . . 
 	ret			;92e1	c9 	. 
 	ld d,e			;92e2	53 	S 
 	ld b,0cdh		;92e3	06 cd 	. . 
@@ -11996,10 +12025,10 @@ l92bbh:
 l92f3h:
 	ld (053cfh),a		;92f3	32 cf 53 	2 . S 
 	call OUTCH		;92f6	cd 84 10 	. . . 
-	call sub_13c8h		;92f9	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;92f9	cd c8 13 	. . . 
 	sbc a,c			;92fc	99 	. 
 	sub 02bh		;92fd	d6 2b 	. + 
-	call sub_13c8h		;92ff	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;92ff	cd c8 13 	. . . 
 	call z,018d6h		;9302	cc d6 18 	. . . 
 	call sub_1527h		;9305	cd 27 15 	. ' . 
 	djnz $+4		;9308	10 02 	. . 
@@ -12040,7 +12069,7 @@ l9342h:
 	inc c			;9345	0c 	. 
 	inc c			;9346	0c 	. 
 l9347h:
-	call SOMETHING_KBD		;9347	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;9347	cd a7 17 	. . . 
 	and 0dfh		;934a	e6 df 	. . 
 	cp 00ah		;934c	fe 0a 	. . 
 	jr z,l9360h		;934e	28 10 	( . 
@@ -13147,7 +13176,7 @@ l9a30h:
 	ld a,(053ceh)		;9a30	3a ce 53 	: . S 
 	and 001h		;9a33	e6 01 	. . 
 	ret z			;9a35	c8 	. 
-	call sub_13c8h		;9a36	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;9a36	cd c8 13 	. . . 
 	ld l,a			;9a39	6f 	o 
 	sub a			;9a3a	97 	. 
 	ld e,0cdh		;9a3b	1e cd 	. . 
@@ -13238,7 +13267,7 @@ sub_9aa9h:
 	call sub_2a82h		;9aa9	cd 82 2a 	. . * 
 	ld bc,00101h		;9aac	01 01 01 	. . . 
 	call sub_1548h		;9aaf	cd 48 15 	. H . 
-	call sub_13c8h		;9ab2	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;9ab2	cd c8 13 	. . . 
 	ld c,l			;9ab5	4d 	M 
 	sbc a,d			;9ab6	9a 	. 
 	inc a			;9ab7	3c 	< 
@@ -14045,8 +14074,7 @@ la0bfh:
 	ld a,c			;a0d9	79 	y 
 	jp z,la2afh		;a0da	ca af a2 	. . . 
 	ld hl,05bb8h		;a0dd	21 b8 5b 	! . [ 
-	call CALL_WITH_MMAP0		;a0e0	cd b1 09 	. . . 
-	dw sub_c103h
+	MCALL_WITH_MMAP0 sub_c103h
 	ld b,002h		;a0e5	06 02 	. . 
 	call sub_1ae6h		;a0e7	cd e6 1a 	. . . 
 	push af			;a0ea	f5 	. 
@@ -14316,8 +14344,7 @@ sub_a2a4h:
 la2afh:
 	ld hl,05bb8h		;a2af	21 b8 5b 	! . [ 
 	ld a,c			;a2b2	79 	y 
-	call CALL_WITH_MMAP0		;a2b3	cd b1 09 	. . . 
-	dw sub_c103h
+	MCALL_WITH_MMAP0 sub_c103h
 	ld b,002h		;a2b8	06 02 	. . 
 	call sub_1ae6h		;a2ba	cd e6 1a 	. . . 
 	cp 01fh		;a2bd	fe 1f 	. . 
@@ -14568,8 +14595,7 @@ sub_a468h:
 	jp z,laaa0h		;a48e	ca a0 aa 	. . . 
 	ld a,c			;a491	79 	y 
 	ld hl,05bdeh		;a492	21 de 5b 	! . [ 
-	call CALL_WITH_MMAP0		;a495	cd b1 09 	. . . 
-	dw sub_c103h
+	MCALL_WITH_MMAP0 sub_c103h
 	ld b,003h		;a49a	06 03 	. . 
 	call sub_1ae6h		;a49c	cd e6 1a 	. . . 
 	push af			;a49f	f5 	. 
@@ -15079,8 +15105,7 @@ la824h:
 	cp 042h		;a840	fe 42 	. B 
 	ld a,c			;a842	79 	y 
 	jr nz,la84ah		;a843	20 05 	  . 
-	call CALL_WITH_MMAP0		;a845	cd b1 09 	. . . 
-	dw sub_c103h
+	MCALL_WITH_MMAP0 sub_c103h
 la84ah:
 	res 7,a		;a84a	cb bf 	. . 
 	ld b,005h		;a84c	06 05 	. . 
@@ -15622,7 +15647,7 @@ lac0fh:
 	ld hl,0		;ac2e	21 00 00 	! . . 
 	call sub_88dch		;ac31	cd dc 88 	. . . 
 lac34h:
-	call sub_13c8h		;ac34	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ac34	cd c8 13 	. . . 
 	ld a,d			;ac37	7a 	z 
 	rst 10h			;ac38	d7 	. 
 	ld d,l			;ac39	55 	U 
@@ -15672,14 +15697,14 @@ lac5dh:
 	ld a,(00014h)		;ac71	3a 14 00 	: . . 
 	cp 0ffh		;ac74	fe ff 	. . 
 	jp nz,laed0h		;ac76	c2 d0 ae 	. . . 
-	call sub_13c8h		;ac79	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ac79	cd c8 13 	. . . 
 	rst 8			;ac7c	cf 	. 
 	rst 10h			;ac7d	d7 	. 
 	inc bc			;ac7e	03 	. 
-	call sub_13c8h		;ac7f	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ac7f	cd c8 13 	. . . 
 	sbc a,0d7h		;ac82	de d7 	. . 
 	ld b,a			;ac84	47 	G 
-	call sub_13c8h		;ac85	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ac85	cd c8 13 	. . . 
 	dec h			;ac88	25 	% 
 	ret c			;ac89	d8 	. 
 	ld l,e			;ac8a	6b 	k 
@@ -15697,16 +15722,16 @@ lac5dh:
 	ld a,(CFG9)		;aca3	3a 15 00 	: . . 
 	cp 0ffh		;aca6	fe ff 	. . 
 	jp nz,laed0h		;aca8	c2 d0 ae 	. . . 
-	call sub_13c8h		;acab	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;acab	cd c8 13 	. . . 
 	jp nc,004d7h		;acae	d2 d7 04 	. . . 
-	call sub_13c8h		;acb1	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;acb1	cd c8 13 	. . . 
 	sbc a,0d7h		;acb4	de d7 	. . 
 	ld b,h			;acb6	44 	D 
-	call sub_13c8h		;acb7	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;acb7	cd c8 13 	. . . 
 	dec h			;acba	25 	% 
 	ret c			;acbb	d8 	. 
 	ld c,e			;acbc	4b 	K 
-	call sub_13c8h		;acbd	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;acbd	cd c8 13 	. . . 
 	ld a,(hl)			;acc0	7e 	~ 
 	ret c			;acc1	d8 	. 
 	ld (de),a			;acc2	12 	. 
@@ -15723,20 +15748,20 @@ lac5dh:
 	ld a,(CFG9)		;acdb	3a 15 00 	: . . 
 	cp 0aah		;acde	fe aa 	. . 
 	jp nz,laed0h		;ace0	c2 d0 ae 	. . . 
-	call sub_13c8h		;ace3	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ace3	cd c8 13 	. . . 
 	sub 0d7h		;ace6	d6 d7 	. . 
 	dec a			;ace8	3d 	= 
-	call sub_13c8h		;ace9	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ace9	cd c8 13 	. . . 
 	dec h			;acec	25 	% 
 	ret c			;aced	d8 	. 
 	inc h			;acee	24 	$ 
-	call sub_13c8h		;acef	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;acef	cd c8 13 	. . . 
 	ld d,a			;acf2	57 	W 
 	ret c			;acf3	d8 	. 
 	ld a,(bc)			;acf4	0a 	. 
 	call OUTCH_INLINE
 	db '/' 
-	call sub_13c8h		;acf9	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;acf9	cd c8 13 	. . . 
 	ld l,c			;acfc	69 	i 
 	ret c			;acfd	d8 	. 
 	ld b,0cdh		;acfe	06 cd 	. . 
@@ -15760,7 +15785,7 @@ lac5dh:
 	jp nz,laed0h		;ad26	c2 d0 ae 	. . . 
 lad29h:
 	ld iy,05461h		;ad29	fd 21 61 54 	. ! a T 
-	call sub_13c8h		;ad2d	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ad2d	cd c8 13 	. . . 
 	ld h,d			;ad30	62 	b 
 	ret c			;ad31	d8 	. 
 	ld b,0cdh		;ad32	06 cd 	. . 
@@ -15787,7 +15812,7 @@ lad29h:
 	cp 0aah		;ad58	fe aa 	. . 
 	jp nz,laed0h		;ad5a	c2 d0 ae 	. . . 
 	ld iy,053c2h		;ad5d	fd 21 c2 53 	. ! . S 
-	call sub_13c8h		;ad61	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ad61	cd c8 13 	. . . 
 	defb 0fdh,0d8h,00eh	;illegal sequence		;ad64	fd d8 0e 	. . . 
 	call sub_adf5h		;ad67	cd f5 ad 	. . . 
 	call sub_13e4h		;ad6a	cd e4 13 	. . . 
@@ -15807,7 +15832,7 @@ lad29h:
 	cp 0aah		;ad84	fe aa 	. . 
 	jp nz,laed0h		;ad86	c2 d0 ae 	. . . 
 	ld iy,0540dh		;ad89	fd 21 0d 54 	. ! . T 
-	call sub_13c8h		;ad8d	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ad8d	cd c8 13 	. . . 
 	add a,0d7h		;ad90	c6 d7 	. . 
 	add hl,bc			;ad92	09 	. 
 	call sub_adf5h		;ad93	cd f5 ad 	. . . 
@@ -15838,8 +15863,7 @@ ladb1h:
 	jp l1925h		;adc9	c3 25 19 	. % . 
 ladcch:
 	ldir		;adcc	ed b0 	. . 
-	call CALL_WITH_MMAP0		;adce	cd b1 09 	. . . 
-	dw INIT
+	MCALL_WITH_MMAP0 INIT
 	jp l1925h		;add3	c3 25 19 	. % . 
 	call sub_13e4h		;add6	cd e4 13 	. . . 
 	nop			;add9	00 	. 
@@ -15883,7 +15907,7 @@ ladfbh:
 	dec bc			;ae16	0b 	. 
 	ret			;ae17	c9 	. 
 sub_ae18h:
-	call sub_13c8h		;ae18	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;ae18	cd c8 13 	. . . 
 	sub b			;ae1b	90 	. 
 	ret c			;ae1c	d8 	. 
 	ld h,0cdh		;ae1d	26 cd 	& . 
@@ -15956,7 +15980,7 @@ lae71h:
 	add a,c			;ae98	81 	. 
 	ld e,a			;ae99	5f 	_ 
 lae9ah:
-	call SOMETHING_KBD		;ae9a	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;ae9a	cd a7 17 	. . . 
 	cp 00ah		;ae9d	fe 0a 	. . 
 	jr z,laebch		;ae9f	28 1b 	( . 
 	cp 030h		;aea1	fe 30 	. 0 
@@ -15986,7 +16010,7 @@ sub_aec5h:
 	inc iy		;aecd	fd 23 	. # 
 	ret			;aecf	c9 	. 
 laed0h:
-	call sub_13c8h		;aed0	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;aed0	cd c8 13 	. . . 
 	ex de,hl			;aed3	eb 	. 
 	ret c			;aed4	d8 	. 
 	ld (de),a			;aed5	12 	. 
@@ -15997,7 +16021,7 @@ sub_aed9h:
 	ld a,(00017h)		;aee0	3a 17 00 	: . . 
 	cp 0ffh		;aee3	fe ff 	. . 
 	jr nz,laed0h		;aee5	20 e9 	  . 
-	call sub_13c8h		;aee7	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;aee7	cd c8 13 	. . . 
 	dec bc			;aeea	0b 	. 
 	exx			;aeeb	d9 	. 
 	ld d,b			;aeec	50 	P 
@@ -16010,7 +16034,7 @@ laeefh:
 	ld (bc),a			;aef8	02 	. 
 	call OUTCH_INLINE
 	db 0x0f 
-	call sub_13c8h		;aefd	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;aefd	cd c8 13 	. . . 
 	ld e,e			;af00	5b 	[ 
 	exx			;af01	d9 	. 
 	rlca			;af02	07 	. 
@@ -16019,7 +16043,7 @@ laeefh:
 	jr z,laf0eh		;af08	28 04 	( . 
 	ld (iy+000h),042h		;af0a	fd 36 00 42 	. 6 . B 
 laf0eh:
-	call sub_13c8h		;af0e	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;af0e	cd c8 13 	. . . 
 	nop			;af11	00 	. 
 	nop			;af12	00 	. 
 	ld bc,lc8cdh		;af13	01 cd c8 	. . . 
@@ -16074,7 +16098,7 @@ laf68h:
 	call OUTCH		;af68	cd 84 10 	. . . 
 	call sub_1570h		;af6b	cd 70 15 	. p . 
 	inc bc			;af6e	03 	. 
-	call sub_13c8h		;af6f	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;af6f	cd c8 13 	. . . 
 	dec b			;af72	05 	. 
 	nop			;af73	00 	. 
 	inc b			;af74	04 	. 
@@ -16137,7 +16161,7 @@ lafb8h:
 	ld (053c2h),hl		;afd8	22 c2 53 	" . S 
 	ld (053c4h),hl		;afdb	22 c4 53 	" . S 
 	call sub_2a82h		;afde	cd 82 2a 	. . * 
-	call sub_13c8h		;afe1	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;afe1	cd c8 13 	. . . 
 	ld (hl),h			;afe4	74 	t 
 	exx			;afe5	d9 	. 
 	ld d,0cdh		;afe6	16 cd 	. . 
@@ -16176,7 +16200,7 @@ lb030h:
 	xor a			;b030	af 	. 
 	call SETMEMMAP		;b031	cd 1a 0f 	. . . 
 	call 0b0a5h		;b034	cd a5 b0 	. . . 
-	call sub_13c8h		;b037	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b037	cd c8 13 	. . . 
 	adc a,d			;b03a	8a 	. 
 	exx			;b03b	d9 	. 
 	ld a,(bc)			;b03c	0a 	. 
@@ -16228,7 +16252,7 @@ lb086h:
 	pop bc			;b08b	c1 	. 
 	ret			;b08c	c9 	. 
 	call 0b0a5h		;b08d	cd a5 b0 	. . . 
-	call sub_13c8h		;b090	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b090	cd c8 13 	. . . 
 	sub h			;b093	94 	. 
 	exx			;b094	d9 	. 
 	inc b			;b095	04 	. 
@@ -16265,7 +16289,7 @@ lb0c3h:
 	ld (053c4h),hl		;b0cd	22 c4 53 	" . S 
 	ld (053c6h),hl		;b0d0	22 c6 53 	" . S 
 	call sub_2a82h		;b0d3	cd 82 2a 	. . * 
-	call sub_13c8h		;b0d6	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b0d6	cd c8 13 	. . . 
 	sbc a,b			;b0d9	98 	. 
 	exx			;b0da	d9 	. 
 	jr nz,$-49		;b0db	20 cd 	  . 
@@ -16309,7 +16333,7 @@ lb123h:
 	call sub_22f0h		;b127	cd f0 22 	. . " 
 	call sub_2318h		;b12a	cd 18 23 	. . # 
 	call 0b0a5h		;b12d	cd a5 b0 	. . . 
-	call sub_13c8h		;b130	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b130	cd c8 13 	. . . 
 	cp b			;b133	b8 	. 
 	exx			;b134	d9 	. 
 	ld (de),a			;b135	12 	. 
@@ -16445,7 +16469,7 @@ lb218h:
 	db 0x0f
 	call OUTCH_INLINE		;b225	cd 18 13 	. . . 
 	db 0x04
-	call sub_13c8h		;b229	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b229	cd c8 13 	. . . 
 	adc a,053h		;b22c	ce 53 	. S 
 	jr nz,lb1fdh		;b22e	20 cd 	  . 
 	jr $+21		;b230	18 13 	. . 
@@ -16460,7 +16484,7 @@ lb218h:
 	call sub_157ch		;b240	cd 7c 15 	. | . 
 	call OUTCH_INLINE		;b243	cd 18 13 	. . . 
 	db 0x0e
-	call SOMETHING_KBD
+	call NEXT_MACRO_OR_KEY
 	cp 020h		;b24a	fe 20 	.   
 	jr nz,lb25fh		;b24c	20 11 	  . 
 	ld a,(05686h)		;b24e	3a 86 56 	: . V 
@@ -16653,23 +16677,20 @@ lb397h:
 	rra			;b39e	1f 	. 
 	ld e,01fh		;b39f	1e 1f 	. . 
 	ld e,01fh		;b3a1	1e 1f 	. . 
-	call CALL_WITH_MMAP0		;b3a3	cd b1 09 	. . . 
-	dw sub_c45eh
+	MCALL_WITH_MMAP0 sub_c45eh
 	ret
 	call 09b1h
 	ld d,h			;b3ac	54 	T 
 	push bc			;b3ad	c5 	. 
 	ret			;b3ae	c9 	. 
 sub_b3afh:
-	call CALL_WITH_MMAP0		;b3af	cd b1 09 	. . . 
-	dw sub_c5cbh
+	MCALL_WITH_MMAP0 sub_c5cbh
 	ret			;b3b4	c9 	. 
 sub_b3b5h:
-	call CALL_WITH_MMAP0		;b3b5	cd b1 09 	. . . 
-	dw sub_c60bh
+	MCALL_WITH_MMAP0 sub_c60bh
 	ret
 	call sub_2a82h		;b3bb	cd 82 2a 	. . * 
-	call sub_13c8h		;b3be	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b3be	cd c8 13 	. . . 
 	ld (033dbh),a		;b3c1	32 db 33 	2 . 3 
 	call sub_1527h		;b3c4	cd 27 15 	. ' . 
 	ld bc,02615h		;b3c7	01 15 26 	. . & 
@@ -16822,7 +16843,7 @@ lb4b5h:
 	push hl			;b4b5	e5 	. 
 	push de			;b4b6	d5 	. 
 lb4b7h:
-	call SOMETHING_KBD		;b4b7	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;b4b7	cd a7 17 	. . . 
 	cp 02dh		;b4ba	fe 2d 	. - 
 	jr z,lb50fh		;b4bc	28 51 	( Q 
 	cp 00ah		;b4be	fe 0a 	. . 
@@ -17012,13 +17033,13 @@ lb5e1h:
 	db 0x08
 	jr sub_b5d8h		;b5e5	18 f1 	. . 
 sub_b5e7h:
-	call sub_13c8h		;b5e7	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b5e7	cd c8 13 	. . . 
 	jp z,00bd9h		;b5ea	ca d9 0b 	. . . 
 	call sub_1431h		;b5ed	cd 31 14 	. 1 . 
 	nop			;b5f0	00 	. 
 	nop			;b5f1	00 	. 
 	inc bc			;b5f2	03 	. 
-	call sub_13c8h		;b5f3	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b5f3	cd c8 13 	. . . 
 	push de			;b5f6	d5 	. 
 	exx			;b5f7	d9 	. 
 	inc c			;b5f8	0c 	. 
@@ -17050,7 +17071,7 @@ lb60bh:
 	cp 0aah		;b61e	fe aa 	. . 
 	jr nz,lb64dh		;b620	20 2b 	  + 
 	call sub_2a82h		;b622	cd 82 2a 	. . * 
-	call sub_13c8h		;b625	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b625	cd c8 13 	. . . 
 	jr lb606h		;b628	18 dc 	. . 
 	add hl,sp			;b62a	39 	9 
 	ld a,04ch		;b62b	3e 4c 	> L 
@@ -17140,7 +17161,7 @@ lb6c5h:
 	djnz lb6b8h		;b6c9	10 ed 	. . 
 	ret			;b6cb	c9 	. 
 sub_b6cch:
-	call sub_13c8h		;b6cc	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b6cc	cd c8 13 	. . . 
 	ld l,d			;b6cf	6a 	j 
 	in a,(0aeh)		;b6d0	db ae 	. . 
 	call sub_1564h		;b6d2	cd 64 15 	. d . 
@@ -17187,7 +17208,7 @@ lb709h:
 	inc b			;b71d	04 	. 
 	ld hl,053c7h		;b71e	21 c7 53 	! . S 
 lb721h:
-	call SOMETHING_KBD		;b721	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;b721	cd a7 17 	. . . 
 	cp 07fh		;b724	fe 7f 	.  
 	jr nz,lb735h		;b726	20 0d 	  . 
 	ld a,b			;b728	78 	x 
@@ -17224,7 +17245,7 @@ lb751h:
 	ld b,006h		;b75f	06 06 	. . 
 	ld (bc),a			;b761	02 	. 
 lb762h:
-	call SOMETHING_KBD		;b762	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;b762	cd a7 17 	. . . 
 	cp 07fh		;b765	fe 7f 	.  
 	jr nz,lb782h		;b767	20 19 	  . 
 	dec hl			;b769	2b 	+ 
@@ -17268,7 +17289,7 @@ lb79eh:
 	inc bc			;b7ac	03 	. 
 	ld b,002h		;b7ad	06 02 	. . 
 lb7afh:
-	call SOMETHING_KBD		;b7af	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;b7af	cd a7 17 	. . . 
 	cp 07fh		;b7b2	fe 7f 	.  
 	jr nz,lb7cfh		;b7b4	20 19 	  . 
 	dec hl			;b7b6	2b 	+ 
@@ -17401,7 +17422,7 @@ sub_b87bh:
 	ld b,004h		;b87b	06 04 	. . 
 	push hl			;b87d	e5 	. 
 lb87eh:
-	call SOMETHING_KBD		;b87e	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;b87e	cd a7 17 	. . . 
 	cp 07fh		;b881	fe 7f 	.  
 	jr nz,lb892h		;b883	20 0d 	  . 
 	ld a,b			;b885	78 	x 
@@ -17477,7 +17498,7 @@ lb8d8h:
 	call sub_88dch		;b8f8	cd dc 88 	. . . 
 lb8fbh:
 	call sub_2a82h		;b8fb	cd 82 2a 	. . * 
-	call sub_13c8h		;b8fe	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b8fe	cd c8 13 	. . . 
 	ld d,c			;b901	51 	Q 
 	call c,0cd29h		;b902	dc 29 cd 	. ) . 
 	ld sp,0c214h		;b905	31 14 c2 	1 . . 
@@ -17575,7 +17596,7 @@ sub_b9cah:
 	ret			;b9d0	c9 	. 
 sub_b9d1h:
 	call sub_2a82h		;b9d1	cd 82 2a 	. . * 
-	call sub_13c8h		;b9d4	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b9d4	cd c8 13 	. . . 
 	ld a,d			;b9d7	7a 	z 
 	call c,03aa2h		;b9d8	dc a2 3a 	. . : 
 	inc c			;b9db	0c 	. 
@@ -17585,7 +17606,7 @@ sub_b9d1h:
 	call sub_1527h		;b9e1	cd 27 15 	. ' . 
 	ex af,af'			;b9e4	08 	. 
 	inc c			;b9e5	0c 	. 
-	call sub_13c8h		;b9e6	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b9e6	cd c8 13 	. . . 
 	inc e			;b9e9	1c 	. 
 	defb 0ddh,008h,03ah	;illegal sequence		;b9ea	dd 08 3a 	. . : 
 	ld c,000h		;b9ed	0e 00 	. . 
@@ -17594,7 +17615,7 @@ sub_b9d1h:
 	call sub_1527h		;b9f2	cd 27 15 	. ' . 
 	ex af,af'			;b9f5	08 	. 
 	dec d			;b9f6	15 	. 
-	call sub_13c8h		;b9f7	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;b9f7	cd c8 13 	. . . 
 	inc h			;b9fa	24 	$ 
 	defb 0ddh,00ch,0c9h	;illegal sequence		;b9fb	dd 0c c9 	. . . 
 sub_b9feh:
@@ -17737,7 +17758,7 @@ sub_bae5h:
 	jp z,lbc42h		;bb06	ca 42 bc 	. B . 
 	ret			;bb09	c9 	. 
 lbb0ah:
-	call sub_13c8h		;bb0a	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;bb0a	cd c8 13 	. . . 
 	ld c,c			;bb0d	49 	I 
 lbb0eh:
 	pop de			;bb0e	d1 	. 
@@ -17745,7 +17766,7 @@ lbb0eh:
 	call sub_1527h		;bb10	cd 27 15 	. ' . 
 	dec bc			;bb13	0b 	. 
 	ld a,(bc)			;bb14	0a 	. 
-	call sub_13c8h		;bb15	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;bb15	cd c8 13 	. . . 
 	ld d,a			;bb18	57 	W 
 	pop de			;bb19	d1 	. 
 	ld a,(bc)			;bb1a	0a 	. 
@@ -17759,7 +17780,7 @@ lbb0eh:
 	call sub_b86dh		;bb28	cd 6d b8 	. m . 
 	ret			;bb2b	c9 	. 
 lbb2ch:
-	call sub_13c8h		;bb2c	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;bb2c	cd c8 13 	. . . 
 	jr nc,lbb0eh		;bb2f	30 dd 	0 . 
 	ld d,b			;bb31	50 	P 
 	call sub_1527h		;bb32	cd 27 15 	. ' . 
@@ -17813,7 +17834,7 @@ lbb75h:
 lbb94h:
 	cp 046h		;bb94	fe 46 	. F 
 	ret nz			;bb96	c0 	. 
-	call sub_13c8h		;bb97	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;bb97	cd c8 13 	. . . 
 	add a,b			;bb9a	80 	. 
 	defb 0ddh,045h	;ld b,ixl		;bb9b	dd 45 	. E 
 	call sub_1527h		;bb9d	cd 27 15 	. ' . 
@@ -18029,7 +18050,7 @@ lbd2bh:
 	ld bc,04efdh		;bd2e	01 fd 4e 	. . N 
 	inc b			;bd31	04 	. 
 lbd32h:
-	call SOMETHING_KBD		;bd32	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;bd32	cd a7 17 	. . . 
 	cp 00ah		;bd35	fe 0a 	. . 
 	jr z,lbd69h		;bd37	28 30 	( 0 
 	res 5,a		;bd39	cb af 	. . 
@@ -18100,7 +18121,7 @@ lbdb1h:
 	ex af,af'			;bdb5	08 	. 
 	ld c,(iy+005h)		;bdb6	fd 4e 05 	. N . 
 lbdb9h:
-	call SOMETHING_KBD		;bdb9	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;bdb9	cd a7 17 	. . . 
 	cp 00ah		;bdbc	fe 0a 	. . 
 	jr z,lbdd4h		;bdbe	28 14 	( . 
 	res 5,a		;bdc0	cb af 	. . 
@@ -18122,7 +18143,7 @@ lbdd4h:
 	ld a,(bc)			;bde1	0a 	. 
 	ex af,af'			;bde2	08 	. 
 lbde3h:
-	call SOMETHING_KBD		;bde3	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;bde3	cd a7 17 	. . . 
 	cp 00ah		;bde6	fe 0a 	. . 
 	jr z,lbe00h		;bde8	28 16 	( . 
 	res 5,a		;bdea	cb af 	. . 
@@ -18156,7 +18177,7 @@ lbe21h:
 sub_be25h:
 	call sub_1527h		;be25	cd 27 15 	. ' . 
 	jr $+3		;be28	18 01 	. . 
-	call sub_13c8h		;be2a	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;be2a	cd c8 13 	. . . 
 	jp pe,012ddh		;be2d	ea dd 12 	. . . 
 	call sub_1570h		;be30	cd 70 15 	. p . 
 	ld (bc),a			;be33	02 	. 
@@ -18164,7 +18185,7 @@ sub_be25h:
 	and h			;be37	a4 	. 
 	ld e,a			;be38	5f 	_ 
 	inc bc			;be39	03 	. 
-	call sub_13c8h		;be3a	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;be3a	cd c8 13 	. . . 
 	ret c			;be3d	d8 	. 
 	defb 0ddh,007h,0cdh	;illegal sequence		;be3e	dd 07 cd 	. . . 
 	ld l,h			;be41	6c 	l 
@@ -18207,7 +18228,7 @@ lbe76h:
 sub_be8ch:
 	call sub_1527h		;be8c	cd 27 15 	. ' . 
 	jr $+3		;be8f	18 01 	. . 
-	call sub_13c8h		;be91	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;be91	cd c8 13 	. . . 
 	call m,01eddh		;be94	fc dd 1e 	. . . 
 	call sub_156ch		;be97	cd 6c 15 	. l . 
 	ld a,(bc)			;be9a	0a 	. 
@@ -18218,7 +18239,7 @@ sub_be8ch:
 	call sub_1527h		;bea1	cd 27 15 	. ' . 
 	ld bc,0c908h		;bea4	01 08 c9 	. . . 
 lbea7h:
-	call SOMETHING_KBD		;bea7	cd a7 17 	. . . 
+	call NEXT_MACRO_OR_KEY		;bea7	cd a7 17 	. . . 
 	cp 00ah		;beaa	fe 0a 	. . 
 	ret z			;beac	c8 	. 
 	res 5,a		;bead	cb af 	. . 
@@ -18666,7 +18687,7 @@ sub_c21dh:
 	dec d			;c241	15 	. 
 	inc bc			;c242	03 	. 
 	rrca			;c243	0f 	. 
-	call sub_13c8h		;c244	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;c244	cd c8 13 	. . . 
 	jp nz,00253h		;c247	c2 53 02 	. S . 
 	call sub_1527h		;c24a	cd 27 15 	. ' . 
 	ld b,001h		;c24d	06 01 	. . 
@@ -18701,17 +18722,17 @@ lc26ch:
 	ld a,c			;c27a	79 	y 
 	pop bc			;c27b	c1 	. 
 	jp nz,lc255h		;c27c	c2 55 c2 	. U . 
-	call sub_13c8h		;c27f	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;c27f	cd c8 13 	. . . 
 	ld d,0c4h		;c282	16 c4 	. . 
 	dec l			;c284	2d 	- 
 	call sub_c2b1h		;c285	cd b1 c2 	. . . 
-	call sub_13c8h		;c288	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;c288	cd c8 13 	. . . 
 	pop af			;c28b	f1 	. 
 	jp lcd14h		;c28c	c3 14 cd 	. . . 
 	ld sp,lcc14h		;c28f	31 14 cc 	1 . . 
 	ld d,e			;c292	53 	S 
 	inc b			;c293	04 	. 
-	call sub_13c8h		;c294	cd c8 13 	. . . 
+	call OUT_MSG_INLINE		;c294	cd c8 13 	. . . 
 	dec b			;c297	05 	. 
 	call nz,0cd0ah		;c298	c4 0a cd 	. . . 
 	ld (hl),b			;c29b	70 	p 
@@ -18856,174 +18877,32 @@ lc390h:
 	sbc hl,de		;c3a0	ed 52 	. R 
 	pop de			;c3a2	d1 	. 
 	ret			;c3a3	c9 	. 
-	rrca			;c3a4	0f 	. 
-	ld b,e			;c3a5	43 	C 
-	ld c,b			;c3a6	48 	H 
-	ld b,c			;c3a7	41 	A 
-	ld c,(hl)			;c3a8	4e 	N 
-	ld c,(hl)			;c3a9	4e 	N 
-	ld b,l			;c3aa	45 	E 
-	ld c,h			;c3ab	4c 	L 
-	jr nz,lc3fch		;c3ac	20 4e 	  N 
-	ld b,c			;c3ae	41 	A 
-	ld c,l			;c3af	4d 	M 
-	ld b,l			;c3b0	45 	E 
-	dec b			;c3b1	05 	. 
-	dec b			;c3b2	05 	. 
-	ld d,d			;c3b3	52 	R 
-	ld b,l			;c3b4	45 	E 
-	ld b,a			;c3b5	47 	G 
-	ld c,c			;c3b6	49 	I 
-	ld c,a			;c3b7	4f 	O 
-	ld c,(hl)			;c3b8	4e 	N 
-	jr nz,lc3dbh		;c3b9	20 20 	    
-	jr nz,lc401h		;c3bb	20 44 	  D 
-	ld c,c			;c3bd	49 	I 
-	ld d,e			;c3be	53 	S 
-	ld d,b			;c3bf	50 	P 
-	ld c,h			;c3c0	4c 	L 
-	ld b,c			;c3c1	41 	A 
-	ld e,c			;c3c2	59 	Y 
-	jr nz,lc411h		;c3c3	20 4c 	  L 
-	ld c,c			;c3c5	49 	I 
-	ld c,(hl)			;c3c6	4e 	N 
-	ld b,l			;c3c7	45 	E 
-	ld d,e			;c3c8	53 	S 
-	dec b			;c3c9	05 	. 
-	ld c,(hl)			;c3ca	4e 	N 
-	ld d,l			;c3cb	55 	U 
-	ld c,l			;c3cc	4d 	M 
-	ld b,d			;c3cd	42 	B 
-	ld b,l			;c3ce	45 	E 
-	ld d,d			;c3cf	52 	R 
-	jr nz,lc3f2h		;c3d0	20 20 	    
-	jr nz,lc3f4h		;c3d2	20 20 	    
-	ld d,b			;c3d4	50 	P 
-	ld b,l			;c3d5	45 	E 
-	ld d,d			;c3d6	52 	R 
-	jr nz,$+84		;c3d7	20 52 	  R 
-	ld b,l			;c3d9	45 	E 
-	ld b,a			;c3da	47 	G 
-lc3dbh:
-	ld c,c			;c3db	49 	I 
-	ld c,a			;c3dc	4f 	O 
-	ld c,(hl)			;c3dd	4e 	N 
-	dec b			;c3de	05 	. 
-	ld c,(hl)			;c3df	4e 	N 
-	ld d,l			;c3e0	55 	U 
-	ld c,l			;c3e1	4d 	M 
-	ld b,d			;c3e2	42 	B 
-	ld b,l			;c3e3	45 	E 
-	ld d,d			;c3e4	52 	R 
-	jr nz,lc436h		;c3e5	20 4f 	  O 
-	ld b,(hl)			;c3e7	46 	F 
-	jr nz,lc43ah		;c3e8	20 50 	  P 
-	ld b,c			;c3ea	41 	A 
-	ld b,a			;c3eb	47 	G 
-	ld b,l			;c3ec	45 	E 
-	ld d,e			;c3ed	53 	S 
-	jr nz,lc410h		;c3ee	20 20 	    
-	jr nz,lc3f7h		;c3f0	20 05 	  . 
-lc3f2h:
-	dec b			;c3f2	05 	. 
-	ld c,(hl)			;c3f3	4e 	N 
-lc3f4h:
-	ld d,l			;c3f4	55 	U 
-	ld c,l			;c3f5	4d 	M 
-	ld b,d			;c3f6	42 	B 
-lc3f7h:
-	ld b,l			;c3f7	45 	E 
-	ld d,d			;c3f8	52 	R 
-	jr nz,$+81		;c3f9	20 4f 	  O 
-	ld b,(hl)			;c3fb	46 	F 
-lc3fch:
-	jr nz,$+71		;c3fc	20 45 	  E 
-	ld d,(hl)			;c3fe	56 	V 
-	ld b,l			;c3ff	45 	E 
-	ld c,(hl)			;c400	4e 	N 
-lc401h:
-	ld d,h			;c401	54 	T 
-	ld d,e			;c402	53 	S 
-	jr nz,lc425h		;c403	20 20 	    
-	jr nz,$+34		;c405	20 20 	    
-	ld c,l			;c407	4d 	M 
-	ld b,c			;c408	41 	A 
-	ld e,b			;c409	58 	X 
-	jr nz,lc441h		;c40a	20 35 	  5 
-	ld sp,00532h		;c40c	31 32 05 	1 2 . 
-	ld c,l			;c40f	4d 	M 
-lc410h:
-	ld c,c			;c410	49 	I 
-lc411h:
-	ld c,(hl)			;c411	4e 	N 
-	jr nz,$+34		;c412	20 20 	    
-	ld sp,l0536h		;c414	31 36 05 	1 6 . 
-	dec b			;c417	05 	. 
-	ld d,e			;c418	53 	S 
-	ld b,l			;c419	45 	E 
-	ld d,c			;c41a	51 	Q 
-	ld d,l			;c41b	55 	U 
-	ld b,l			;c41c	45 	E 
-	ld c,(hl)			;c41d	4e 	N 
-	ld b,e			;c41e	43 	C 
-	ld b,l			;c41f	45 	E 
-	jr nz,lc468h		;c420	20 46 	  F 
-	ld d,d			;c422	52 	R 
-	ld c,a			;c423	4f 	O 
-	ld c,l			;c424	4d 	M 
-lc425h:
-	dec b			;c425	05 	. 
-	jr nz,lc448h		;c426	20 20 	    
-	jr nz,$+34		;c428	20 20 	    
-	jr nz,$+71		;c42a	20 45 	  E 
-	ld e,b			;c42c	58 	X 
-	ld d,h			;c42d	54 	T 
-	ld b,l			;c42e	45 	E 
-	ld d,d			;c42f	52 	R 
-	ld c,(hl)			;c430	4e 	N 
-	ld b,c			;c431	41 	A 
-	ld c,h			;c432	4c 	L 
-	jr nz,lc479h		;c433	20 44 	  D 
-	ld b,l			;c435	45 	E 
-lc436h:
-	ld d,(hl)			;c436	56 	V 
-	ld c,c			;c437	49 	I 
-	ld b,e			;c438	43 	C 
-	ld b,l			;c439	45 	E 
-lc43ah:
-	ccf			;c43a	3f 	? 
-	jr nz,lc45dh		;c43b	20 20 	    
-	jr z,$+91		;c43d	28 59 	( Y 
-	cpl			;c43f	2f 	/ 
-	ld c,(hl)			;c440	4e 	N 
-lc441h:
-	add hl,hl			;c441	29 	) 
-	jr nz,lc487h		;c442	20 43 	  C 
-	ld d,h			;c444	54 	T 
-	ld d,d			;c445	52 	R 
-	ld c,h			;c446	4c 	L 
-	dec l			;c447	2d 	- 
-lc448h:
-	ld d,e			;c448	53 	S 
-	jr nz,$+63		;c449	20 3d 	  = 
-	jr nz,$+70		;c44b	20 44 	  D 
-	ld c,c			;c44d	49 	I 
-	ld d,e			;c44e	53 	S 
-	ld b,e			;c44f	43 	C 
-	ld c,a			;c450	4f 	O 
-	ld c,(hl)			;c451	4e 	N 
-	ld c,(hl)			;c452	4e 	N 
-	ld b,l			;c453	45 	E 
-	ld b,e			;c454	43 	C 
-	ld d,h			;c455	54 	T 
-	jr nz,$+68		;c456	20 42 	  B 
-	ld b,c			;c458	41 	A 
-	ld d,h			;c459	54 	T 
-	ld d,h			;c45a	54 	T 
-	ld b,l			;c45b	45 	E 
-	ld d,d			;c45c	52 	R 
-lc45dh:
-	ld e,c			;c45d	59 	Y 
+
+	db                         0x0f, 0x43, 0x48, 0x41   ; c3a4 :     .CHA
+	db 0x4e, 0x4e, 0x45, 0x4c, 0x20, 0x4e, 0x41, 0x4d   ; c3a8 : NNEL NAM
+	db 0x45, 0x05, 0x05, 0x52, 0x45, 0x47, 0x49, 0x4f   ; c3b0 : E..REGIO
+	db 0x4e, 0x20, 0x20, 0x20, 0x44, 0x49, 0x53, 0x50   ; c3b8 : N   DISP
+	db 0x4c, 0x41, 0x59, 0x20, 0x4c, 0x49, 0x4e, 0x45   ; c3c0 : LAY LINE
+	db 0x53, 0x05, 0x4e, 0x55, 0x4d, 0x42, 0x45, 0x52   ; c3c8 : S.NUMBER
+	db 0x20, 0x20, 0x20, 0x20, 0x50, 0x45, 0x52, 0x20   ; c3d0 :     PER 
+	db 0x52, 0x45, 0x47, 0x49, 0x4f, 0x4e, 0x05, 0x4e   ; c3d8 : REGION.N
+	db 0x55, 0x4d, 0x42, 0x45, 0x52, 0x20, 0x4f, 0x46   ; c3e0 : UMBER OF
+	db 0x20, 0x50, 0x41, 0x47, 0x45, 0x53, 0x20, 0x20   ; c3e8 :  PAGES  
+	db 0x20, 0x05, 0x05, 0x4e, 0x55, 0x4d, 0x42, 0x45   ; c3f0 :  ..NUMBE
+	db 0x52, 0x20, 0x4f, 0x46, 0x20, 0x45, 0x56, 0x45   ; c3f8 : R OF EVE
+	db 0x4e, 0x54, 0x53, 0x20, 0x20, 0x20, 0x20, 0x4d   ; c400 : NTS    M
+	db 0x41, 0x58, 0x20, 0x35, 0x31, 0x32, 0x05, 0x4d   ; c408 : AX 512.M
+	db 0x49, 0x4e, 0x20, 0x20, 0x31, 0x36, 0x05, 0x05   ; c410 : IN  16..
+	db 0x53, 0x45, 0x51, 0x55, 0x45, 0x4e, 0x43, 0x45   ; c418 : SEQUENCE
+	db 0x20, 0x46, 0x52, 0x4f, 0x4d, 0x05, 0x20, 0x20   ; c420 :  FROM.  
+	db 0x20, 0x20, 0x20, 0x45, 0x58, 0x54, 0x45, 0x52   ; c428 :    EXTER
+	db 0x4e, 0x41, 0x4c, 0x20, 0x44, 0x45, 0x56, 0x49   ; c430 : NAL DEVI
+	db 0x43, 0x45, 0x3f, 0x20, 0x20, 0x28, 0x59, 0x2f   ; c438 : CE?  (Y/
+	db 0x4e, 0x29, 0x20, 0x43, 0x54, 0x52, 0x4c, 0x2d   ; c440 : N) CTRL-
+	db 0x53, 0x20, 0x3d, 0x20, 0x44, 0x49, 0x53, 0x43   ; c448 : S = DISC
+	db 0x4f, 0x4e, 0x4e, 0x45, 0x43, 0x54, 0x20, 0x42   ; c450 : ONNECT B
+	db 0x41, 0x54, 0x54, 0x45, 0x52, 0x59               ; c458 : ATTERY
+
 sub_c45eh:
 	ld a,(CFG7)		;c45e	3a 3c 00 	: < . 
 	cp 0bbh		;c461	fe bb 	. . 
@@ -20752,7 +20631,13 @@ lcd8fh:
 	ds 0xe000-$, 0xff
 
 	; ---------------------------------------
-	db 0xaa, 0xaa, 0xf9, 0x11, 0xff, 0x87, 0xa1, 0xb1   ; e000 : ........
+	; e000 
+	; ---------------------------------------
+
+ROM_MAGIC:
+	dw 0xaaaa		; Magic number
+ROM_DEMO:
+	db             0xf9, 0x11, 0xff, 0x87, 0xa1, 0xb1   ; e000 : ........
 	db 0xe4, 0x0a, 0x0a, 0x0a, 0x0a, 0x59, 0x0a, 0x0a   ; e008 : .....Y..
 	db 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x96, 0x31   ; e010 : .......1
 	db 0x34, 0x35, 0x0a, 0x31, 0x34, 0x37, 0x0a, 0x96   ; e018 : 45.147..
