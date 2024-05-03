@@ -157,8 +157,29 @@ l00c6h:
 	ld a,b			;00c9	78		x
 	call DATA2FIFO		;00ca	cd 09 0f	. . .
 
+; From z8470 datasheet
+; 0x38 == %00111000 == 00 111 000
+;                      76 543 210
+;  0-2  Register Index (0-5 for write, 0-2 for read) (SIO: 0-7 for write)
+; => Writing 0 (keep writing to regiister 0)
+; 3-5  Command (0..7)
+;       0=No action
+;       1=DART: Reserved / SIO: Send Abort (SDLC)
+;       2=Reset Ext/Status Interrupts
+;       3=Reset Channel
+;       4=Enable Interrupt on next Rx character
+;       5=Reset Tx Int pending
+;       6=Reset Error
+;       7=Return from Int (Ch-A only)
+; => Writing 7 (return from interrupt)
+; 6-7  CRC Reset Code (DART: Reserved, should be 0) (SIO: 0..3)
+;       0=No action
+;       1=DART: Reserved, SIO: Reset Receive CRC Checker
+;       2=DART: Reserved, SIO: Reset Transmit CRC Generator
+;       3=DART: Reserved, SIO: Reset Tx Underrun/End of Message latch
+; => Writing 0 (no action)
 ; If port is even, the send 0x38 to PORT+2 (ACK?)
-SEND38IFNEEDED:
+ACK_IF_NEEDED:
 	bit 0,c
 	jr nz,_exit
 	ld a,0x38
@@ -206,7 +227,7 @@ INTER_3E_6C:
 	ld c,0x00
 	ld hl,FIFO1
 	call PORT2FIFO	; Read port 0x00 into FIFO1
-	jr SEND38IFNEEDED
+	jr ACK_IF_NEEDED
 
 INTER_6E:
 	push bc			;010b	c5		.
@@ -220,7 +241,7 @@ INTER_7C:
 	ld c,010h		;0112	0e 10		. .
 	ld hl,FIFO3		;0114	21 e8 40	! . @
 	call PORT2FIFO	;0117	cd 07 0f	. . .
-	jr SEND38IFNEEDED		;011a	18 b1		. .
+	jr ACK_IF_NEEDED		;011a	18 b1		. .
 
 INTER_7E:
 	push bc			;011c	c5		.
@@ -234,7 +255,7 @@ INTER_74:
 	ld c,011h		;0123	0e 11		. .
 	ld hl,FIFO4		;0125	21 ec 40	! . @
 	call PORT2FIFO	;0128	cd 07 0f	. . .
-	jr SEND38IFNEEDED		;012b	18 a0		. .
+	jr ACK_IF_NEEDED		;012b	18 a0		. .
 
 INTER_76:
 	push bc			;012d	c5		.
@@ -261,7 +282,7 @@ l0147h:
 	call DATA2FIFO		;0147	cd 09 0f	. . .
 	ld a,(05eaah)		;014a	3a aa 5e	: . ^
 	and a			;014d	a7		.
-	jp nz,SEND38IFNEEDED		;014e	c2 cd 00	. . .
+	jp nz,ACK_IF_NEEDED		;014e	c2 cd 00	. . .
 	ld a,(hl)		;0151	7e		~
 	and 01fh		;0152	e6 1f		. .
 	ld b,a			;0154	47		G
@@ -276,7 +297,7 @@ l0147h:
 	and 01fh		;0160	e6 1f		. .
 	cp b			;0162	b8		.
 	jp z,08b49h		;0163	ca 49 8b	. I .
-	jp SEND38IFNEEDED		;0166	c3 cd 00	. . .
+	jp ACK_IF_NEEDED		;0166	c3 cd 00	. . .
 
 INTER_8E:
 	push bc			;0169	c5		.
@@ -290,7 +311,7 @@ l0170h:
 	ld c,015h		;0171	0e 15		. .
 	ld hl,FIFO6		;0173	21 f4 40	! . @
 	call PORT2FIFO	;0176	cd 07 0f	. . .
-	jp SEND38IFNEEDED		;0179	c3 cd 00	. . .
+	jp ACK_IF_NEEDED		;0179	c3 cd 00	. . .
 
 INTER_86:
 	push bc			;017c	c5		.
