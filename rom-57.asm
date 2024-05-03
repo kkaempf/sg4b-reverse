@@ -20,10 +20,20 @@ FLAG_DISP: equ 4		;	Display control flag? -- may be also be something like I/O r
 
 CURSORX: equ 0x4f86		;	Horizontal cursor position (0-39)
 
-; [JCM-1] I believe that 40E0 is a pointer to where the RS232 buffer is in RAM.
-SERIALBUF: equ 0x40e0
-; [JCM-1] I believe that 40E4 is a pointer to the location of the keyboard buffer.
-KBDBUF: equ 0x40e4
+PORT_DATAKBD: equ 0x01	; Keyboard data port
+PORT_DMA: equ 0x62	; DMA port
+
+; Various circular buffers (32 bytes) to handle data input
+; First two bytes = head, then tail (? checkme)
+FIFO1: equ 0x40e0	;	PORT: 0x00 Serial?
+FIFO2: equ 0x40e4	;	PORT: 0x01 (Keyboard)
+FIFO3: equ 0x40e8	;	PORT: 0x10 Serial?
+FIFO4: equ 0x40ec	;	PORT: 0x11
+FIFO5: equ 0x40f0	;	PORT: 0x14 Serial?
+FIFO6: equ 0x40f4	;	PORT: 0x15
+FIFO7: equ 0x40f8	;	Not sure if I/O related
+; For port 0x00, 0x10, 0x14, it seems that 0x38 is written to the port+2 after the data is read
+; (so 0x02, 0x12 and 0x16)
 
 TMPHL: equ 0x04f87	;	A temporary 2 bytes location to save HL
 
@@ -32,10 +42,6 @@ CALLMAPSAVE_A: equ 0x5fd9
 CALLMAPSAVE_DE: equ 0x5fdb
 CALLMAPSAVE_HL: equ 0x5fdd
 CALLMAPSAVE_MAP: equ 0x5fdf
-
-PORT_DMA: equ 0x62	; DMA port
-
-PORT_DATAKBD: equ 0x01	; Keyboard data port
 
 	; ---------------------------------------
 	;	16K ROM U20
@@ -147,21 +153,24 @@ l00beh:
 	cp 001h			;00c1	fe 01		. .
 	jp nz,COLD_START	;00c3	c2 00 00	. . .
 l00c6h:
-	ld hl,KBDBUF		;00c6	21 e4 40	! . @
+	ld hl,FIFO2		;00c6	21 e4 40	! . @
 	ld a,b			;00c9	78		x
-	call sub_0f09h		;00ca	cd 09 0f	. . .
-l00cdh:
-	bit 0,c			;00cd	cb 41		. A
-	jr nz,l00d7h		;00cf	20 06		  .
-	ld a,038h		;00d1	3e 38		> 8
-	inc c			;00d3	0c		.
-	inc c			;00d4	0c		.
-	out (c),a		;00d5	ed 79		. y
-l00d7h:
-	exx			;00d7	d9		.
-	pop af			;00d8	f1		.
-	ei			;00d9	fb		.
-	reti			;00da	ed 4d		. M
+	call DATA2FIFO		;00ca	cd 09 0f	. . .
+
+; If port is even, the send 0x38 to PORT+2 (ACK?)
+SEND38IFNEEDED:
+	bit 0,c
+	jr nz,_exit
+	ld a,0x38
+	inc c
+	inc c
+	out (c),a
+_exit:
+	exx
+	pop af
+	ei
+	reti
+
 l00dch:
 	ld a,b			;00dc	78		x
 	cp 091h			;00dd	fe 91		. .
@@ -192,12 +201,12 @@ l00fah:
 
 ; [JCM-1] The RS232 interrupt handler starts at 00FF 
 INTER_3E_6C:
-	exx			;00ff	d9		.
-	push af			;0100	f5		.
-	ld c,000h		;0101	0e 00		. .
-	ld hl,SERIALBUF		;0103	21 e0 40	! . @
-	call SERIAL_SOMETHING	;0106	cd 07 0f	. . .
-	jr l00cdh		;0109	18 c2		. .
+	exx
+	push af
+	ld c,0x00
+	ld hl,FIFO1
+	call PORT2FIFO	; Read port 0x00 into FIFO1
+	jr SEND38IFNEEDED
 
 INTER_6E:
 	push bc			;010b	c5		.
@@ -209,9 +218,9 @@ INTER_7C:
 	exx			;0110	d9		.
 	push af			;0111	f5		.
 	ld c,010h		;0112	0e 10		. .
-	ld hl,040e8h		;0114	21 e8 40	! . @
-	call SERIAL_SOMETHING	;0117	cd 07 0f	. . .
-	jr l00cdh		;011a	18 b1		. .
+	ld hl,FIFO3		;0114	21 e8 40	! . @
+	call PORT2FIFO	;0117	cd 07 0f	. . .
+	jr SEND38IFNEEDED		;011a	18 b1		. .
 
 INTER_7E:
 	push bc			;011c	c5		.
@@ -223,9 +232,9 @@ INTER_74:
 	exx			;0121	d9		.
 	push af			;0122	f5		.
 	ld c,011h		;0123	0e 11		. .
-	ld hl,040ech		;0125	21 ec 40	! . @
-	call SERIAL_SOMETHING	;0128	cd 07 0f	. . .
-	jr l00cdh		;012b	18 a0		. .
+	ld hl,FIFO4		;0125	21 ec 40	! . @
+	call PORT2FIFO	;0128	cd 07 0f	. . .
+	jr SEND38IFNEEDED		;012b	18 a0		. .
 
 INTER_76:
 	push bc			;012d	c5		.
@@ -247,12 +256,12 @@ l0140h:
 	ld (05eabh),a		;0140	32 ab 5e	2 . ^
 	ld a,b			;0143	78		x
 l0144h:
-	ld hl,040f0h		;0144	21 f0 40	! . @
+	ld hl,FIFO5		;0144	21 f0 40	! . @
 l0147h:
-	call sub_0f09h		;0147	cd 09 0f	. . .
+	call DATA2FIFO		;0147	cd 09 0f	. . .
 	ld a,(05eaah)		;014a	3a aa 5e	: . ^
 	and a			;014d	a7		.
-	jp nz,l00cdh		;014e	c2 cd 00	. . .
+	jp nz,SEND38IFNEEDED		;014e	c2 cd 00	. . .
 	ld a,(hl)		;0151	7e		~
 	and 01fh		;0152	e6 1f		. .
 	ld b,a			;0154	47		G
@@ -267,7 +276,7 @@ l0147h:
 	and 01fh		;0160	e6 1f		. .
 	cp b			;0162	b8		.
 	jp z,08b49h		;0163	ca 49 8b	. I .
-	jp l00cdh		;0166	c3 cd 00	. . .
+	jp SEND38IFNEEDED		;0166	c3 cd 00	. . .
 
 INTER_8E:
 	push bc			;0169	c5		.
@@ -279,9 +288,9 @@ INTER_84:
 l0170h:
 	push af			;0170	f5		.
 	ld c,015h		;0171	0e 15		. .
-	ld hl,040f4h		;0173	21 f4 40	! . @
-	call SERIAL_SOMETHING	;0176	cd 07 0f	. . .
-	jp l00cdh		;0179	c3 cd 00	. . .
+	ld hl,FIFO6		;0173	21 f4 40	! . @
+	call PORT2FIFO	;0176	cd 07 0f	. . .
+	jp SEND38IFNEEDED		;0179	c3 cd 00	. . .
 
 INTER_86:
 	push bc			;017c	c5		.
@@ -404,27 +413,26 @@ WARM_BOOT:
 	call CALL_WITH_MMAP0		;025b	cd b1 09	. . .
 	dw INIT
 	ld hl,RAM_BASE		;0260	21 00 40	! . @
-	ld (040e0h),hl		;0263	22 e0 40	" . @
-	ld (040e2h),hl		;0266	22 e2 40	" . @
+	ld (FIFO1),hl		;0263	22 e0 40	" . @
+	ld (FIFO1+2),hl		;0266	22 e2 40	" . @
 	ld hl,04020h		;0269	21 20 40	!   @
-	ld (KBDBUF),hl		;026c	22 e4 40	" . @
-	ld (040e6h),hl		;026f	22 e6 40	" . @
+	ld (FIFO2),hl		;026c	22 e4 40	" . @
+	ld (FIFO2+2),hl		;026f	22 e6 40	" . @
 	ld hl,04040h		;0272	21 40 40	! @ @
-	ld (040e8h),hl		;0275	22 e8 40	" . @
-	ld (040eah),hl		;0278	22 ea 40	" . @
+	ld (FIFO3),hl		;0275	22 e8 40	" . @
+	ld (FIFO3+2),hl		;0278	22 ea 40	" . @
 	ld hl,04060h		;027b	21 60 40	! ` @
-	ld (040ech),hl		;027e	22 ec 40	" . @
-l0281h:
-	ld (040eeh),hl		;0281	22 ee 40	" . @
+	ld (FIFO4),hl		;027e	22 ec 40	" . @
+	ld (FIFO4+2),hl		;0281	22 ee 40	" . @
 	ld hl,04080h		;0284	21 80 40	! . @
-	ld (040f0h),hl		;0287	22 f0 40	" . @
-	ld (040f2h),hl		;028a	22 f2 40	" . @
+	ld (FIFO5),hl		;0287	22 f0 40	" . @
+	ld (FIFO5+2),hl		;028a	22 f2 40	" . @
 	ld hl,040a0h		;028d	21 a0 40	! . @
-	ld (040f4h),hl		;0290	22 f4 40	" . @
-	ld (040f6h),hl		;0293	22 f6 40	" . @
+	ld (FIFO6),hl		;0290	22 f4 40	" . @
+	ld (FIFO6+2),hl		;0293	22 f6 40	" . @
 	ld hl,040c0h		;0296	21 c0 40	! . @
-	ld (040f8h),hl		;0299	22 f8 40	" . @
-	ld (040fah),hl		;029c	22 fa 40	" . @
+	ld (FIFO7),hl		;0299	22 f8 40	" . @
+	ld (FIFO7+2),hl		;029c	22 fa 40	" . @
 	xor a			;029f	af		.
 	ld (05b6eh),a		;02a0	32 6e 5b	2 n [
 	ld (05cbah),a		;02a3	32 ba 5c	2 . \
@@ -1965,6 +1973,8 @@ l0ed6h:
 	ld (hl),c		;0edd	71		q
 	djnz l0ed6h		;0ede	10 f6		. .
 	ret			;0ee0	c9		.
+
+; #### Some FIFO test, maybe full or empty?
 sub_0ee1h:
 	push bc			;0ee1	c5		.
 	push de			;0ee2	d5		.
@@ -1999,25 +2009,36 @@ l0f03h:
 	pop de			;0f04	d1		.
 	pop bc			;0f05	c1		.
 	ret			;0f06	c9		.
-; Serial port
-SERIAL_SOMETHING:
-	in a,(c)		;0f07	ed 78		. x
-sub_0f09h:
-	ld e,(hl)		;0f09	5e		^
-	inc hl			;0f0a	23		#
-	ld d,(hl)		;0f0b	56		V
-	ld (de),a		;0f0c	12		.
-	ld a,e			;0f0d	7b		{
-	and 0e0h		;0f0e	e6 e0		. .
-	ld b,a			;0f10	47		G
-	ld a,e			;0f11	7b		{
-	inc a			;0f12	3c		<
-	and 01fh		;0f13	e6 1f		. .
-	or b			;0f15	b0		.
-	ld e,a			;0f16	5f		_
-	dec hl			;0f17	2b		+
-	ld (hl),e		;0f18	73		s
-	ret			;0f19	c9		.
+
+; Port reading into FIFO
+;	C: port to read from
+;	HL: FIFO to write to
+PORT2FIFO:
+	in a,(c)
+; Pushes data in FIFO
+;	A: data to push
+; 	HL: FIFO to push to
+DATA2FIFO:
+		;	Get head
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+		;	Store data
+	ld (de),a
+		; Increments e, modulo 32
+	ld a,e
+	and %11100000		; Keep top 3 bits of adrs
+	ld b,a
+	ld a,e
+	inc a			; Increment and modulo 32
+	and %00011111
+	or b			; Combine with top 3 bits
+	ld e,a
+		; Store new head
+	dec hl
+	ld (hl),e
+	ret
+
 ; Memory Mapping?
 SETMEMMAP:
 	ld (CUR_MAP),a		;0f1a	32 22 41	2 " A
@@ -2847,6 +2868,8 @@ l13bfh:
 	cp e			;13c2	bb		.
 	jr nc,l13b9h		;13c3	30 f4		0 .
 	jp l1363h		;13c5	c3 63 13	. c .
+
+; ### SOMETHING WITH INLINE DATA
 sub_13c8h:
 	ex (sp),hl		;13c8	e3		.
 	push de			;13c9	d5		.
@@ -2855,21 +2878,24 @@ sub_13c8h:
 	call sub_144dh		;13cc	cd 4d 14	. M .
 	push de			;13cf	d5		.
 	call CALL_WITH_MMAP0		;13d0	cd b1 09	. . .
-	dw sub_13dbh
+	dw OUTSTR
 	pop hl			;13d5	e1		.
 	pop af			;13d6	f1		.
 	pop bc			;13d7	c1		.
 	pop de			;13d8	d1		.
 	ex (sp),hl		;13d9	e3		.
 	ret			;13da	c9		.
-sub_13dbh:
+
+; OUT c characters from (HL)
+OUTSTR:
 	ld b,c			;13db	41		A
-l13dch:
+_loop:
 	ld a,(hl)		;13dc	7e		~
 	call OUTCH		;13dd	cd 84 10	. . .
 	inc hl			;13e0	23		#
-	djnz l13dch		;13e1	10 f9		. .
+	djnz _loop		;13e1	10 f9		. .
 	ret			;13e3	c9		.
+
 sub_13e4h:
 	pop hl			;13e4	e1		.
 	push de			;13e5	d5		.
@@ -2965,6 +2991,8 @@ sub_144dh:
 	add hl,de		;145b	19		.
 	pop de			;145c	d1		.
 	ret			;145d	c9		.
+
+
 sub_145eh:
 	ld a,c			;145e	79		y
 	and 040h		;145f	e6 40		. @
@@ -3406,7 +3434,7 @@ sub_16eeh:
 	ret z			;16ef	c8		.
 	push de			;16f0	d5		.
 	push hl			;16f1	e5		.
-	ld hl,040f8h		;16f2	21 f8 40	! . @
+	ld hl,FIFO7		;16f2	21 f8 40	! . @
 	ld d,a			;16f5	57		W
 l16f6h:
 	and 0f0h		;16f6	e6 f0		. .
@@ -3415,7 +3443,7 @@ l16f6h:
 	inc a			;16fa	3c		<
 	and 00fh		;16fb	e6 0f		. .
 	or e			;16fd	b3		.
-	call sub_0f09h		;16fe	cd 09 0f	. . .
+	call DATA2FIFO		;16fe	cd 09 0f	. . .
 	pop hl			;1701	e1		.
 	pop de			;1702	d1		.
 	ret			;1703	c9		.
@@ -3423,7 +3451,7 @@ sub_1704h:
 	ld a,(0602eh)		;1704	3a 2e 60	: . `
 	or a			;1707	b7		.
 	ret nz			;1708	c0		.
-	ld de,040f8h		;1709	11 f8 40	. . @
+	ld de,FIFO7		;1709	11 f8 40	. . @
 	call sub_0ee1h		;170c	cd e1 0e	. . .
 	ret c			;170f	d8		.
 	ld (0602fh),a		;1710	32 2f 60	2 / `
@@ -3528,7 +3556,7 @@ l17cfh:
 	ld b,a			;17d3	47		G
 	jr l17f5h		;17d4	18 1f		. .
 l17d6h:
-	ld de,KBDBUF		;17d6	11 e4 40	. . @
+	ld de,FIFO2		;17d6	11 e4 40	. . @
 	ld a,(04f76h)		;17d9	3a 76 4f	: v O
 	cp 005h			;17dc	fe 05		. .
 	ld b,00ah		;17de	06 0a		. .
@@ -3781,7 +3809,7 @@ l19a4h:
 	call sub_2a82h		;19ab	cd 82 2a	. . *
 	call sub_13c8h		;19ae	cd c8 13	. . .
 	ld de,l36ceh+2		;19b1	11 d0 36	. . 6
-	ld de,KBDBUF		;19b4	11 e4 40	. . @
+	ld de,FIFO2		;19b4	11 e4 40	. . @
 l19b7h:
 	call sub_0ee1h		;19b7	cd e1 0e	. . .
 	jr nc,l19c1h		;19ba	30 05		0 .
@@ -7123,7 +7151,7 @@ l3155h:
 	xor a			;3158	af		.
 l3159h:
 	call SETMEMMAP	;3159	cd 1a 0f	. . .
-	call 0c86ch		;315c	cd 6c c8	. l .
+	call sub_c86ch		;315c	cd 6c c8	. l .
 l315fh:
 	call 0a0c6h		;315f	cd c6 a0	. . .
 	call 0a47bh		;3162	cd 7b a4	. { .
@@ -7570,22 +7598,22 @@ sub_33ffh:
 	ld a,(05fd7h)		;342a	3a d7 5f	: . _
 	bit 4,a			;342d	cb 67		. g
 	ret nz			;342f	c0		.
-	ld hl,KBDBUF		;3430	21 e4 40	! . @
+	ld hl,FIFO2		;3430	21 e4 40	! . @
 	ld a,0f9h		;3433	3e f9		> .
-	call sub_0f09h		;3435	cd 09 0f	. . .
-	ld hl,KBDBUF		;3438	21 e4 40	! . @
+	call DATA2FIFO		;3435	cd 09 0f	. . .
+	ld hl,FIFO2		;3438	21 e4 40	! . @
 	ld a,09ah		;343b	3e 9a		> .
-	call sub_0f09h		;343d	cd 09 0f	. . .
+	call DATA2FIFO		;343d	cd 09 0f	. . .
 	ld a,001h		;3440	3e 01		> .
 	ld (05fd8h),a		;3442	32 d8 5f	2 . _
 	ret			;3445	c9		.
 l3446h:
-	ld hl,KBDBUF		;3446	21 e4 40	! . @
+	ld hl,FIFO2		;3446	21 e4 40	! . @
 	ld a,(05fd7h)		;3449	3a d7 5f	: . _
 	bit 5,a			;344c	cb 6f		. o
 	jr nz,l3456h		;344e	20 06		  .
 	ld a,020h		;3450	3e 20		>  
-	call sub_0f09h		;3452	cd 09 0f	. . .
+	call DATA2FIFO		;3452	cd 09 0f	. . .
 	ret			;3455	c9		.
 l3456h:
 	ld a,(05fd8h)		;3456	3a d8 5f	: . _
@@ -7594,7 +7622,7 @@ l3456h:
 	cp 009h			;345d	fe 09		. .
 	jr z,l3467h		;345f	28 06		( .
 	ld a,00ah		;3461	3e 0a		> .
-	call sub_0f09h		;3463	cd 09 0f	. . .
+	call DATA2FIFO		;3463	cd 09 0f	. . .
 	ret			;3466	c9		.
 l3467h:
 	ld a,000h		;3467	3e 00		> .
@@ -7603,12 +7631,12 @@ l3467h:
 l346eh:
 	ld a,00ah		;346e	3e 0a		> .
 	push bc			;3470	c5		.
-	call sub_0f09h		;3471	cd 09 0f	. . .
+	call DATA2FIFO		;3471	cd 09 0f	. . .
 	pop bc			;3474	c1		.
-	ld hl,KBDBUF		;3475	21 e4 40	! . @
+	ld hl,FIFO2		;3475	21 e4 40	! . @
 	djnz l346eh		;3478	10 f4		. .
 	ld a,0f8h		;347a	3e f8		> .
-	call sub_0f09h		;347c	cd 09 0f	. . .
+	call DATA2FIFO		;347c	cd 09 0f	. . .
 	ret			;347f	c9		.
 sub_3480h:
 	ld de,24		;3480	11 18 00	. . .
@@ -11035,7 +11063,7 @@ sub_8b78h:
 	cp 001h		;8b80	fe 01 	. . 
 	ret z			;8b82	c8 	. 
 l8b83h:
-	ld de,040f0h		;8b83	11 f0 40 	. . @ 
+	ld de,FIFO5		;8b83	11 f0 40 	. . @ 
 	call sub_0ee1h		;8b86	cd e1 0e 	. . . 
 	jr nc,l8b9ah		;8b89	30 0f 	0 . 
 	ld a,(05cbbh)		;8b8b	3a bb 5c 	: . \ 
@@ -11373,10 +11401,10 @@ l8e0bh:
 	jr l8e26h		;8e15	18 0f 	. . 
 l8e17h:
 	ld a,0f9h		;8e17	3e f9 	> . 
-	ld hl,KBDBUF		;8e19	21 e4 40 	! . @ 
-	call sub_0f09h		;8e1c	cd 09 0f 	. . . 
+	ld hl,FIFO2		;8e19	21 e4 40 	! . @ 
+	call DATA2FIFO		;8e1c	cd 09 0f 	. . . 
 	ld a,0f8h		;8e1f	3e f8 	> . 
-	call sub_0f09h		;8e21	cd 09 0f 	. . . 
+	call DATA2FIFO		;8e21	cd 09 0f 	. . . 
 	ld a,052h		;8e24	3e 52 	> R 
 l8e26h:
 	call sub_8ca2h		;8e26	cd a2 8c 	. . . 
@@ -11560,8 +11588,8 @@ l8f90h:
 	jp z,COLD_START		;8f93	ca 00 00 	. . . 
 	cp 099h		;8f96	fe 99 	. . 
 	jr z,sub_8fa5h		;8f98	28 0b 	( . 
-	ld hl,KBDBUF		;8f9a	21 e4 40 	! . @ 
-	jp sub_0f09h		;8f9d	c3 09 0f 	. . . 
+	ld hl,FIFO2		;8f9a	21 e4 40 	! . @ 
+	jp DATA2FIFO		;8f9d	c3 09 0f 	. . . 
 	ld a,003h		;8fa0	3e 03 	> . 
 	ld (05cbah),a		;8fa2	32 ba 5c 	2 . \ 
 sub_8fa5h:
@@ -11903,35 +11931,35 @@ l9224h:
 	ld a,(ix+004h)		;922c	dd 7e 04 	. ~ . 
 	cp 042h		;922f	fe 42 	. B 
 	jp nz,l9299h		;9231	c2 99 92 	. . . 
-	ld hl,(KBDBUF)		;9234	2a e4 40 	* . @ 
+	ld hl,(FIFO2)		;9234	2a e4 40 	* . @ 
 	ld de,(040e6h)		;9237	ed 5b e6 40 	. [ . @ 
 	call sub_0f20h		;923b	cd 20 0f 	.   . 
 	ret nz			;923e	c0 	. 
 	ld a,0f4h		;923f	3e f4 	> . 
-	ld hl,KBDBUF		;9241	21 e4 40 	! . @ 
-	call sub_0f09h		;9244	cd 09 0f 	. . . 
+	ld hl,FIFO2		;9241	21 e4 40 	! . @ 
+	call DATA2FIFO		;9244	cd 09 0f 	. . . 
 	ld a,0f4h		;9247	3e f4 	> . 
-	call sub_0f09h		;9249	cd 09 0f 	. . . 
+	call DATA2FIFO		;9249	cd 09 0f 	. . . 
 	ld a,(ix+005h)		;924c	dd 7e 05 	. ~ . 
-	call sub_0f09h		;924f	cd 09 0f 	. . . 
+	call DATA2FIFO		;924f	cd 09 0f 	. . . 
 	ld a,(ix+006h)		;9252	dd 7e 06 	. ~ . 
-	call sub_0f09h		;9255	cd 09 0f 	. . . 
+	call DATA2FIFO		;9255	cd 09 0f 	. . . 
 	ld a,00ah		;9258	3e 0a 	> . 
-	call sub_0f09h		;925a	cd 09 0f 	. . . 
+	call DATA2FIFO		;925a	cd 09 0f 	. . . 
 	push ix		;925d	dd e5 	. . 
 	ld b,006h		;925f	06 06 	. . 
 l9261h:
 	ld a,(ix+007h)		;9261	dd 7e 07 	. ~ . 
 	push bc			;9264	c5 	. 
-	call sub_0f09h		;9265	cd 09 0f 	. . . 
+	call DATA2FIFO		;9265	cd 09 0f 	. . . 
 	pop bc			;9268	c1 	. 
 	inc ix		;9269	dd 23 	. # 
 	djnz l9261h		;926b	10 f4 	. . 
 	pop ix		;926d	dd e1 	. . 
 	ld a,00ah		;926f	3e 0a 	> . 
-	call sub_0f09h		;9271	cd 09 0f 	. . . 
+	call DATA2FIFO		;9271	cd 09 0f 	. . . 
 	ld a,(ix+00dh)		;9274	dd 7e 0d 	. ~ . 
-	call sub_0f09h		;9277	cd 09 0f 	. . . 
+	call DATA2FIFO		;9277	cd 09 0f 	. . . 
 	ld l,(ix+00eh)		;927a	dd 6e 0e 	. n . 
 	ld h,(ix+00fh)		;927d	dd 66 0f 	. f . 
 	call sub_92abh		;9280	cd ab 92 	. . . 
@@ -11956,20 +11984,20 @@ sub_92abh:
 	ld de,04f7ah		;92ab	11 7a 4f 	. z O 
 	ld c,004h		;92ae	0e 04 	. . 
 	call sub_0f9eh		;92b0	cd 9e 0f 	. . . 
-	ld hl,KBDBUF		;92b3	21 e4 40 	! . @ 
+	ld hl,FIFO2		;92b3	21 e4 40 	! . @ 
 	ld de,04f7ah		;92b6	11 7a 4f 	. z O 
 	ld b,004h		;92b9	06 04 	. . 
 l92bbh:
 	ld a,(de)			;92bb	1a 	. 
 	push de			;92bc	d5 	. 
 	push bc			;92bd	c5 	. 
-	call sub_0f09h		;92be	cd 09 0f 	. . . 
+	call DATA2FIFO		;92be	cd 09 0f 	. . . 
 	pop bc			;92c1	c1 	. 
 	pop de			;92c2	d1 	. 
 	inc de			;92c3	13 	. 
 	djnz l92bbh		;92c4	10 f5 	. . 
 	ld a,00ah		;92c6	3e 0a 	> . 
-	call sub_0f09h		;92c8	cd 09 0f 	. . . 
+	call DATA2FIFO		;92c8	cd 09 0f 	. . . 
 	ret			;92cb	c9 	. 
 	call sub_13c8h		;92cc	cd c8 13 	. . . 
 	ld l,l			;92cf	6d 	m 
@@ -13591,7 +13619,7 @@ l9d28h:
 	ld (060cch),a		;9d4a	32 cc 60 	2 . ` 
 	call sub_9ca7h		;9d4d	cd a7 9c 	. . . 
 l9d50h:
-	ld de,040e8h		;9d50	11 e8 40 	. . @ 
+	ld de,FIFO3
 	call sub_0ee1h		;9d53	cd e1 0e 	. . . 
 	jp c,l9debh		;9d56	da eb 9d 	. . . 
 	and 03fh		;9d59	e6 3f 	. ? 
@@ -14037,7 +14065,7 @@ la0bfh:
 	ld a,(05b7bh)		;a0c6	3a 7b 5b 	: { [ 
 	and 001h		;a0c9	e6 01 	. . 
 	ret nz			;a0cb	c0 	. 
-	ld de,040e8h		;a0cc	11 e8 40 	. . @ 
+	ld de,FIFO3 
 	call sub_0ee1h		;a0cf	cd e1 0e 	. . . 
 	ret c			;a0d2	d8 	. 
 	ld c,a			;a0d3	4f 	O 
@@ -14560,7 +14588,7 @@ sub_a468h:
 	ld a,(CFG9)		;a47b	3a 15 00 	: . . 
 	cp 0aah		;a47e	fe aa 	. . 
 	ret z			;a480	c8 	. 
-	ld de,040ech		;a481	11 ec 40 	. . @ 
+	ld de,FIFO4		;a481	11 ec 40 	. . @ 
 	call sub_0ee1h		;a484	cd e1 0e 	. . . 
 	ret c			;a487	d8 	. 
 	ld c,a			;a488	4f 	O 
@@ -14855,7 +14883,7 @@ la682h:
 	ld a,(CFG9)		;a683	3a 15 00 	: . . 
 	cp 0aah		;a686	fe aa 	. . 
 	ret nz			;a688	c0 	. 
-	ld de,040ech		;a689	11 ec 40 	. . @ 
+	ld de,FIFO4		;a689	11 ec 40 	. . @ 
 	call sub_0ee1h		;a68c	cd e1 0e 	. . . 
 	ret c			;a68f	d8 	. 
 	res 7,a		;a690	cb bf 	. . 
@@ -15068,7 +15096,7 @@ la824h:
 	ret nz			;a826	c0 	. 
 	ld a,05ch		;a827	3e 5c 	> \ 
 	ret			;a829	c9 	. 
-	ld de,040f4h		;a82a	11 f4 40 	. . @ 
+	ld de,FIFO6		;a82a	11 f4 40 	. . @ 
 	call sub_0ee1h		;a82d	cd e1 0e 	. . . 
 	ret c			;a830	d8 	. 
 	ld c,a			;a831	4f 	O 
@@ -19702,7 +19730,8 @@ lc85eh:
 	ld a,008h		;c867	3e 08 	> . 
 	out (030h),a		;c869	d3 30 	. 0 
 	ret			;c86b	c9 	. 
-	ld de,040e0h		;c86c	11 e0 40 	. . @ 
+sub_c86ch:
+	ld de,FIFO1		;c86c	11 e0 40 	. . @ 
 	call sub_0ee1h		;c86f	cd e1 0e 	. . . 
 	ret c			;c872	d8 	. 
 	ld b,006h		;c873	06 06 	. . 
