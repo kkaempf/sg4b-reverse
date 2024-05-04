@@ -1,6 +1,5 @@
 ; TODO:
 ;	Find all inlines ( ex (sp),hl )
-;	Replace all calls to OUT_MSG_INLINE with M_OUT_MSG
 ; 0xc5f3 is a date/time function
 ; 0xc60b just below it pushes date/time/month strings from data into stack locations? 
 ; 0xc5cb is another date/time (RTC setup?) function
@@ -3257,7 +3256,7 @@ sub_15b0h:
 	ret nz			;15b5	c0		.
 	push bc			;15b6	c5		.
 	push iy			;15b7	fd e5		. .
-	M_OUT_MSG MSG_TAPE,26
+	M_OUT_MSG 0x174c, 0x1a ; "TAPE ACTION" 05 "PLAYER NUMBER "
 	ld a,(hl)		;15bf	7e		~
 	push af			;15c0	f5		.
 	or a			;15c1	b7		.
@@ -3497,7 +3496,6 @@ l173fh:
 	ld a,044h		;1747	3e 44		> D
 	jp 0893fh		;1749	c3 3f 89	. ? .
 
-MSG_TAPE:
 	db "TAPE ACTION" ; 174c
 	db 5 ; 1757
 	db "PLAYER NUMBER 1" ; 1758
@@ -3779,7 +3777,7 @@ l1934h:
 	ld l,a			;1947	6f		o
 	ret			;1948	c9		.
 	call sub_1b0dh		;1949	cd 0d 1b	. . .
-	M_OUT_MSG 0xd000, 0x11
+	M_OUT_MSG 0xd000, 0x11 ; "SOFTWARE VERSION "
 	ld a,(05cbah)
 	cp 005h
 	jr nz,OUTVERSION
@@ -3822,7 +3820,7 @@ l19a4h:
 	ld hl,01766h		;19a7	21 66 17	! f .
 	push hl			;19aa	e5		.
 	call sub_2a82h		;19ab	cd 82 2a	. . *
-	M_OUT_MSG 0xd011, 0x36
+	M_OUT_MSG 0xd011, 0x36 ; "TO DISCONNECT BATTERY BACKUP" 05 "FOR SHIPPING TYPE CTRL-D" 05 
 	ld de,FIFO_KBD		;19b4	11 e4 40	. . @
 l19b7h:
 	call sub_0ee1h		;19b7	cd e1 0e	. . .
@@ -3832,11 +3830,11 @@ l19b7h:
 l19c1h:
 	cp 004h			;19c1	fe 04		. .
 	jr nz,l19d0h		;19c3	20 0b		  .
-	M_OUT_MSG 0xd047, 0x23
+	M_OUT_MSG 0xd047, 0x23 ; "BATTERY DISCONNECTED" 05 "TURN POWER OFF"
 	out (070h),a		;19cb	d3 70		. p
 	jp l1934h		;19cd	c3 34 19	. 4 .
 l19d0h:
-	M_OUT_MSG 0xd06a, 0x10
+	M_OUT_MSG 0xd06a, 0x10 ; "REQUEST CANCELED"
 	jp l1934h
 sub_19d9h:
 	push bc			;19d9	c5		.
@@ -6018,7 +6016,7 @@ l2896h:
 	or a			;28d7	b7		.
 	jp nz,l2783h		;28d8	c2 83 27	. . '
 l28dbh:
-	M_OUT_MSG 0xd07a, 0x08
+	M_OUT_MSG 0xd07a, 0x08 ; 09 09 "STORED"
 	jp l1934h		;28e1	c3 34 19	. 4 .
 sub_28e4h:
 	push hl			;28e4	e5		.
@@ -6312,7 +6310,7 @@ sub_2b05h:
 	call SETMEMMAP	;2b0c	cd 1a 0f	. . .
 	ret			;2b0f	c9		.
 l2b10h:
-	M_OUT_MSG 0xd087, 0x14
+	M_OUT_MSG 0xd087, 0x14 ; 04 "INVALID PAGE NUMBER"
 	ret			;2b16	c9		.
 l2b17h:
 	ld a,(05cbch)		;2b17	3a bc 5c	: . \
@@ -7694,7 +7692,7 @@ l34bdh:
 	ld hl,053d6h		;34f0	21 d6 53	! . S
 	call 0b845h		;34f3	cd 45 b8	. E .
 	call sub_2a82h		;34f6	cd 82 2a	. . *
-	M_OUT_MSG 0xd09b, 0xc6
+	M_OUT_MSG 0xd09b, 0xc6 ; 0F "DISPLAY TYPE" 05 "DISPLAY SPEED" 05 "DISPLAY TIME     SECONDS" 05 "PAGE SKIP" 05 "PAGE LINK" 05 "PAGE WAIT" 05 05 "      DISPLAY TIME WINDOW" 05 05 "FIRST DAY" 05 "      TIME" 05 05 "            THROUGH" 05 05 "LAST DAY" 05 "     TIME" 05 05 "LINE LEVELS   1  2  3  4"
 	call sub_1527h
 	ld bc,0dd0fh		;3502	01 0f dd	. . .
 	ld hl,053c2h		;3505	21 c2 53	! . S
@@ -8325,7 +8323,7 @@ l3938h:
 	ld a,c			;393f	79		y
 	pop bc			;3940	c1		.
 	jp nz,l390eh		;3941	c2 0e 39	. . 9
-	M_OUT_MSG 0xd2bb, 0x03
+	M_OUT_MSG 0xd2bb, 0x03 ; 09 ":" 09 
 	ld a,l
 	push bc			;394b	c5		.
 	ld c,a			;394c	4f		O
@@ -8467,7 +8465,7 @@ l3a24h:
 	ld a,c			;3a2b	79		y
 	pop bc			;3a2c	c1		.
 	jp nz,l39e9h		;3a2d	c2 e9 39	. . 9
-	M_OUT_MSG 0xd2bb, 0x03
+	M_OUT_MSG 0xd2bb, 0x03 ; 09 ":" 09 
 	ld a,l
 	pop hl			;3a37	e1		.
 	inc hl			;3a38	23		#
@@ -8719,7 +8717,7 @@ l3ba0h:
 	pop hl			;3ba8	e1		.
 	ret			;3ba9	c9		.
 	call sub_2a82h		;3baa	cd 82 2a	. . *
-	M_OUT_MSG 0xd2be, 0x17
+	M_OUT_MSG 0xd2be, 0x17 ; 0F "SEQUENCE FOR REGION  " 0E 
 	ld iy,-3
 	add iy,sp		;3bb7	fd 39		. 9
 	ld sp,iy		;3bb9	fd f9		. .
@@ -8742,7 +8740,7 @@ l3bcfh:
 	ld bc,00027h		;3bdf	01 27 00	. ' .
 	ldir			;3be2	ed b0		. .
 l3be4h:
-	M_OUT_MSG 0xd2d5, 0x37
+	M_OUT_MSG 0xd2d5, 0x37 ; 0F 05 05 "FILE  START  STOP  CHANGE" 05 "      PAGE   PAGE   FILE" 05 05 
 	ld hl, 0x53c9
 	push hl			;3bed	e5		.
 	ld (iy+000h),001h	;3bee	fd 36 00 01	. 6 . .
@@ -9652,7 +9650,7 @@ l80b1h:
 	bit 4,(hl)		;8208	cb 66 	. f 
 	call nz,sub_2326h		;820a	c4 26 23 	. & # 
 	call sub_2a82h		;820d	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd488, 0xd9
+	M_OUT_MSG 0xd488, 0xd9 ; "SELECT" 05 05 "E-EDIT" 05 "F-FORMATED EDIT" 05 "D-DISPLAY RESUME" 05 "R-RECALL PAGE" 05 "S-STORE PAGE" 05 "N-NEXT PAGE" 05 "L-LAST PAGE" 05 "C-CLOCK SET" 05 "P-PAGE COPY" 05 "M-MEMORY SET" 05 "X-EXTERNAL LINE LEVELS" 05 "B-BLOCK EDIT" 05 "H-HELP MENU FOR CONTROL CODES" 05 "SETUP-NEXT MENU"
 	call sub_1527h		;8219	cd 27 15 	. ' .
 	ld bc,02109h		;8219	01 09 21 	. . ! 
 	ld c,h			;821c	4c 	L 
@@ -9660,7 +9658,7 @@ l80b1h:
 	call sub_8237h		;821e	cd 37 82 	. 7 . 
 	jp (hl)			;8221	e9 	. 
 	call sub_2a82h		;8222	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd561, 0xba
+	M_OUT_MSG 0xd561, 0xba ; "SELECT" 05 05 "C-CHANNEL REGION SETUP" 05 "S-SEQUENCE" 05 "E-EVENTS" 05 "N-NEXT EVENT" 05 "L-LAST EVENT" 05 "D-DATA EXTERNAL SOURCE" 05 "W-WEATHER SETUP" 05 "B-BATCH TRANSFER" 05 "R-REMOTE EDIT" 05 "K-KEYBOARD DIRECT" 05 "A-AUTHORIZATION CODES"
 	call sub_1527h		;822b	cd 27 15 	. ' . 
 	ld bc,02109h		;822e	01 09 21 	. . ! 
 	ld a,c			;8231	79 	y 
@@ -9762,8 +9760,8 @@ l8278h:
 	jr nz,l82c7h		;82a3	20 22 	  " 
 	add a,d			;82a5	82 	. 
 	call sub_2a82h		;82a6	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd30c, 0xf6
-	M_OUT_MSG 0xd402, 0x86
+	M_OUT_MSG 0xd30c, 0xf6 ; "CONTROL KEY FUNCTIONS" 05 05 "LINE SEPARATOR" 05 " C-COLOR" 05 " T-TOP ON/OFF" 05 " B-BOTTOM ON/OFF" 05 "WORD CONTROL CHARACTERS" 05 " F-ALTERNATE FONT" 05 " X-EXTERNAL VIDEO" 05 "EDIT FUNCTIONS" 05 " L-ERASE TO END OF LINE" 05 " P-ERASE TO END OF PAGE" 05 " A-ERASE PAGE ATTRIBUTES" 05 " S-CHARACTER INSERT" 05 
+	M_OUT_MSG 0xd402, 0x86 ; " D-CHARACTER DELETE" 05 " V-LINE INSERT" 05 " K-LINE DELETE" 05 " R-BORDER" 05 "SYSTEM FUNCTIONS" 05 " E-SELECT CHANNEL FOR EDITING" 05 " O-OFF LINE BATCH TRANSFER" 0F 
 	ret
 
 ; ???
@@ -10040,7 +10038,7 @@ l83d5h:
 	ret			;8412	c9 	. 
 	call sub_8441h		;8413	cd 41 84 	. A . 
 	call sub_2a82h		;8416	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd61b, 0x1f
+	M_OUT_MSG 0xd61b, 0x1f ; "KEYBOARD DIRECT  SYSTEM NAME   "
 	call sub_131fh		;841f	cd 1f 13 	. . . 
 	jp nz,04253h		;8422	c2 53 42 	. S B 
 	ld hl,(053c2h)		;8425	2a c2 53 	* . S 
@@ -10048,7 +10046,7 @@ l83d5h:
 	ld a,04bh		;842b	3e 4b 	> K 
 	ld (05cc1h),a		;842d	32 c1 5c 	2 . \ 
 	call sub_848eh		;8430	cd 8e 84 	. . . 
-	M_OUT_MSG 0xd63a, 0x09
+	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
 	ld a,001h		;8439	3e 01 	> . 
 	ld (05cbah),a		;843b	32 ba 5c 	2 . \ 
 	jp l1934h		;843e	c3 34 19 	. 4 . 
@@ -10061,7 +10059,7 @@ sub_8441h:
 	jp l1934h		;844a	c3 34 19 	. 4 . 
 	call sub_8441h		;844d	cd 41 84 	. A . 
 	call sub_2a82h		;8450	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd643, 0x1b
+	M_OUT_MSG 0xd643, 0x1b ; "REMOTE EDIT  SYSTEM NAME   "
 	call sub_131fh		;8459	cd 1f 13 	. . . 
 	jp nz,04253h		;845c	c2 53 42 	. S B 
 	ld hl,(053c2h)		;845f	2a c2 53 	* . S 
@@ -10078,7 +10076,7 @@ sub_8441h:
 	ld de,05fb2h		;847d	11 b2 5f 	. . _ 
 	ld bc,4
 	ldir 
-	M_OUT_MSG 0xd63a, 0x09
+	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
 	jp l1934h		;848b	c3 34 19 	. 4 . 
 sub_848eh:
 	ld a,(0000fh)		;848e	3a 0f 00 	: . . 
@@ -10103,7 +10101,7 @@ l84aah:
 	jr z,l84ddh		;84b3	28 28 	( ( 
 	jr l84a2h		;84b5	18 eb 	. . 
 l84b7h:
-	M_OUT_MSG 0xd70b, 0x11
+	M_OUT_MSG 0xd70b, 0x11 ; 05 "LOGON ID        "
 	call sub_131fh
 	cp a			;84c0	bf 	. 
 	ld e,h			;84c1	5c 	\ 
@@ -10124,7 +10122,7 @@ l84ddh:
 	pop hl			;84e0	e1 	. 
 	jp l1934h		;84e1	c3 34 19 	. 4 . 
 sub_84e4h:
-	M_OUT_MSG 0xd71c, 0x14
+	M_OUT_MSG 0xd71c, 0x14 ; 05 "NO ACCESS          "
 	ld a,(0000fh)		;84ea	3a 0f 00 	: . . 
 	cp 0aah		;84ed	fe aa 	. . 
 	call z,sub_93dah		;84ef	cc da 93 	. . . 
@@ -10140,7 +10138,7 @@ sub_84f9h:
 	ret			;8504	c9 	. 
 	call sub_8441h		;8505	cd 41 84 	. A . 
 	call sub_2a82h		;8508	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd66d, 0x1e
+	M_OUT_MSG 0xd66d, 0x1e ; "BATCH TRANSFER  SYSTEM NAME   "
 	call sub_131fh		;8511	cd 1f 13 	. . . 
 	jp nz,04253h		;8514	c2 53 42 	. S B 
 	ld hl,(053c2h)		;8517	2a c2 53 	* . S 
@@ -10148,7 +10146,7 @@ sub_84f9h:
 	ld a,042h		;851d	3e 42 	> B 
 	ld (05cc1h),a		;851f	32 c1 5c 	2 . \ 
 	call sub_848eh		;8522	cd 8e 84 	. . . 
-	M_OUT_MSG 0xd63a, 0x09
+	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
 	ld a,003h		;852b	3e 03 	> . 
 	ld (05cbah),a		;852d	32 ba 5c 	2 . \ 
 	call sub_1527h		;8530	cd 27 15 	. ' . 
@@ -10594,7 +10592,7 @@ sub_88b5h:
 	call sub_8fa5h		;88ca	cd a5 8f 	. . . 
 	jp l1934h		;88cd	c3 34 19 	. 4 . 
 l88d0h:
-	M_OUT_MSG 0xd664, 0x09
+	M_OUT_MSG 0xd664, 0x09 ; 05 "COMPLETE"
 	call sub_8fa5h		;88d6	cd a5 8f 	. . . 
 	jp l1934h		;88d9	c3 34 19 	. 4 . 
 sub_88dch:
@@ -11567,7 +11565,7 @@ sub_8fa5h:
 	ld (05ea1h),bc		;8fd0	ed 43 a1 5e 	. C . ^ 
 	ld a,099h		;8fd4	3e 99 	> . 
 	out (014h),a		;8fd6	d3 14 	. . 
-	M_OUT_MSG 0xd730, 0x0a
+	M_OUT_MSG 0xd730, 0x0a ; 05 "OFF LINE "
 	jr l8fe3h		;8fde	18 03 	. . 
 l8fe0h:
 	call sub_91e4h		;8fe0	cd e4 91 	. . . 
@@ -11650,7 +11648,7 @@ l905ah:
 	ld hl,0		;9065	21 00 00 	! . . 
 	call sub_88dch		;9068	cd dc 88 	. . . 
 l906bh:
-	M_OUT_MSG 0xd73a, 0x16
+	M_OUT_MSG 0xd73a, 0x16 ; "LIMIT REMOTE ACCESS?  "
 	ld a,(053c2h)		;9071	3a c2 53 	: . S 
 	or a			;9074	b7 	. 
 	jr nz,l907bh		;9075	20 04 	  . 
@@ -11661,7 +11659,7 @@ l907bh:
 l907dh:
 	call OUTCH		;907d	cd 84 10 	. . . 
 
-	M_OUT_MSG 0xd750, 0x2a
+	M_OUT_MSG 0xd750, 0x2a ; "  (Y / N)" 05 "USER CODE  START PAGE  STOP PAGE"
 	ld iy,0x53c3
 	ld b,0x18
 	M_OUT_CH 0x05
@@ -11946,11 +11944,11 @@ l92bbh:
 	ld a,00ah		;92c6	3e 0a 	> . 
 	call DATA2FIFO		;92c8	cd 09 0f 	. . . 
 	ret			;92cb	c9 	. 
-	M_OUT_MSG 0xd66d, 0x1d
-	M_OUT_MSG 0x53c7, 0x02
-	M_OUT_MSG 0xd70b, 0x0b
-	M_OUT_MSG 0x53c9, 0x06
-	M_OUT_MSG 0xd68c, 0x0c
+	M_OUT_MSG 0xd66d, 0x1d ; "BATCH TRANSFER  SYSTEM NAME  "
+	M_OUT_MSG 0x53c7, 0x02 ; *** RAM data ***
+	M_OUT_MSG 0xd70b, 0x0b ; 05 "LOGON ID  "
+	M_OUT_MSG 0x53c9, 0x06 ; *** RAM data ***
+	M_OUT_MSG 0xd68c, 0x0c ; 05 "DIRECTION  "
 	ld a,(053cfh)		;92ea	3a cf 53 	: . S 
 	cp 046h		;92ed	fe 46 	. F 
 	jr z,l92f3h		;92ef	28 02 	( . 
@@ -11958,8 +11956,8 @@ l92bbh:
 l92f3h:
 	ld (053cfh),a		;92f3	32 cf 53 	2 . S 
 	call OUTCH		;92f6	cd 84 10 	. . . 
-	M_OUT_MSG 0xd699, 0x2b
-	M_OUT_MSG 0xd6cc, 0x18
+	M_OUT_MSG 0xd699, 0x2b ; "  (S=SEND F=FETCH)" 05 05 "SOURCE  SOURCE  DESTIN "
+	M_OUT_MSG 0xd6cc, 0x18 ; 05 " FIRST   LAST    FIRST "
 	call sub_1527h		;9305	cd 27 15 	. ' . 
 	djnz $+4		;9308	10 02 	. . 
 l930ah:
@@ -13106,7 +13104,7 @@ l9a30h:
 	ld a,(053ceh)		;9a30	3a ce 53 	: . S 
 	and 001h		;9a33	e6 01 	. . 
 	ret z			;9a35	c8 	. 
-	M_OUT_MSG 0x976f, 0x1e
+	M_OUT_MSG 0x976f, 0x1e ; "EDIT PUBLIC ACCESS VARIABLES N"
 	call sub_156ch
 	ld bc,0ce21h		;9a3f	01 21 ce 	. ! . 
 	ld d,e			;9a42	53 	S 
@@ -15570,7 +15568,7 @@ lac0fh:
 	ld hl,0		;ac2e	21 00 00 	! . . 
 	call sub_88dch		;ac31	cd dc 88 	. . . 
 lac34h:
-	M_OUT_MSG 0xd77a, 0x55
+	M_OUT_MSG 0xd77a, 0x55 ; 0F "EXTERNAL DATA SELECT  " 05 05 "1 AP" 05 "2 UPI" 05 "3 REUTERS" 05 "4 NOAA" 05 "5 STOCKS" 05 "6 BROADCAST" 05 "7 DOW JONES"
 	call sub_1527h		;ac3a	cd 27 15 	. ' . 
 	ld bc,02616h		;ac3d	01 16 26 	. . & 
 	rlca			;ac40	07 	. 
@@ -15617,9 +15615,9 @@ lac5dh:
 	ld a,(00014h)		;ac71	3a 14 00 	: . . 
 	cp 0ffh		;ac74	fe ff 	. . 
 	jp nz,laed0h		;ac76	c2 d0 ae 	. . . 
-	M_OUT_MSG 0xd7cf, 0x03
-	M_OUT_MSG 0xd7de, 0x47
-	M_OUT_MSG 0xd825, 0x6b
+	M_OUT_MSG 0xd7cf, 0x03 ; 0F "AP"
+	M_OUT_MSG 0xd7de, 0x47 ; " NEWS SPLITS" 05 "PAGE BLOCK START PAGE STOP PAGE" 05 "    1" 08 0B "2" 08 0B "3" 08 0B "4" 08 0B "5" 08 0B "6" 08 0B "7" 08 0B "8"
+	M_OUT_MSG 0xd825, 0x6b ; 05 05 "NEWS CATEGORY   BLOCK" 05 "GENERAL NEWS" 05 "REGIONAL NEWS" 05 "FINANCIAL" 05 "STOCKS" 05 "SPORTS" 05 "SPORTS SCORES" 05 "BULLETINS" 05 "FEATURES"
 	call sub_1564h		;ac8b	cd 64 15 	. d . 
 	ld b,0cdh		;ac8e	06 cd 	. . 
 	ld (hl),b			;ac90	70 	p 
@@ -15634,10 +15632,10 @@ lac5dh:
 	ld a,(CFG9)		;aca3	3a 15 00 	: . . 
 	cp 0ffh		;aca6	fe ff 	. . 
 	jp nz,laed0h		;aca8	c2 d0 ae 	. . . 
-	M_OUT_MSG 0xd7d2, 0x04
-	M_OUT_MSG 0xd7de, 0x44
-	M_OUT_MSG 0xd825, 0x4b
-	M_OUT_MSG 0xd87e, 0x12
+	M_OUT_MSG 0xd7d2, 0x04 ; 0F "UPI"
+	M_OUT_MSG 0xd7de, 0x44 ; " NEWS SPLITS" 05 "PAGE BLOCK START PAGE STOP PAGE" 05 "    1" 08 0B "2" 08 0B "3" 08 0B "4" 08 0B "5" 08 0B "6" 08 0B "7"
+	M_OUT_MSG 0xd825, 0x4b ; 05 05 "NEWS CATEGORY   BLOCK" 05 "GENERAL NEWS" 05 "REGIONAL NEWS" 05 "FINANCIAL" 05 "STOCKS" 05 "SPORTS" 05 
+	M_OUT_MSG 0xd87e, 0x12 ; "BULLETINS" 05 "FEATURES"
 	call sub_1564h		;acc3	cd 64 15 	. d . 
 	dec b			;acc6	05 	. 
 	call sub_1570h		;acc7	cd 70 15 	. p . 
@@ -15651,11 +15649,11 @@ lac5dh:
 	ld a,(CFG9)		;acdb	3a 15 00 	: . . 
 	cp 0aah		;acde	fe aa 	. . 
 	jp nz,laed0h		;ace0	c2 d0 ae 	. . . 
-	M_OUT_MSG 0xd7d6, 0x3d
-	M_OUT_MSG 0xd825, 0x24
-	M_OUT_MSG 0xd857, 0x0a
+	M_OUT_MSG 0xd7d6, 0x3d ; 0F "REUTERS NEWS SPLITS" 05 "PAGE BLOCK START PAGE STOP PAGE" 05 "    1" 08 0B "2"
+	M_OUT_MSG 0xd825, 0x24 ; 05 05 "NEWS CATEGORY   BLOCK" 05 "GENERAL NEWS"
+	M_OUT_MSG 0xd857, 0x0a ; 05 "FINANCIAL"
 	M_OUT_CH '/' 
-	M_OUT_MSG 0xd869, 0x06
+	M_OUT_MSG 0xd869, 0x06 ; "SPORTS"
 	call sub_1570h
 	rlca			;ad02	07 	. 
 	ld c,002h		;ad03	0e 02 	. . 
@@ -15675,7 +15673,7 @@ lac5dh:
 	jp nz,laed0h		;ad26	c2 d0 ae 	. . . 
 lad29h:
 	ld iy,05461h		;ad29	fd 21 61 54 	. ! a T 
-	M_OUT_MSG 0xd862, 0x06
+	M_OUT_MSG 0xd862, 0x06 ; "STOCKS"
 	call sub_adf5h
 	call sub_13e4h		;ad36	cd e4 13 	. . . 
 	nop			;ad39	00 	. 
@@ -15698,7 +15696,7 @@ lad29h:
 	cp 0aah		;ad58	fe aa 	. . 
 	jp nz,laed0h		;ad5a	c2 d0 ae 	. . . 
 	ld iy,053c2h		;ad5d	fd 21 c2 53 	. ! . S 
-	M_OUT_MSG 0xd8fd, 0x0e
+	M_OUT_MSG 0xd8fd, 0x0e ; "BROADCAST NEWS"
 	call sub_adf5h		;ad67	cd f5 ad 	. . . 
 	call sub_13e4h		;ad6a	cd e4 13 	. . . 
 	nop			;ad6d	00 	. 
@@ -15717,7 +15715,7 @@ lad29h:
 	cp 0aah		;ad84	fe aa 	. . 
 	jp nz,laed0h		;ad86	c2 d0 ae 	. . . 
 	ld iy,0540dh		;ad89	fd 21 0d 54 	. ! . T 
-	M_OUT_MSG 0xd7c6, 0x09
+	M_OUT_MSG 0xd7c6, 0x09 ; "DOW JONES"
 	call sub_adf5h		;ad93	cd f5 ad 	. . . 
 	call sub_13e4h		;ad96	cd e4 13 	. . . 
 	nop			;ad99	00 	. 
@@ -15790,7 +15788,7 @@ ladfbh:
 	dec bc			;ae16	0b 	. 
 	ret			;ae17	c9 	. 
 sub_ae18h:
-	M_OUT_MSG 0xd890, 0x26
+	M_OUT_MSG 0xd890, 0x26 ; "ENTER" 0B 08 08 08 08 08 "0=NONE" 0B 08 08 08 08 08 08 "1 TO" 0B 08 08 08 08 "     "
 	call sub_1564h
 	ld bc,0f679h		;ae21	01 79 f6 	. y . 
 	jr nc,ladf3h		;ae24	30 cd 	0 . 
@@ -15889,7 +15887,7 @@ sub_aec5h:
 	inc iy		;aecd	fd 23 	. # 
 	ret			;aecf	c9 	. 
 laed0h:
-	M_OUT_MSG 0xd8eb, 0x12
+	M_OUT_MSG 0xd8eb, 0x12 ; "OPTION NOT ENABLED"
 	jp l1934h		;aed6	c3 34 19 	. 4 . 
 sub_aed9h:
 	ld iy,05417h		;aed9	fd 21 17 54 	. ! . T 
@@ -15897,7 +15895,7 @@ sub_aed9h:
 	ld a,(00017h)		;aee0	3a 17 00 	: . . 
 	cp 0ffh		;aee3	fe ff 	. . 
 	jr nz,laed0h		;aee5	20 e9 	  . 
-	M_OUT_MSG 0xd90b, 0x50
+	M_OUT_MSG 0xd90b, 0x50 ; 0F "      NOAA WEATHER SERVICE" 05 05 " START  STOP  WORD  OPEN" 05 " PAGE   PAGE  WRAP  CODE" 05 05 
 	ld b,008h		;aeed	06 08 	. . 
 laeefh:
 	call sub_af44h		;aeef	cd 44 af 	. D . 
@@ -15906,15 +15904,15 @@ laeefh:
 	rrca			;aef7	0f 	. 
 	ld (bc),a			;aef8	02 	. 
 	M_OUT_CH 0x0f 
-	M_OUT_MSG 0xd95b, 0x07
+	M_OUT_MSG 0xd95b, 0x07 ; "INPUT  "
 	ld a,(iy+000h)		;af03	fd 7e 00 	. ~ . 
 	cp 041h		;af06	fe 41 	. A 
 	jr z,laf0eh		;af08	28 04 	( . 
 	ld (iy+000h),042h		;af0a	fd 36 00 42 	. 6 . B 
 laf0eh:
 	; FReD : weird
-	M_OUT_MSG 0x0000, 0x01
-	M_OUT_MSG 0xd962, 0x12
+	M_OUT_MSG 0x0000, 0x01 ; F3 
+	M_OUT_MSG 0xd962, 0x12 ; "  A=ASCII,B=BAUDOT"
 	call sub_1527h		;af1a	cd 27 15 	. ' . 
 	ld b,005h		;af1d	06 05 	. . 
 	M_OUT_CH 0x0e
@@ -15962,7 +15960,7 @@ laf68h:
 	call sub_1570h		;af6b	cd 70 15 	. p . 
 	inc bc			;af6e	03 	. 
 	; FReD : weird
-	M_OUT_MSG 0x0005, 0x04
+	M_OUT_MSG 0x0005, 0x04 ; FF FF FF FF 
 	M_OUT_CH 0x05
 	ld de,00009h		;af79	11 09 00 	. . . 
 	add iy,de		;af7c	fd 19 	. . 
@@ -16020,7 +16018,7 @@ lafb8h:
 	ld (053c2h),hl		;afd8	22 c2 53 	" . S 
 	ld (053c4h),hl		;afdb	22 c4 53 	" . S 
 	call sub_2a82h		;afde	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd974, 0x16
+	M_OUT_MSG 0xd974, 0x16 ; "SET PAGES 0000 TO 0000"
 	call sub_156ch
 	add hl,bc			;afea	09 	. 
 	call sub_13e4h		;afeb	cd e4 13 	. . . 
@@ -16055,7 +16053,7 @@ lb030h:
 	xor a			;b030	af 	. 
 	call SETMEMMAP		;b031	cd 1a 0f 	. . . 
 	call 0b0a5h		;b034	cd a5 b0 	. . . 
-	M_OUT_MSG 0xd98a, 0x0a
+	M_OUT_MSG 0xd98a, 0x0a ; "MEMORY SET"
 	jp l1934h		;b03d	c3 34 19 	. 4 . 
 lb040h:
 	call sub_14e5h		;b040	cd e5 14 	. . . 
@@ -16104,7 +16102,7 @@ lb086h:
 	pop bc			;b08b	c1 	. 
 	ret			;b08c	c9 	. 
 	call 0b0a5h		;b08d	cd a5 b0 	. . . 
-	M_OUT_MSG 0xd994, 0x04
+	M_OUT_MSG 0xd994, 0x04 ; "PAGE"
 	call sub_1570h		;b096	cd 70 15 	. p . 
 	ld (bc),a			;b099	02 	. 
 	call sub_1431h		;b09a	cd 31 14 	. 1 . 
@@ -16137,7 +16135,7 @@ lb0c3h:
 	ld (053c4h),hl		;b0cd	22 c4 53 	" . S 
 	ld (053c6h),hl		;b0d0	22 c6 53 	" . S 
 	call sub_2a82h		;b0d3	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd998, 0x20
+	M_OUT_MSG 0xd998, 0x20 ; "COPY 000 PAGES FROM 0000 TO 0000"
 	call sub_156ch
 	add hl,de			;b0df	19 	. 
 	call sub_13e4h		;b0e0	cd e4 13 	. . . 
@@ -16177,7 +16175,7 @@ lb123h:
 	call sub_22f0h		;b127	cd f0 22 	. . " 
 	call sub_2318h		;b12a	cd 18 23 	. . # 
 	call 0b0a5h		;b12d	cd a5 b0 	. . . 
-	M_OUT_MSG 0xd9b8, 0x12
+	M_OUT_MSG 0xd9b8, 0x12 ; "PAGE COPY COMPLETE"
 	jp l1934h		;b136	c3 34 19 	. 4 . 
 sub_b139h:
 	ld a,b			;b139	78 	x 
@@ -16307,7 +16305,7 @@ lb218h:
 	call sub_b3b5h		;b21e	cd b5 b3 	. . . 
 	M_OUT_CH 0x0f
 	M_OUT_CH 0x04
-	M_OUT_MSG 0x53ce, 0x20
+	M_OUT_MSG 0x53ce, 0x20 ; *** RAM data ***
 	M_OUT_CH 0x04
 	ld a,(05686h)		;b233	3a 86 56 	: . V 
 	ld e,a			;b236	5f 	_ 
@@ -16524,7 +16522,7 @@ sub_b3b5h:
 	M_CALL_WITH_MMAP0 sub_c60bh
 	ret
 	call sub_2a82h		;b3bb	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdb32, 0x33
+	M_OUT_MSG 0xdb32, 0x33 ; 0F "WEATHER MENU SELECT" 05 05 "1 U.S. SYSTEM" 05 "2 METRIC SYSTEM"
 	call sub_1527h		;b3c4	cd 27 15 	. ' . 
 	ld bc,02615h		;b3c7	01 15 26 	. . & 
 	ld (bc),a			;b3ca	02 	. 
@@ -16854,12 +16852,12 @@ lb5e1h:
 	M_OUT_CH 0x08
 	jr sub_b5d8h		;b5e5	18 f1 	. . 
 sub_b5e7h:
-	M_OUT_MSG 0xd9ca, 0x0b
+	M_OUT_MSG 0xd9ca, 0x0b ; "START PAGE "
 	call sub_1431h		;b5ed	cd 31 14 	. 1 . 
 	nop			;b5f0	00 	. 
 	nop			;b5f1	00 	. 
 	inc bc			;b5f2	03 	. 
-	M_OUT_MSG 0xd9d5, 0x0c
+	M_OUT_MSG 0xd9d5, 0x0c ; "  STOP PAGE "
 	call sub_1431h		;b5f9	cd 31 14 	. 1 . 
 	ld (bc),a			;b5fc	02 	. 
 	nop			;b5fd	00 	. 
@@ -16888,7 +16886,7 @@ lb60bh:
 	cp 0aah		;b61e	fe aa 	. . 
 	jr nz,lb64dh		;b620	20 2b 	  + 
 	call sub_2a82h		;b622	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdc18, 0x39
+	M_OUT_MSG 0xdc18, 0x39 ; "ACTION  L     L=LINE LEVELS" 05 "              T=OUTPUT TO VTR"
 	ld a,04ch		;b62b	3e 4c 	> L 
 	ld (053c2h),a		;b62d	32 c2 53 	2 . S 
 	call sub_1527h		;b630	cd 27 15 	. ' . 
@@ -16976,7 +16974,7 @@ lb6c5h:
 	djnz lb6b8h		;b6c9	10 ed 	. . 
 	ret			;b6cb	c9 	. 
 sub_b6cch:
-	M_OUT_MSG 0xdb6a, 0xae
+	M_OUT_MSG 0xdb6a, 0xae ; 05 "LINE LEVELS" 05 05 "OUT     1  2  3  4" 05 05 05 " H=HIGH, L=LOW, N=NO CHANGE" 05 05 05 "IN      1  2" 05 05 "ACTION        N=NONE, P=PAGE END" 05 "              S=SEQUENCE RESET" 05 05 "REGION        1 TO 6 OR A=ALL" 05 
 	call sub_1564h		;b6d2	cd 64 15 	. d . 
 	ld a,(bc)			;b6d5	0a 	. 
 	call sub_1570h		;b6d6	cd 70 15 	. p . 
@@ -17311,7 +17309,7 @@ lb8d8h:
 	call sub_88dch		;b8f8	cd dc 88 	. . . 
 lb8fbh:
 	call sub_2a82h		;b8fb	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdc51, 0x29
+	M_OUT_MSG 0xdc51, 0x29 ; " BLOCK EDIT" 05 05 " FIRST  LAST" 05 " PAGE   PAGE" 05 05 " "
 	call sub_1431h
 	jp nz, l0453h		; Weird, it is in the middle of an instruction
 	call sub_1570h		;b90a	cd 70 15 	. p . 
@@ -17406,21 +17404,21 @@ sub_b9cah:
 	ret			;b9d0	c9 	. 
 sub_b9d1h:
 	call sub_2a82h		;b9d1	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdc7a, 0xa2
+	M_OUT_MSG 0xdc7a, 0xa2 ; "EVENT        ACTIVE     Y OR N" 05 05 "MINUTE      0 TO 59" 05 "HOUR        1 TO 12, A=ALL" 05 "AM/PM       A=AM, P=PM" 05 "DAY         1 TO 7, A=ALL" 05 "ACTION      L=LEVELS, S=SEQUENCE" 05 05 
 	ld a,(CFG5)
 	cp 0aah		;b9dd	fe aa 	. . 
 	jr nz,$+13		;b9df	20 0b 	  . 
 	call sub_1527h		;b9e1	cd 27 15 	. ' . 
 	ex af,af'			;b9e4	08 	. 
 	inc c			;b9e5	0c 	. 
-	M_OUT_MSG 0xdd1c, 0x08
+	M_OUT_MSG 0xdd1c, 0x08 ; "T=TAPE" 05 05 
 	ld a,(CFG10)		;b9e6	cd c8 13 	. . . 
 	cp 0aah		;b9ef	fe aa 	. . 
 	ret nz			;b9f1	c0 	. 
 	call sub_1527h		;b9f2	cd 27 15 	. ' . 
 	ex af,af'			;b9f5	08 	. 
 	dec d			;b9f6	15 	. 
-	M_OUT_MSG 0xdd24, 0x0c
+	M_OUT_MSG 0xdd24, 0x0c ; "B=BATCH T." 05 05 
 	ret
 sub_b9feh:
 	call sub_1527h		;b9fe	cd 27 15 	. ' . 
@@ -17562,11 +17560,11 @@ sub_bae5h:
 	jp z,lbc42h		;bb06	ca 42 bc 	. B . 
 	ret			;bb09	c9 	. 
 lbb0ah:
-	M_OUT_MSG 0xd149, 0x0c		;bb0a	cd c8 13 	. . . 
+	M_OUT_MSG 0xd149, 0x0c ; "LINE LEVELS "
 	call sub_1527h		;bb10	cd 27 15 	. ' . 
 	dec bc			;bb13	0b 	. 
 	ld a,(bc)			;bb14	0a 	. 
-	M_OUT_MSG 0xd157, 0x0a
+	M_OUT_MSG 0xd157, 0x0a ; "1  2  3  4"
 	call sub_1527h		;bb1b	cd 27 15 	. ' . 
 	dec c			;bb1e	0d 	. 
 	ld a,(bc)			;bb1f	0a 	. 
@@ -17577,7 +17575,7 @@ lbb0ah:
 	call sub_b86dh		;bb28	cd 6d b8 	. m . 
 	ret			;bb2b	c9 	. 
 lbb2ch:
-	M_OUT_MSG 0xdd30, 0x50
+	M_OUT_MSG 0xdd30, 0x50 ; "TYPE     F=FILE CHANGE, I=INSERT" 05 "TIMING   I=IMMEDIATE, D=DELAYED" 05 "REGION   1 TO 6"
 	call sub_1527h		;bb32	cd 27 15 	. ' . 
 	add hl,bc			;bb35	09 	. 
 	ex af,af'			;bb36	08 	. 
@@ -17629,7 +17627,7 @@ lbb75h:
 lbb94h:
 	cp 046h		;bb94	fe 46 	. F 
 	ret nz			;bb96	c0 	. 
-	M_OUT_MSG 0xdd80, 0x45
+	M_OUT_MSG 0xdd80, 0x45 ; "FILE  START   STOP  CHANGE" 05 "       PAGE   PAGE   FILE" 05 05 "  1" 05 "  2" 05 "  3" 05 "  4"
 	call sub_1527h		;bb9d	cd 27 15 	. ' . 
 	djnz lbbaah		;bba0	10 08 	. . 
 	push iy		;bba2	fd e5 	. . 
@@ -17970,14 +17968,14 @@ lbe21h:
 sub_be25h:
 	call sub_1527h		;be25	cd 27 15 	. ' . 
 	jr $+3		;be28	18 01 	. . 
-	M_OUT_MSG 0xddea, 0x12
+	M_OUT_MSG 0xddea, 0x12 ; "STORE EVENT NUMBER"
 	call sub_1570h		;be30	cd 70 15 	. p . 
 	ld (bc),a			;be33	02 	. 
 	call sub_1431h		;be34	cd 31 14 	. 1 . 
 	and h			;be37	a4 	. 
 	ld e,a			;be38	5f 	_ 
 	inc bc			;be39	03 	. 
-	M_OUT_MSG 0xddd8, 0x07
+	M_OUT_MSG 0xddd8, 0x07 ; "       "
 	call sub_156ch
 	ex af,af'			;be43	08 	. 
 lbe44h:
@@ -18017,7 +18015,7 @@ lbe76h:
 sub_be8ch:
 	call sub_1527h		;be8c	cd 27 15 	. ' . 
 	jr $+3		;be8f	18 01 	. . 
-	M_OUT_MSG 0xddfc, 0x1e
+	M_OUT_MSG 0xddfc, 0x1e ; "      EVENT NUMBER      STORED"
 	call sub_156ch		;be97	cd 6c 15 	. l . 
 	ld a,(bc)			;be9a	0a 	. 
 	call sub_1431h		;be9b	cd 31 14 	. 1 . 
@@ -18475,7 +18473,7 @@ sub_c21dh:
 	dec d			;c241	15 	. 
 	inc bc			;c242	03 	. 
 	rrca			;c243	0f 	. 
-	M_OUT_MSG 0x53c2, 0x02
+	M_OUT_MSG 0x53c2, 0x02 ; *** RAM data ***
 	call sub_1527h		;c24a	cd 27 15 	. ' . 
 	ld b,001h		;c24d	06 01 	. . 
 	ld iy,053c4h		;c24f	fd 21 c4 53 	. ! . S 
@@ -18508,12 +18506,12 @@ lc26ch:
 	ld a,c			;c27a	79 	y 
 	pop bc			;c27b	c1 	. 
 	jp nz,lc255h		;c27c	c2 55 c2 	. U . 
-	M_OUT_MSG 0xc416, 0x2d
+	M_OUT_MSG 0xc416, 0x2d ; 05 05 "SEQUENCE FROM" 05 "     EXTERNAL DEVICE?  (Y/N) "
 	call sub_c2b1h		;c285	cd b1 c2 	. . . 
-	M_OUT_MSG 0xc3f1, 0x14
+	M_OUT_MSG 0xc3f1, 0x14 ; 05 05 "NUMBER OF EVENTS  "
 	call sub_1431h
 	call z, l0453h
-	M_OUT_MSG 0xc405, 0x0a
+	M_OUT_MSG 0xc405, 0x0a ; "  MAX 512" 05 
 	call sub_1570h
 	jr lc26ch		;c29d	18 cd 	. . 
 	ret z			;c29f	c8 	. 
