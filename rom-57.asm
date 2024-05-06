@@ -165,14 +165,104 @@ CFG10:
 CFG9:
 	db 0xff
 	db 0xff, 0xff
+
+; DART documentation (https://www.cpcwiki.eu/index.php?title=Z80-DART/Z80-SIO_chip)
+
+; WR0 Write register 0
+;  0-2  Register Index (0-5 for write, 0-2 for read) (SIO: 0-7 for write)
+;  3-5  Command (0..7)
+;        0=No action
+;        1=DART: Reserved / SIO: Send Abort (SDLC)
+;        2=Reset Ext/Status Interrupts
+;        3=Reset Channel
+;        4=Enable Interrupt on next Rx character
+;        5=Reset Tx Int pending
+;        6=Reset Error
+;        7=Return from Int (Ch-A only)
+;  6-7  CRC Reset Code (DART: Reserved, should be 0) (SIO: 0..3)
+;        0=No action
+;        1=DART: Reserved, SIO: Reset Receive CRC Checker
+;        2=DART: Reserved, SIO: Reset Transmit CRC Generator
+;        3=DART: Reserved, SIO: Reset Tx Underrun/End of Message latch
+
+; WR1 Write register 1
+;  0   External Interrupts Enable
+;  1   Tx Interrupt Enable
+;  2   Status Affects Vector (Channel B only) (see WR2/RR2)
+;  3-4 Rx Interrupt Mode (0..3)
+;       0=None
+;       1=On first Rx char
+;       2=On all Rx chars (Parity affects vector)
+;       3=On all Rx chars (Parity does not affect vector)
+;  5   Wait/Ready on Receive/Transmit
+;  6   Wait/Ready Function
+;  7   Wait/Ready Enable
+
+; WR3 Write register 3 - Rx Control
+;  0   Rx Enable
+;  1   DART: Reserved (must be 0), SIO: Sync Char Load Inhibit
+;  2   DART: Reserved (must be 0), SIO: Address Search Mode
+;  3   DART: Reserved (must be 0), SIO: Receiver CRC Enable
+;  4   DART: Reserved (must be 0), SIO: Enter Hunt Phase
+;  5   Enable automatic hardware handshaking using RTS/CTS
+;  6-7 Rx data bits          (0..3 = 5bits, 7bits, 6bits, 8bits)
+
+; WR4 Write register 4 - Rx/Tx Control
+;  0   Rx/Tx Parity bit      (0=None, 1=Enable)
+;  1   Rx/Tx Parity type     (0=Odd, 1=Even)
+;  2-3 Rx/Tx Stop bits (0..3=Reserved, 1bit, 1.5bits, 2bits) (SIO: 0=Sync Modes)
+;  4-5 DART: Reserved (must be 0), SIO: Sync Mode (enabled when Bit2-3=zero)
+;       0=8bit SYNC Character        (SIO only, not DART)
+;       1=16bit SYNC Character       (SIO only, not DART)
+;       2=SDLC Mode (0111 1110 Flag) (SIO only, not DART)
+;       3=External SYNC Mode         (SIO only, not DART)
+;  6-7 Rx/Tx DART clock mode (0..3=X1, X16, X32, X64)
+
+; WR5 Write register 5 - Tx Control
+;  0   DART: Reserved (must be 0), SIO: Tx CRC Enable
+;  1   RTS enabled/disabled
+;  2   DART: Reserved (must be 0), SIO: Rx/Tx CRC Type (0=SDLC, 1=CRC-16)
+;  3   Tx Enable
+;  4   Tx Send break
+;  6-5 Tx data bits          (0..3 = 5bits, 7bits, 6bits, 8bits)
+;  7   DTR enabled/disabled
+
+
+
 KEYBOARD_INIT2:
 	db 0x04, 0x4c, 0x05, 0x60, 0x03, 0xc1, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0x60 : %0 11 0 0 0 0 0 =>	RTS disabled
+	;									8 bits
+	;									DTR disabled
+	; 0x03 0xc1 : %01 1 0 0 0 0 1 => 	8bits
+	;									RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status doesn't affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
+
 PORT_SERIAL_INIT:
 	db 0x04, 0x84, 0x05, 0x68, 0x03, 0xc1, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0x68 : %0 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR disabled
+	; 0x03 0xc1 : %01 1 0 0 0 0 1 => 	8bits
+	;									RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status doesn't affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
+
+; Other DART init
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
+
 PORT13_INIT2:
-	db 0x04, 0x4c, 0x05, 0xe8, 0x03
-	db 0x01, 0x01, 0x1c
+	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
 
 ; RST-38 entry point (warm boot?)
 	di
@@ -185,11 +275,10 @@ CFG8:
 
 	dw INTER_3E_6C	;	 Probably 6C, not 3E
 	
-	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1
-	db 0x01, 0x1c, 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1
-	db 0x01, 0x1c, 0x04, 0x8c, 0x05, 0xe8, 0x03, 0x01
-	db 0x01, 0x1c, 0x04, 0xcc, 0x05, 0xe8, 0x03, 0x01
-	db 0x01, 0x1c
+	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
+	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
+	db 0x04, 0x8c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
+	db 0x04, 0xcc, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
 
 	;	Interrupt vectors
 	;	Valid indexes in mode 2 are 64, 66, 6C, 6E, 74, 76, 7C, 7E, 84, 86, 8C, 8E
@@ -2494,7 +2583,7 @@ _loop:
 	pop bc
 	ret
 
-; Complicated. Finds the Ath position from 04159h where bit 5 is set, looking at every 67 bytes. Returns this location plus 43 or 88
+; Complicated. Finds the Ath position from 04159h where bit 5 is set, looking at every 67 bytes. Returns this location plus 43 or 88 depeding wether we got to position A.
 ; Looks at at most 26 values
 ; => It looks to me that there are 26 control blocs of 67 bytes. Bit 5 is some sort of flag.
 sub_112fh:
@@ -2546,11 +2635,11 @@ TARGET10:
 	ret			;1175	c9		.
 
 TARGET4:
-	push af			;1176	f5		.
-	push hl			;1177	e5		.
-	call sub_1112h		;1178	cd 12 11	. . .
-	xor a			;117b	af		.
-	call sub_112fh		;117c	cd 2f 11	. / .
+	push af
+	push hl
+	call sub_1112h
+	xor a
+	call sub_112fh
 	ld (p4f84),hl		;117f	22 84 4f	" . O
 	ld a,(hl)		;1182	7e		~
 	and 0c0h		;1183	e6 c0		. .
@@ -2572,25 +2661,26 @@ sub_1191h:
 	ld (hl),a
 	ret
 
+; Forward a character
 TARGET9:
-	push af			;119b	f5		.
-	push hl			;119c	e5		.
-	ld hl,(p4f84)		;119d	2a 84 4f	* . O
-	ld a,(hl)		;11a0	7e		~
-	and 0c0h		;11a1	e6 c0		. .
-	ld (hl),a		;11a3	77		w
-	ld a,(CURSORX)		;11a4	3a 86 4f	: . O
-	inc a			;11a7	3c		<
-	ld (CURSORX),a		;11a8	32 86 4f	2 . O
-	or (hl)			;11ab	b6		.
-	ld (hl),a		;11ac	77		w
-	call sub_1191h		;11ad	cd 91 11	. . .
-	ld a,(CURSORX)		;11b0	3a 86 4f	: . O
-	cp 40			;11b3	fe 28		. (
-	call nc,TARGET5		;11b5	d4 b1 12	. . .
-	pop hl			;11b8	e1		.
-	pop af			;11b9	f1		.
-	ret			;11ba	c9		.
+	push af
+	push hl
+	ld hl,(p4f84)
+	ld a,(hl)
+	and 0c0h
+	ld (hl),a
+	ld a,(CURSORX)
+	inc a
+	ld (CURSORX),a
+	or (hl)
+	ld (hl),a
+	call sub_1191h
+	ld a,(CURSORX)
+	cp 40
+	call nc,TARGET5
+	pop hl
+	pop af
+	ret
 
 TARGET8:
 	push af			;11bb	f5		.
@@ -2721,7 +2811,7 @@ TARGET14:
 	push hl
 	ld a,(f5fb6)
 	or a
-	jr nz,l12a3h
+	jr nz,_skip
 	ld hl,(p4f84)
 	ld a,(hl)
 	and 0c0h
@@ -2729,9 +2819,9 @@ TARGET14:
 	ld a,(CURSORX)
 	or (hl)
 	ld (hl),a
-	ld a,000h
+	ld a,0
 	ld (f5b6d),a
-l12a3h:
+_skip:
 	pop hl
 	pop af
 	ret
