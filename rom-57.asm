@@ -1,3 +1,5 @@
+HACK_ROM: equ 0
+
 ; variables:
 p4f84: equ 0x4f84
 v53c2: equ 0x53c2
@@ -288,7 +290,11 @@ CFG8:
 	dw INTER_66
 	dw INTER_DEFAULT
 	dw INTER_DEFAULT
+IF HACK_ROM
+	dw FRED_HACK	;	Capture the interrupt 0x6C
+ELSE
 	dw INTER_3E_6C
+ENDIF
 	dw INTER_6E
 	dw INTER_DEFAULT
 	dw INTER_DEFAULT
@@ -9285,6 +9291,16 @@ l3eb3h:
 	call 099cah		;3ebe	cd ca 99	. . .
 	call sub_0849h		;3ec1	cd 49 08	. I .
 	jp l1925h		;3ec4	c3 25 19	. % .
+
+IF HACK_ROM
+FRED_HACK:
+	exx
+	push af
+	ld c,PORT_SERIAL_DATA
+	ld hl,FIFO_KBD
+	call PORT2FIFO	; Read port 0x00 into FIFO_SERIAL
+	jp ACK_IF_NEEDED
+ENDIF
 
 	ds 0x4000-$, 0x00
 
