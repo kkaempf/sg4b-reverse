@@ -159,7 +159,6 @@ CFG6:
 CFG10:
 	db 0xff, 0xff
 	
-	; Interrupt 0x10
 	dw INTER_10
 
 ;	Unknown
@@ -200,6 +199,9 @@ CFG9:
 ;  6   Wait/Ready Function
 ;  7   Wait/Ready Enable
 
+; WR2 Write register 2 - Interrupt Vector (Channel B only)
+;  0-7 Interrupt Vector (Bit1-3=no effect when WR1.Bit2=1, see RR2 for details)
+
 ; WR3 Write register 3 - Rx Control
 ;  0   Rx Enable
 ;  1   DART: Reserved (must be 0), SIO: Sync Char Load Inhibit
@@ -229,6 +231,11 @@ CFG9:
 ;  6-5 Tx data bits          (0..3 = 5bits, 7bits, 6bits, 8bits)
 ;  7   DTR enabled/disabled
 
+; WR6 Write register 6 - Sync Character or SDLC address (Z80 SIO only)
+;  0-7 DART: N/A, SIO: LSBs of 8bit/16bit sync char, or SDLC address
+
+; WR7 Write register 7 - Sync Character or SDLC flag (Z80 SIO only)
+;  0-7 DART: N/A, SIO: MSBs of 16bit sync char, or SDLC flag (should be 7Eh)
 
 
 KEYBOARD_INIT2:
@@ -237,11 +244,11 @@ KEYBOARD_INIT2:
 	; 0x05 0x60 : %0 11 0 0 0 0 0 =>	RTS disabled
 	;									8 bits
 	;									DTR disabled
-	; 0x03 0xc1 : %01 1 0 0 0 0 1 => 	8bits
-	;									RTS/CTS handshake
+	; 0x03 0xc1 : %11 0 0 0 0 0 1 => 	8bits
+	;									no RTS/CTS handshake
 	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
 	; 									Tx interrupt disable
-	;									Status doesn't affect vector
+	;									Status affect vector
 	;									Rx interrupt on all chars, parity does not affects vector
 	;									Wait/Ready disable
 
@@ -252,19 +259,43 @@ PORT_SERIAL_INIT:
 	;									Tx enabled
 	;									8 bits
 	;									DTR disabled
-	; 0x03 0xc1 : %01 1 0 0 0 0 1 => 	8bits
-	;									RTS/CTS handshake
+	; 0x03 0xc1 : %11 0 0 0 0 0 1 => 	8bits
+	;									no RTS/CTS handshake
 	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
 	; 									Tx interrupt disable
-	;									Status doesn't affect vector
+	;									Status affect vector
 	;									Rx interrupt on all chars, parity does not affects vector
 	;									Wait/Ready disable
 
 ; Other DART init
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR enabled
+	; 0x03 0x01 : %00 0 0 0 0 0 1 => 	5bits (?)
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
 
-PORT13_INIT2:
+PORT13_INIT2A:
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR enabled
+	; 0x03 0x01 : %00 0 0 0 0 0 1 => 	5bits (?)
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
 
 ; RST-38 entry point (warm boot?)
 	di
@@ -275,15 +306,65 @@ CFG7:
 CFG8:
 	db 0x00		; Hard coded config
 
-	dw INTER_3E_6C	;	 Probably 6C, not 3E
+	db 0xff, 0x00
 	
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR enabled
+	; 0x03 0xc1 : %11 0 0 0 0 0 1 => 	8bits
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
+
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
+	; Idem above
+
 	db 0x04, 0x8c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR enabled
+	; 0x03 0x01 : %00 0 0 0 0 0 1 => 	5bits (?)
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
+
 	db 0x04, 0xcc, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
+	; 0x04 0x4c : %11 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x64
+	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR enabled
+	; 0x03 0x01 : %00 0 0 0 0 0 1 => 	5bits (?)
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
 
 	;	Interrupt vectors
+
+	;	In general SIO devices capture 8 addresses
+    ; Transmit Interrupt (T): This is usually bit 0 of the interrupt vector. It indicates that the transmit buffer is empty and ready for new data.
+
+    ; Receive Interrupt (R): This is usually bit 1 of the interrupt vector. It indicates that the receive buffer has received new data.
+
+    ; Channel Identifier (C): This is usually bit 2 of the interrupt vector. It identifies which channel generated the interrupt, helpful when dealing with multiple serial channels.
+
 	;	Valid indexes in mode 2 are 64, 66, 6C, 6E, 74, 76, 7C, 7E, 84, 86, 8C, 8E
+
+
 	dw INTER_DEFAULT
 	dw INTER_DEFAULT
 	dw INTER_64
@@ -293,7 +374,7 @@ CFG8:
 IF HACK_ROM
 	dw FRED_HACK	;	Capture the interrupt 0x6C
 ELSE
-	dw INTER_3E_6C
+	dw INTER_6C
 ENDIF
 	dw INTER_6E
 	dw INTER_DEFAULT
@@ -312,16 +393,49 @@ ENDIF
 	dw INTER_DEFAULT
 	dw INTER_8C
 	dw INTER_8E
-PORT13_INIT4:
+PORT13_INIT2C:
 	db 0x04, 0x44, 0x05, 0x60, 0x03, 0x81, 0x01, 0x1c
-PORT13_INIT3:
+	; 0x04 0x44 : %01 00 01 0 0   =>	No Parity + 1 stop bits + Clock mode = x16
+	; 0x05 0x60 : %0 11 0 0 0 0 0 =>	RTS disabled
+	;									Tx disable
+	;									8 bits
+	;									DTR disabled
+	; 0x03 0x81 : %10 0 0 0 0 0 1 => 	6bits (?)
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
+
+
+PORT13_INIT2B:
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0x41, 0x01, 0x1c
+	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
+	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
+	;									Tx enabled
+	;									8 bits
+	;									DTR enabled
+	; 0x03 0x41 : %01 0 0 0 0 0 1 => 	7bits (?)
+	;									no RTS/CTS handshake
+	; 0x01 0x1c : %0 0 0 11 1 0 0 =>	No ext interrupt
+	; 									Tx interrupt disable
+	;									Status affect vector
+	;									Rx interrupt on all chars, parity does not affects vector
+	;									Wait/Ready disable
+
+
 KEYBOARD_INIT:
 	db 0x30, 0x10, 0x02, 0x60
+; Common init for port 13
 PORT13_INIT:
 	db 0x30, 0x10, 0x02, 0x70
+	; 0x30 : %00 110 000          => 	Reset error, next register 0
+	; 0x10 : %00 010 000		  => 	Reset Ext/Status Interrupts, next register 0
+	; 0x02 0x70 				  =>	Interrupt vector 0x70 + status
 
 	db 0x30, 0x10, 0x02, 0x80
+	; Idem above, interrupt vector 0x80 + status
 
 ; [JCM-1] The keyboard interrupt handler starts at 00AC
 INTER_64
@@ -410,7 +524,7 @@ _skip:
 	reti
 
 ; Serial port data received
-INTER_3E_6C:
+INTER_6C:
 	exx
 	push af
 	ld c,PORT_SERIAL_DATA
@@ -18238,20 +18352,20 @@ lc01fh:
 	ld hl,PORT13_INIT
 	otir
 
-		; Different init sequences
+		; Different init sequences for port 8
 	ld b,8
-	ld hl,PORT13_INIT2 
+	ld hl,PORT13_INIT2A 
 	ld a,(CFG9) 
 	cp 0xff 
 	jr z,_init 
-	ld hl,PORT13_INIT3 
+	ld hl,PORT13_INIT2B 
 	cp 0xaa 
-	jr z,_init 
-	ld hl,PORT13_INIT4 
+	jr z,_init
+	ld hl,PORT13_INIT2C 
 	ld a,(CFG8) 
 	bit 1,a 
-	jr z,_init 
-	ld hl,PORT13_INIT5 
+	jr z,_init
+	ld hl,PORT13_INIT2D 
 _init:
 	otir
 
@@ -18274,7 +18388,7 @@ lc093h:
 	ld a,(CFG8)		;c0a3	3a 3d 00 	: = . 
 	bit 1,a		;c0a6	cb 4f 	. O 
 	jr z,lc0adh		;c0a8	28 03 	( . 
-	ld hl,PORT13_INIT5		;c0aa	21 d3 c0 	! . . 
+	ld hl,PORT13_INIT2D		;c0aa	21 d3 c0 	! . . 
 lc0adh:
 	ld a,(00017h)		;c0ad	3a 17 00 	: . . 
 	cp 0aah		;c0b0	fe aa 	. . 
@@ -18296,7 +18410,7 @@ lc0c1h:
 	ret			;c0d2	c9 	. 
 
 ; Special case PORT13 Initialisation data
-PORT13_INIT5:
+PORT13_INIT2D:
 	db 0x04, 0x84, 0x05, 0x60, 0x03, 0x81, 0x01, 0x1c
 
 sub_c0dbh:
@@ -18330,31 +18444,32 @@ lc0f6h:
 	ret nc			;c100	d0 	. 
 	inc c			;c101	0c 	. 
 	ret			;c102	c9 	. 
-; c10e may be interrupt 44 (I don't think so anymore)
-sub_c103h:
-	and 01fh		;c103	e6 1f 	. . 
-	cp 01bh		;c105	fe 1b 	. . 
-	call z,sub_c11eh		;c107	cc 1e c1 	. . . 
-	cp 01fh		;c10a	fe 1f 	. . 
-	call z,sub_c121h		;c10c	cc 21 c1 	. ! . 
-	bit 0,(hl)		;c10f	cb 46 	. F 
-	jr z,lc115h		;c111	28 02 	( . 
-	set 5,a		;c113	cb ef 	. . 
-lc115h:
-	ld hl,lc124h		;c115	21 24 c1 	! $ . 
-	ld d,0		;c118	16 00 	. . 
-	ld e,a			;c11a	5f 	_ 
-	add hl,de			;c11b	19 	. 
-	ld a,(hl)			;c11c	7e 	~ 
-	ret			;c11d	c9 	. 
-sub_c11eh:
-	set 0,(hl)		;c11e	cb c6 	. . 
-	ret			;c120	c9 	. 
-sub_c121h:
-	res 0,(hl)		;c121	cb 86 	. . 
-	ret			;c123	c9 	. 
 
-lc124h:
+; Some kind of key handling routine
+sub_c103h:
+	and %00011111
+	cp 0x1b					; ESC (?)
+	call z,_shifton		; Yes, set bit 0 to 1
+	cp 01fh					; DEL (?) [this looks more like some sort of mode shift to me]
+	call z,_shiftoff		; Clear bit 0
+	bit 0,(hl)				; 
+	jr z,_lookup				; No shift mode 
+	set 5,a					; Apply shift mode
+_lookup:
+	ld hl,KEYTABLE2			; Second keytable 
+	ld d,0 
+	ld e,a
+	add hl,de				; Offset to char
+	ld a,(hl)				; Get char
+	ret						; Done
+_shifton:
+	set 0,(hl)				; Shift mode on 
+	ret
+_shiftoff:
+	res 0,(hl)				; Shift mode off
+	ret
+
+KEYTABLE2:
 	; Two 32 char tables, usage unknown
 	db " E\nA SIU\rDRJNFCKTZLWHYPQOBG"
 	db 0x1c
