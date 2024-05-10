@@ -27,6 +27,9 @@ v6030: equ 0x6030
 v6031: equ 0x6031
 v60c7: equ 0x60c7
 
+fUS_SI: equ 0x5466			;	Flags. Bit 0 = US TEMP, Bit 1 = SI TEMP
+pWEATHER_CONF: equ 0x5467	;	Config for weather display, one entry for each *digits* with a 'X' if skipped
+
 ; TODO:
 ;	Find all inlines ( ex (sp),hl )
 ; sub_3d48h is not finished
@@ -2473,62 +2476,68 @@ sub_0f94h:
 	ld b,a			;0f9b	47		G
 	or a			;0f9c	b7		.
 	ret			;0f9d	c9		.
-sub_0f9eh:
-	push iy			;0f9e	fd e5		. .
-	push de			;0fa0	d5		.
-	pop iy			;0fa1	fd e1		. .
-	push bc			;0fa3	c5		.
-	ld a,c			;0fa4	79		y
-	cp 002h			;0fa5	fe 02		. .
-	jr c,l0fd9h		;0fa7	38 30		8 0
-	jr z,l0fcbh		;0fa9	28 20		(  
-	cp 003h			;0fab	fe 03		. .
-	jr z,l0fbdh		;0fad	28 0e		( .
-	xor a			;0faf	af		.
-l0fb0h:
-	call sub_0fe3h		;0fb0	cd e3 0f	. . .
-	ld de,003e8h		;0fb3	11 e8 03	. . .
-	sbc hl,de		;0fb6	ed 52		. R
-	jr nc,l0fb0h		;0fb8	30 f6		0 .
-l0fbah:
-	call sub_0fe7h		;0fba	cd e7 0f	. . .
-l0fbdh:
-	xor a			;0fbd	af		.
-l0fbeh:
-	call sub_0fe3h		;0fbe	cd e3 0f	. . .
-	ld de,00064h		;0fc1	11 64 00	. d .
-	sbc hl,de		;0fc4	ed 52		. R
-	jr nc,l0fbeh		;0fc6	30 f6		0 .
-l0fc8h:
-	call sub_0fe7h		;0fc8	cd e7 0f	. . .
-l0fcbh:
-	xor a			;0fcb	af		.
-l0fcch:
-	call sub_0fe3h		;0fcc	cd e3 0f	. . .
-	ld de,10		;0fcf	11 0a 00	. . .
-	sbc hl,de		;0fd2	ed 52		. R
-	jr nc,l0fcch		;0fd4	30 f6		0 .
-	call sub_0fe7h		;0fd6	cd e7 0f	. . .
-l0fd9h:
-	ld a,l			;0fd9	7d		}
-	or 030h			;0fda	f6 30		. 0
-	ld (iy+000h),a		;0fdc	fd 77 00	. w .
-	pop bc			;0fdf	c1		.
-	pop iy			;0fe0	fd e1		. .
-	ret			;0fe2	c9		.
-sub_0fe3h:
-	ld b,h			;0fe3	44		D
-	ld c,l			;0fe4	4d		M
-	inc a			;0fe5	3c		<
-	ret			;0fe6	c9		.
-sub_0fe7h:
-	dec a			;0fe7	3d		=
-	ld h,b			;0fe8	60		`
-	ld l,c			;0fe9	69		i
-	or 030h			;0fea	f6 30		. 0
-	ld (iy+000h),a		;0fec	fd 77 00	. w .
-	inc iy			;0fef	fd 23		. #
-	ret			;0ff1	c9		.
+
+; HL = Number to print
+; DE = Memory to print into
+; C = Number of digits to print`
+NUM2STR:
+	push iy
+	push de
+	pop iy		; iy = de
+	push bc
+	ld a,c
+	cp 2
+	jr c,_units		; ARG = 0 or 1
+	jr z,_tens		; ARG = 2
+	cp 3
+	jr z,_hundreds		; ARG =3
+	xor a			; ARG = 4,5,6,7
+_thousands:
+	call PRT_HELPER1		; BC=HL; A++
+	ld de,1000
+	sbc hl,de
+	jr nc,_thousands
+	call PRT_HELPER2
+_hundreds: ; ARG = 3
+	xor a
+_loop1:
+	call PRT_HELPER1
+	ld de,100
+	sbc hl,de
+	jr nc,_loop1
+	call PRT_HELPER2		; Ouputs digit
+_tens:	; ARG = 2
+	xor a
+_loop2:
+	call PRT_HELPER1		; BC=HL; A++
+	ld de,10
+	sbc hl,de
+	jr nc,_loop2
+	call PRT_HELPER2		; Ouputs digit
+_units:
+	ld a,l
+	or 030h
+	ld (iy+000h),a
+	pop bc
+	pop iy
+	ret
+
+; BC = HL; A++
+PRT_HELPER1:
+	ld b,h
+	ld c,l
+	inc a
+	ret
+
+; Print A-1 as a ascii digit into IY, put BC in HL
+PRT_HELPER2:
+	dec a
+	ld h,b
+	ld l,c
+	or '0'
+	ld (iy+000h),a
+	inc iy
+	ret
 
 ; Find char corresponding to key (probably)
 KEY2CHAR:
@@ -3197,18 +3206,21 @@ SOMETHING1_INLINE:
 	push de			;13eb	d5		.
 	push hl			;13ec	e5		.
 	call sub_145eh		;13ed	cd 5e 14	. ^ .
+
 l13f0h:
-	ld d,001h		;13f0	16 01		. .
-	ld e,030h		;13f2	1e 30		. 0
-l13f4h:
-	call NEXT_MACRO_OR_KEY	;13f4	cd a7 17	. . .
-	cp 00ah			;13f7	fe 0a		. .
-	jr z,l1405h		;13f9	28 0a		( .
-	call sub_14cah		;13fb	cd ca 14	. . .
-	jr c,l13f4h		;13fe	38 f4		8 .
-	call sub_147bh		;1400	cd 7b 14	. { .
-	jr l13f4h		;1403	18 ef		. .
-l1405h:
+	ld d,1
+	ld e,'0'
+
+_loop:
+	call NEXT_MACRO_OR_KEY
+	cp "\n"
+	jr z,_entry
+	call IS_DIGIT
+	jr c,_loop
+	call sub_147bh
+	jr _loop
+
+_entry:
 	ld a,c			;1405	79		y
 	and 007h		;1406	e6 07		. .
 	push bc			;1408	c5		.
@@ -3231,6 +3243,7 @@ l141eh:
 	ld e,023h		;141e	1e 23		. #
 	call sub_1501h		;1420	cd 01 15	. . .
 	jr l13f0h		;1423	18 cb		. .
+
 l1425h:
 	pop hl			;1425	e1		.
 	ld (hl),e		;1426	73		s
@@ -3244,22 +3257,25 @@ l142bh:
 	ex (sp),hl		;142e	e3		.
 	ex de,hl		;142f	eb		.
 	ret			;1430	c9		.
+
 sub_1431h:
-	ex (sp),hl		;1431	e3		.
-	push de			;1432	d5		.
-	push bc			;1433	c5		.
-	push af			;1434	f5		.
-	call GET_WORD_AND_BYTE		;1435	cd 4d 14	. M .
-	push de			;1438	d5		.
-	call sub_145eh		;1439	cd 5e 14	. ^ .
-	ld a,c			;143c	79		y
-	and 007h		;143d	e6 07		. .
-	ld b,a			;143f	47		G
+	ex (sp),hl
+	push de
+	push bc
+	push af
+	call GET_WORD_AND_BYTE
+	push de
+	call sub_145eh
+
+	ld a,c
+	and %00000111
+	ld b,a
 _loop:
-	ld a,(hl)		;1440	7e		~
-	call OUT_CH		;1441	cd 84 10	. . .
-	inc hl			;1444	23		#
-	djnz _loop		;1445	10 f9		. .
+	ld a,(hl)
+	call OUT_CH
+	inc hl
+	djnz _loop
+
 	pop hl			;1447	e1		.
 	pop af			;1448	f1		.
 	pop bc			;1449	c1		.
@@ -3296,28 +3312,31 @@ GET_WORD_AND_BYTE:
 
 
 sub_145eh:
-	ld a,c			;145e	79		y
-	and 040h		;145f	e6 40		. @
-	jr z,l1468h		;1461	28 05		( .
-	ld l,(hl)		;1463	6e		n
-	ld h,000h		;1464	26 00		& .
-	jr l146ch		;1466	18 04		. .
-l1468h:
-	ld e,(hl)		;1468	5e		^
-	inc hl			;1469	23		#
-	ld d,(hl)		;146a	56		V
-	ex de,hl		;146b	eb		.
-l146ch:
-	ld a,c			;146c	79		y
-	and 007h		;146d	e6 07		. .
-	push bc			;146f	c5		.
-	ld c,a			;1470	4f		O
-	ld de,04f7ah		;1471	11 7a 4f	. z O
-	push de			;1474	d5		.
-	call sub_0f9eh		;1475	cd 9e 0f	. . .
-	pop hl			;1478	e1		.
-	pop bc			;1479	c1		.
-	ret			;147a	c9		.
+	ld a,c
+	and 0x40
+	jr z,_word		; Word based pointer
+	; hl = *hl (as byte)
+	ld l,(hl)
+	ld h,0
+	jr _doit
+_word:
+	; hl = *hl (as word)
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	ex de,hl
+_doit:
+	ld a,c
+	and %00000111
+	push bc
+	ld c,a
+	ld de,04f7ah
+	push de
+	call NUM2STR
+	pop hl
+	pop bc
+	ret
+
 sub_147bh:
 	push af			;147b	f5		.
 	M_OUT_CH 0x0f
@@ -3368,17 +3387,19 @@ sub_14bdh:
 	cp 020h			;14bd	fe 20		.  
 	ret z			;14bf	c8		.
 	cp 041h			;14c0	fe 41		. A
-	jr c,sub_14cah		;14c2	38 06		8 .
+	jr c,IS_DIGIT		;14c2	38 06		8 .
 	and 0dfh		;14c4	e6 df		. .
 	cp 05bh			;14c6	fe 5b		. [
 	ccf			;14c8	3f		?
 	ret			;14c9	c9		.
-sub_14cah:
-	cp 030h			;14ca	fe 30		. 0
-	ret c			;14cc	d8		.
-	cp 03ah			;14cd	fe 3a		. :
-	ccf			;14cf	3f		?
-	ret			;14d0	c9		.
+
+; nc if character in A is a digit
+IS_DIGIT:
+	cp '0'
+	ret c
+	cp '9'+1
+	ccf
+	ret
 
 ; Input
 ; 	A = Char
@@ -12125,7 +12146,7 @@ l9299h:
 sub_92abh:
 	ld de,04f7ah		;92ab	11 7a 4f 	. z O 
 	ld c,004h		;92ae	0e 04 	. . 
-	call sub_0f9eh		;92b0	cd 9e 0f 	. . . 
+	call NUM2STR		;92b0	cd 9e 0f 	. . . 
 	ld hl,FIFO_KBD		;92b3	21 e4 40 	! . @ 
 	ld de,04f7ah		;92b6	11 7a 4f 	. z O 
 	ld b,004h		;92b9	06 04 	. . 
@@ -13950,7 +13971,7 @@ l9f42h:
 	inc ix		;9f4a	dd 23 	. # 
 	push bc			;9f4c	c5 	. 
 	push de			;9f4d	d5 	. 
-	call sub_0f9eh		;9f4e	cd 9e 0f 	. . . 
+	call NUM2STR		;9f4e	cd 9e 0f 	. . . 
 	pop de			;9f51	d1 	. 
 	pop bc			;9f52	c1 	. 
 	inc de			;9f53	13 	. 
@@ -16659,29 +16680,28 @@ WEATHER_SETUP:
 	ld h,0x02
 	call sub_3d48h		;b3cb	cd 48 3d 	. H = 
 	ld a,l			;b3ce	7d 	} 
-	ld (05466h),a		;b3cf	32 66 54 	2 f T 
+	ld (fUS_SI),a		;b3cf	32 66 54 	2 f T 
 	call sub_2a82h		;b3d2	cd 82 2a 	. . * 
 	M_OUT_CH 0x0f
-	ld a,(05466h)		;b3d9	3a 66 54 	: f T 
-	bit 0,a		;b3dc	cb 47 	. G 
-	jp nz,lb3e7h		;b3de	c2 e7 b3 	. . . 
-	; #### FReD : may be print?
-	ld de,0d9f2h		;b3e1	11 f2 d9 	. . . 
-	jp lb3eah		;b3e4	c3 ea b3 	. . . 
-lb3e7h:
-	ld de,0da92h		;b3e7	11 92 da 	. . . 
-lb3eah:
+	ld a,(fUS_SI)
+	bit 0,a
+	jp nz,_si_units			; SI units
+	ld de,REF_TEXT_TEMP_US
+	jp _cont				; US units
+_si_units:
+	ld de,REF_TEXT_TEMP_SI		;b3e7	11 92 da 	. . . 
+_cont:
 	push de			;b3ea	d5 	. 
 	ld a,(05cbah)		;b3eb	3a ba 5c 	: . \ 
 	cp 005h		;b3ee	fe 05 	. . 
 	jr nz,lb404h		;b3f0	20 12 	  . 
-	ld a,(05466h)		;b3f2	3a 66 54 	: f T 
+	ld a,(fUS_SI)		;b3f2	3a 66 54 	: f T 
 	push af			;b3f5	f5 	. 
 	ld a,057h		;b3f6	3e 57 	> W 
 	ld hl,0		;b3f8	21 00 00 	! . . 
 	call sub_88dch		;b3fb	cd dc 88 	. . . 
 	pop af			;b3fe	f1 	. 
-	ld (05466h),a		;b3ff	32 66 54 	2 f T 
+	ld (fUS_SI),a		;b3ff	32 66 54 	2 f T 
 	jr lb40fh		;b402	18 0b 	. . 
 lb404h:
 	ld bc,000a4h		;b404	01 a4 00 	. . . 
@@ -16689,7 +16709,7 @@ lb404h:
 	ld hl,055e1h		;b40a	21 e1 55 	! . U 
 	ldir		;b40d	ed b0 	. . 
 lb40fh:
-	ld hl,05467h		;b40f	21 67 54 	! g T 
+	ld hl,pWEATHER_CONF		;b40f	21 67 54 	! g T 
 	pop de			;b412	d1 	. 
 	push de			;b413	d5 	. 
 	push hl			;b414	e5 	. 
@@ -16884,80 +16904,97 @@ lb527h:
 	pop hl			;b530	e1 	. 
 	jp lb4b5h		;b531	c3 b5 b4 	. . . 
 
-
+; Something about weather fields configuration
+; Unsure what 'de'/'hl' points to
 lb534h:
-	pop de			;b534	d1 	. 
-	pop hl			;b535	e1 	. 
+	pop de
+	pop hl
 	M_OUT_CH 0x0f 
 	M_OUT_CH 0x09
-lb53eh:
-	inc hl			;b53e	23 	# 
-lb53fh:
-	inc de			;b53f	13 	. 
-	ld a,(de)			;b540	1a 	. 
-	cp 02eh		;b541	fe 2e 	. . 
-	jr z,lb53fh		;b543	28 fa 	( . 
-	cp 030h		;b545	fe 30 	. 0 
-	jr z,lb53eh		;b547	28 f5 	( . 
-	ld a,(hl)			;b549	7e 	~ 
-	cp 0ffh		;b54a	fe ff 	. . 
-	jp nz,lb48ah		;b54c	c2 8a b4 	. . . 
-	call OUT_B_9_INLINE		;b54f	cd 27 15 	. ' . 
-	ld b,00eh		;b552	06 0e 	. . 
-	ld iy,053c2h		;b554	fd 21 c2 53 	. ! . S 
-	call sub_b600h		;b558	cd 00 b6 	. . . 
-	ld hl,053c6h		;b55b	21 c6 53 	! . S 
-	ld a,(05466h)		;b55e	3a 66 54 	: f T 
-	bit 0,a		;b561	cb 47 	. G 
-	jp nz,lb56ch		;b563	c2 6c b5 	. l . 
-	ld de,0d9f2h		;b566	11 f2 d9 	. . . 
-	jp lb56fh		;b569	c3 6f b5 	. o . 
-lb56ch:
-	ld de,0da92h		;b56c	11 92 da 	. . . 
-lb56fh:
-	ld ix,05467h		;b56f	dd 21 67 54 	. ! g T 
-	ld iy,0db65h		;b573	fd 21 65 db 	. ! e . 
-lb577h:
-	ld b,(iy+000h)		;b577	fd 46 00 	. F . 
-	ld c,000h		;b57a	0e 00 	. . 
 
-; JCM : something temperature
-lb57ch:
-	ld a,(de)			;b57c	1a 	. 
-	cp 030h		;b57d	fe 30 	. 0 
-	jr nz,lb58dh		;b57f	20 0c 	  . 
-	ld a,(ix+000h)		;b581	dd 7e 00 	. ~ . 
-	inc ix		;b584	dd 23 	. # 
-	cp 058h		;b586	fe 58 	. X 
-	jp nz,lb58dh		;b588	c2 8d b5 	. . . 
-	ld c,0ffh		;b58b	0e ff 	. . 
-lb58dh:
-	ld (hl),a			;b58d	77 	w 
-	inc de			;b58e	13 	. 
-	inc hl			;b58f	23 	# 
-	djnz lb57ch		;b590	10 ea 	. . 
-	push bc			;b592	c5 	. 
-	ld b,a			;b593	47 	G 
-	ld a,000h		;b594	3e 00 	> . 
-	push de			;b596	d5 	. 
-	ld d,b			;b597	50 	P 
-	ld b,a			;b598	47 	G 
-	ld a,c			;b599	79 	y 
-	ld c,d			;b59a	4a 	J 
-	pop de			;b59b	d1 	. 
-	sub b			;b59c	90 	. 
-	ld a,c			;b59d	79 	y 
-	pop bc			;b59e	c1 	. 
-	jp z,lb5afh		;b59f	ca af b5 	. . . 
-	ld c,(iy+000h)		;b5a2	fd 4e 00 	. N . 
-	xor a			;b5a5	af 	. 
-	sbc hl,bc		;b5a6	ed 42 	. B 
-	ld b,c			;b5a8	41 	A 
-	ld a,020h		;b5a9	3e 20 	>   
-lb5abh:
-	ld (hl),a			;b5ab	77 	w 
-	inc hl			;b5ac	23 	# 
-	djnz lb5abh		;b5ad	10 fc 	. . 
+	; hl++;  while (*de++ in ['.','0]) hl++
+lb53eh:
+	inc hl
+lb53fh:
+	inc de
+	ld a,(de)
+	cp '.'
+	jr z,lb53fh		; Ignore '.'
+	cp '0'
+	jr z,lb53eh		; Loop for every '0'
+
+	; if (*hl==-1)
+	ld a,(hl)
+	cp 0ffh
+	jp nz,lb48ah
+	M_OUT_B_9 6,14
+	ld iy,053c2h
+	call sub_b600h		; Something with keyboard reading
+	ld hl,053c6h		;b55b	21 c6 53 	! . S 
+	ld a,(fUS_SI)
+	bit 0,a
+	jp nz,_si_units 
+	ld de,REF_TEXT_TEMP_US
+	jp _cont
+_si_units:
+	ld de,REF_TEXT_TEMP_SI		; Ref text with '0's
+_cont:
+	ld ix,pWEATHER_CONF	; 'X' if field should be ignored
+
+						; Length of the 5 weather fields
+						; If there is an 'X' in any of the digits, the entire field is ignored
+						; Some fields can contain 2 measurements
+	ld iy,WEATHER_FIELDS_LENGTHS
+lb577h:
+	ld b,(iy+000h)
+	ld c,0
+
+	; We copy B characters from DE to HL
+	; When copying a '0', if the corresponding entry in ix is 'X',
+	; we replace it by 'X'
+	; (note ix contains only entries for digits)
+	; C is 0 or FF (FF if we found any 'X')
+_loop:
+	ld a,(de)
+	cp '0'
+	jr nz,_copy		; Normal text, we copy
+	ld a,(ix+000h)
+	inc ix
+	cp 'X'
+	jp nz,_copy		; Digit no 'Xed', we copy
+	ld c,0xff		; Set flag to 0xff
+_copy:
+	ld (hl),a 
+	inc de 
+	inc hl 
+	djnz _loop		; Next character
+
+		; ?
+	push bc 
+	ld b,a 
+	ld a,0 
+	push de 
+	ld d,b 
+	ld b,a 
+	ld a,c 
+	ld c,d 
+	pop de 
+	sub b 
+	ld a,c 
+	pop bc
+
+	jp z,lb5afh
+
+	ld c,(iy+000h)
+	xor a
+	sbc hl,bc
+	ld b,c
+	ld a,' '
+_fill_loop:				; Fills with spaces
+	ld (hl),a
+	inc hl
+	djnz _fill_loop
+
 lb5afh:
 	inc iy		;b5af	fd 23 	. # 
 	ld a,(ix+000h)		;b5b1	dd 7e 00 	. ~ . 
@@ -19520,7 +19557,7 @@ lc98fh:
 	jr c,lc9b1h		;c992	38 1d 	8 . 
 	ld de,055ebh		;c994	11 eb 55 	. . U 
 	ld c,004h		;c997	0e 04 	. . 
-	call sub_0f9eh		;c999	cd 9e 0f 	. . . 
+	call NUM2STR		;c999	cd 9e 0f 	. . . 
 	ld hl,055ebh		;c99c	21 eb 55 	! . U 
 	call sub_c9a4h		;c99f	cd a4 c9 	. . . 
 	jr lc9cdh		;c9a2	18 29 	. ) 
@@ -19545,7 +19582,7 @@ lc9b1h:
 	inc hl			;c9b7	23 	# 
 	ld de,055ech		;c9b8	11 ec 55 	. . U 
 	ld c,003h		;c9bb	0e 03 	. . 
-	call sub_0f9eh		;c9bd	cd 9e 0f 	. . . 
+	call NUM2STR		;c9bd	cd 9e 0f 	. . . 
 	ld hl,055ech		;c9c0	21 ec 55 	! . U 
 	ld a,(hl)			;c9c3	7e 	~ 
 	cp 030h		;c9c4	fe 30 	. 0 
@@ -19746,7 +19783,7 @@ lcb0fh:
 	ld de,05628h		;cb21	11 28 56 	. ( V 
 	ld l,h			;cb24	6c 	l 
 	ld h,000h		;cb25	26 00 	& . 
-	call sub_0f9eh		;cb27	cd 9e 0f 	. . . 
+	call NUM2STR		;cb27	cd 9e 0f 	. . . 
 	ld hl,05628h		;cb2a	21 28 56 	! ( V 
 	call sub_c9a4h		;cb2d	cd a4 c9 	. . . 
 	jp lcb4dh		;cb30	c3 4d cb 	. M . 
@@ -19758,7 +19795,7 @@ lcb33h:
 	ld h,000h		;cb3a	26 00 	& . 
 	ld de,05628h		;cb3c	11 28 56 	. ( V 
 	ld c,003h		;cb3f	0e 03 	. . 
-	call sub_0f9eh		;cb41	cd 9e 0f 	. . . 
+	call NUM2STR		;cb41	cd 9e 0f 	. . . 
 	ld hl,05628h		;cb44	21 28 56 	! ( V 
 	call sub_c9a4h		;cb47	cd a4 c9 	. . . 
 	dec hl			;cb4a	2b 	+ 
@@ -19796,7 +19833,7 @@ lcb78h:
 	jp m,lcb92h		;cb7e	fa 92 cb 	. . . 
 	ld c,004h		;cb81	0e 04 	. . 
 	ld de,05628h		;cb83	11 28 56 	. ( V 
-	call sub_0f9eh		;cb86	cd 9e 0f 	. . . 
+	call NUM2STR		;cb86	cd 9e 0f 	. . . 
 	ld hl,05628h		;cb89	21 28 56 	! ( V 
 	call sub_c9a4h		;cb8c	cd a4 c9 	. . . 
 	jp lcbaah		;cb8f	c3 aa cb 	. . . 
@@ -19807,7 +19844,7 @@ lcb92h:
 	sbc hl,de		;cb97	ed 52 	. R 
 	ld c,004h		;cb99	0e 04 	. . 
 	ld de,05628h		;cb9b	11 28 56 	. ( V 
-	call sub_0f9eh		;cb9e	cd 9e 0f 	. . . 
+	call NUM2STR		;cb9e	cd 9e 0f 	. . . 
 	ld hl,05628h		;cba1	21 28 56 	! ( V 
 	call sub_c9a4h		;cba4	cd a4 c9 	. . . 
 	dec hl			;cba7	2b 	+ 
@@ -19850,7 +19887,7 @@ lcc03h:
 lcc09h:
 	ld c,002h		;cc09	0e 02 	. . 
 lcc0bh:
-	call sub_0f9eh		;cc0b	cd 9e 0f 	. . . 
+	call NUM2STR		;cc0b	cd 9e 0f 	. . . 
 	jp lc94dh		;cc0e	c3 4d c9 	. M . 
 lcc11h:
 	ld a,(0560dh)		;cc11	3a 0d 56 	: . V 
@@ -19920,7 +19957,7 @@ lcc78h:
 	push hl			;cc80	e5 	. 
 	ld de,05612h		;cc81	11 12 56 	. . V 
 	ld c,002h		;cc84	0e 02 	. . 
-	call sub_0f9eh		;cc86	cd 9e 0f 	. . . 
+	call NUM2STR		;cc86	cd 9e 0f 	. . . 
 	ld de,05615h		;cc89	11 15 56 	. . V 
 	ld c,002h		;cc8c	0e 02 	. . 
 	call sub_0f54h		;cc8e	cd 54 0f 	. T . 
@@ -19960,7 +19997,7 @@ lccaah:
 	add hl,de			;ccd5	19 	. 
 	ld de,0563ah		;ccd6	11 3a 56 	. : V 
 	ld c,004h		;ccd9	0e 04 	. . 
-	call sub_0f9eh		;ccdb	cd 9e 0f 	. . . 
+	call NUM2STR		;ccdb	cd 9e 0f 	. . . 
 	ld hl,0563dh		;ccde	21 3d 56 	! = V 
 	ld a,(hl)			;cce1	7e 	~ 
 	ld (hl),02eh		;cce2	36 2e 	6 . 
@@ -19973,7 +20010,7 @@ lccebh:
 	add hl,de			;ccee	19 	. 
 	ld de,0563bh		;ccef	11 3b 56 	. ; V 
 	ld c,004h		;ccf2	0e 04 	. . 
-	call sub_0f9eh		;ccf4	cd 9e 0f 	. . . 
+	call NUM2STR		;ccf4	cd 9e 0f 	. . . 
 	ld hl,(0563dh)		;ccf7	2a 3d 56 	* = V 
 	ld (0563eh),hl		;ccfa	22 3e 56 	" > V 
 	ld a,02eh		;ccfd	3e 2e 	> . 
@@ -20383,7 +20420,9 @@ lcd8fh:
 	db 0x54, 0x4f, 0x50, 0x20, 0x50, 0x41, 0x47, 0x45   ; d9d8 : TOP PAGE
 	db 0x20, 0x43, 0x4c, 0x4f, 0x43, 0x4b, 0x20, 0x43   ; d9e0 :  CLOCK C
 	db 0x48, 0x49, 0x50, 0x20, 0x41, 0x43, 0x54, 0x49   ; d9e8 : HIP ACTI
-	db 0x56, 0x45, 0x54, 0x45, 0x4d, 0x50, 0x2e, 0x20   ; d9f0 : VETEMP. 
+	db 0x56, 0x45
+REF_TEXT_TEMP_US
+	db             0x54, 0x45, 0x4d, 0x50, 0x2e, 0x20   ; d9f2 : VETEMP. 
 	db 0x30, 0x30, 0x30, 0x5c, 0x46, 0x5e, 0x20, 0x20   ; d9f8 : 000\F^  
 	db 0x20, 0x20, 0x48, 0x49, 0x20, 0x30, 0x30, 0x30   ; da00 :   HI 000
 	db 0x5c, 0x20, 0x4c, 0x4f, 0x20, 0x30, 0x30, 0x30   ; da08 : \ LO 000
@@ -20403,7 +20442,9 @@ lcd8fh:
 	db 0x20, 0x20, 0x4d, 0x4f, 0x4e, 0x54, 0x48, 0x20   ; da78 :   MONTH 
 	db 0x30, 0x30, 0x2e, 0x30, 0x30, 0x22, 0x20, 0x20   ; da80 : 00.00"  
 	db 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20   ; da88 :         
-	db 0x20, 0x20, 0x54, 0x45, 0x4d, 0x50, 0x2e, 0x20   ; da90 :   TEMP. 
+	db 0x20, 0x20
+REF_TEXT_TEMP_SI:
+	db             0x54, 0x45, 0x4d, 0x50, 0x2e, 0x20   ; da92 :   TEMP. 
 	db 0x30, 0x30, 0x30, 0x5c, 0x43, 0x5e, 0x20, 0x20   ; da98 : 000\C^  
 	db 0x20, 0x20, 0x48, 0x49, 0x20, 0x30, 0x30, 0x30   ; daa0 :   HI 000
 	db 0x5c, 0x20, 0x4c, 0x4f, 0x20, 0x30, 0x30, 0x30   ; daa8 : \ LO 000
@@ -20429,8 +20470,10 @@ lcd8fh:
 	db 0x31, 0x20, 0x55, 0x2e, 0x53, 0x2e, 0x20, 0x53   ; db48 : 1 U.S. S
 	db 0x59, 0x53, 0x54, 0x45, 0x4d, 0x05, 0x32, 0x20   ; db50 : YSTEM.2 
 	db 0x4d, 0x45, 0x54, 0x52, 0x49, 0x43, 0x20, 0x53   ; db58 : METRIC S
-	db 0x59, 0x53, 0x54, 0x45, 0x4d, 0x28, 0x28, 0x10   ; db60 : YSTEM((.
-	db 0x18, 0x28, 0x05, 0x4c, 0x49, 0x4e, 0x45, 0x20   ; db68 : .(.LINE 
+	db 0x59, 0x53, 0x54, 0x45, 0x4d						; db60 : YSTEM
+WEATHER_FIELDS_LENGTHS:
+	db 0x28, 0x28, 0x10, 0x18, 0x28
+	db             0x05, 0x4c, 0x49, 0x4e, 0x45, 0x20   ; db68 :   .LINE 
 	db 0x4c, 0x45, 0x56, 0x45, 0x4c, 0x53, 0x05, 0x05   ; db70 : LEVELS..
 	db 0x4f, 0x55, 0x54, 0x20, 0x20, 0x20, 0x20, 0x20   ; db78 : OUT     
 	db 0x31, 0x20, 0x20, 0x32, 0x20, 0x20, 0x33, 0x20   ; db80 : 1  2  3 
