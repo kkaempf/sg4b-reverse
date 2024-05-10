@@ -2430,46 +2430,57 @@ l0f3bh:
 	call SETMEMMAP	;0f4d	cd 1a 0f	. . .
 	ld hl,060deh		;0f50	21 de 60	! . `
 	ret			;0f53	c9		.
-sub_0f54h:
-	push iy			;0f54	fd e5		. .
-	push de			;0f56	d5		.
-	pop iy			;0f57	fd e1		. .
-	ld hl,0	;0f59	21 00 00	! . .
-	ld a,c			;0f5c	79		y
-	cp 002h			;0f5d	fe 02		. .
-	jr c,l0f88h		;0f5f	38 27		8 '
-	jr z,l0f7dh		;0f61	28 1a		( .
-	cp 003h			;0f63	fe 03		. .
-	jr z,l0f72h		;0f65	28 0b		( .
-	call sub_0f94h		;0f67	cd 94 0f	. . .
-	jr z,l0f72h		;0f6a	28 06		( .
-	ld de,003e8h		;0f6c	11 e8 03	. . .
-l0f6fh:
-	add hl,de		;0f6f	19		.
-	djnz l0f6fh		;0f70	10 fd		. .
-l0f72h:
-	call sub_0f94h		;0f72	cd 94 0f	. . .
-	jr z,l0f7dh		;0f75	28 06		( .
-	ld de,00064h		;0f77	11 64 00	. d .
-l0f7ah:
-	add hl,de		;0f7a	19		.
-	djnz l0f7ah		;0f7b	10 fd		. .
-l0f7dh:
-	call sub_0f94h		;0f7d	cd 94 0f	. . .
-	jr z,l0f88h		;0f80	28 06		( .
-	ld de,10		;0f82	11 0a 00	. . .
-l0f85h:
-	add hl,de		;0f85	19		.
-	djnz l0f85h		;0f86	10 fd		. .
-l0f88h:
-	ld a,(iy+000h)		;0f88	fd 7e 00	. ~ .
-	and 00fh		;0f8b	e6 0f		. .
-	ld d,000h		;0f8d	16 00		. .
-	ld e,a			;0f8f	5f		_
-	add hl,de		;0f90	19		.
-	pop iy			;0f91	fd e1		. .
-	ret			;0f93	c9		.
-sub_0f94h:
+
+; Unsure of usage
+; C == # of digits
+; INPUT
+; 	DE = Address of string
+; OUTPUT
+; 	HL = Decimal value
+STR2NUM:
+	push iy
+	push de
+	pop iy			; IY = DE
+	ld hl,0
+	ld a,c
+	cp 2
+	jr c,_units
+	jr z,_tens
+	cp 3
+	jr z,_hundreds
+	call STR2NUM_HELPER
+	jr z,_hundreds		; Leading zero for thousands
+	ld de,1000
+_loop1:
+	add hl,de
+	djnz _loop1
+_hundreds:
+	call STR2NUM_HELPER
+	jr z,_tens		; Leading zero for hundreds
+	ld de,100
+_loop2:
+	add hl,de
+	djnz _loop2
+_tens:
+	call STR2NUM_HELPER
+	jr z,_units		; Leading zero for tens
+	ld de,10
+_loop3:
+	add hl,de
+	djnz _loop3
+_units:
+	ld a,(iy+000h)
+	and 00fh
+	ld d,0
+	ld e,a
+	add hl,de
+	pop iy
+	ret
+; Get a digits from IY, convert from ASCII
+; OUTPUT
+;   B = Digit
+;   Z is number is zero
+STR2NUM_HELPER:
 	ld a,(iy+000h)		;0f94	fd 7e 00	. ~ .
 	inc iy			;0f97	fd 23		. #
 	and 00fh		;0f99	e6 0f		. .
@@ -3064,7 +3075,7 @@ INPUT_INLINE:
 	push de
 	push bc
 	push af
-	call GET_WORD_AND_BYTE
+	call GET_WORD_AND_BYTE	; HL, C
 	push de
 	ld a,c
 	and 040h
@@ -3177,7 +3188,7 @@ OUT_MSG_INLINE:
 	push de
 	push bc
 	push af
-	call GET_WORD_AND_BYTE	; extract arguments from code at HL
+	call GET_WORD_AND_BYTE	; HL, C
 	push de					; DE is the place where we need to jump back (HL+3)
 	M_CALL_WITH_MMAP0 OUTSTR
 	pop hl
@@ -3202,10 +3213,10 @@ SOMETHING1_INLINE:
 	push de			;13e5	d5		.
 	push bc			;13e6	c5		.
 	push af			;13e7	f5		.
-	call GET_WORD_AND_BYTE		;13e8	cd 4d 14	. M .
+	call GET_WORD_AND_BYTE	; HL, C
 	push de			;13eb	d5		.
 	push hl			;13ec	e5		.
-	call sub_145eh		;13ed	cd 5e 14	. ^ .
+	call VAR2STR		;13ed	cd 5e 14	. ^ .
 
 l13f0h:
 	ld d,1
@@ -3221,13 +3232,13 @@ _loop:
 	jr _loop
 
 _entry:
-	ld a,c			;1405	79		y
-	and 007h		;1406	e6 07		. .
-	push bc			;1408	c5		.
-	ld c,a			;1409	4f		O
-	ex de,hl		;140a	eb		.
+	ld a,c
+	and %00000111	; # of digits
+	push bc
+	ld c,a
+	ex de,hl
 	push de			;140b	d5		.
-	call sub_0f54h		;140c	cd 54 0f	. T .
+	call STR2NUM		;140c	cd 54 0f	. T .
 	pop de			;140f	d1		.
 	pop bc			;1410	c1		.
 	ex de,hl		;1411	eb		.
@@ -3263,9 +3274,9 @@ sub_1431h:
 	push de
 	push bc
 	push af
-	call GET_WORD_AND_BYTE
+	call GET_WORD_AND_BYTE	; HL, C
 	push de
-	call sub_145eh
+	call VAR2STR
 
 	ld a,c
 	and %00000111
@@ -3310,10 +3321,12 @@ GET_WORD_AND_BYTE:
 	pop de
 	ret
 
-
-sub_145eh:
+; Take content of (HL) and output it with C&0x7 digits
+; If C&0x40, content is 8 bits, else 16 bits
+; OUTPUT: HL points to a mem zone with the string
+VAR2STR:
 	ld a,c
-	and 0x40
+	and %01000000
 	jr z,_word		; Word based pointer
 	; hl = *hl (as byte)
 	ld l,(hl)
@@ -13757,7 +13770,7 @@ l9d61h:
 	jr c,l9de8h		;9d8a	38 5c 	8 \ 
 	ld c,003h		;9d8c	0e 03 	. . 
 	ld de,06057h		;9d8e	11 57 60 	. W ` 
-	call sub_0f54h		;9d91	cd 54 0f 	. T . 
+	call STR2NUM		;9d91	cd 54 0f 	. T . 
 	ld (0605ah),hl		;9d94	22 5a 60 	" Z ` 
 	call sub_9eb4h		;9d97	cd b4 9e 	. . . 
 	ld hl,(0605ah)		;9d9a	2a 5a 60 	* Z ` 
@@ -19960,7 +19973,7 @@ lcc78h:
 	call NUM2STR		;cc86	cd 9e 0f 	. . . 
 	ld de,05615h		;cc89	11 15 56 	. . V 
 	ld c,002h		;cc8c	0e 02 	. . 
-	call sub_0f54h		;cc8e	cd 54 0f 	. T . 
+	call STR2NUM		;cc8e	cd 54 0f 	. T . 
 	ld a,l			;cc91	7d 	} 
 	pop hl			;cc92	e1 	. 
 	cp l			;cc93	bd 	. 
