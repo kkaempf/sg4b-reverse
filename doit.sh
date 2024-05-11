@@ -19,7 +19,7 @@ while true; do
             # git diff -U0  --no-index --no-prefix --word-diff=plain --word-diff --word-diff-regex=. /tmp/a.hex /tmp/b.hex
             diff /tmp/a.hex /tmp/b.hex | head -10
         else
-            dd if=rom-57.bin of=rom-hack.bin bs=16384 count=1
+            ( dd if=rom-57.bin of=rom-hack.bin bs=16384 count=1 2>&1 ) > /dev/null
             cp rom-57.asm rom-57-lastgood.asm
         fi
     fi
