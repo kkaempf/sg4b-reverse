@@ -40,6 +40,8 @@ fUS_SI: equ 0x5466			;	Flags. Bit 0 = US TEMP, Bit 1 = SI TEMP
 pWEATHER_CONF: equ 0x5467	;	Config for weather display, one entry for each *digits* with a 'X' if skipped
 SCRATCH4: equ 0x4f7a		;	Used a 4 bytes zone for STR/NUM conversions
 
+NEWLINE: equ 0x05
+
 ; TODO:
 ;	Find all inlines ( ex (sp),hl )
 ; OUT_C_INLINE/OUT_B_INLINE/OUT_8_INLINE/RIGHT_INLINE are inline function to fix
@@ -139,8 +141,8 @@ MACRO M_SOMETHING2, VAL
 	call SOMETHING2_INLINE
 	db VAL
 ENDM
-MACRO M_OUT_B_9, NUMB, NUM9
-	call OUT_B_9_INLINE
+MACRO M_GOTO_YX, NUMB, NUM9
+	call GOTO_YX_INLINE
 	db NUMB
 	db NUM9
 ENDM
@@ -3512,7 +3514,7 @@ sub_1501h:
 
 ; Emit '0x0b' times the first argument and '0x09' times the second one.
 ; Probably GOTOYX
-OUT_B_9_INLINE:
+GOTO_YX_INLINE:
 	M_OUT_CH 0x0f
 	M_OUT_CH 0x04
 	ex (sp),hl
@@ -3824,11 +3826,11 @@ sub_1704h:
 	ld (0602eh),a		;1715	32 2e 60	2 . `
 	ret			;1718	c9		.
 	call sub_2a82h		;1719	cd 82 2a	. . *
-	M_OUT_B_9 5,1
+	M_GOTO_YX 5,1
 	ld hl,v53c2
 	ld (hl),0x00
 	call sub_15b0h		;1726	cd b0 15	. . .
-	M_OUT_B_9 5,1
+	M_GOTO_YX 5,1
 	call sub_162bh
 	ld a,(05cbah)
 	cp 005h			;1734	fe 05		. .
@@ -8033,7 +8035,7 @@ l34bdh:
 	call 0b845h		;34f3	cd 45 b8	. E .
 	call sub_2a82h		;34f6	cd 82 2a	. . *
 	M_OUT_MSG 0xd09b, 0xc6 ; 0F "DISPLAY TYPE" 05 "DISPLAY SPEED" 05 "DISPLAY TIME     SECONDS" 05 "PAGE SKIP" 05 "PAGE LINK" 05 "PAGE WAIT" 05 05 "      DISPLAY TIME WINDOW" 05 05 "FIRST DAY" 05 "      TIME" 05 05 "            THROUGH" 05 05 "LAST DAY" 05 "     TIME" 05 05 "LINE LEVELS   1  2  3  4"
-	M_OUT_B_9 1,15
+	M_GOTO_YX 1,15
 	ld ix,v53c2
 	ld iy,0d161h
 	ld c,00ah		;350c	0e 0a		. .
@@ -8050,7 +8052,7 @@ l34bdh:
 	ld (ix+003h),001h	;351e	dd 36 03 01	. 6 . .
 l3522h:
 	call 03b0ch		;3522	cd 0c 3b	. . ;
-	M_OUT_B_9 2,15
+	M_GOTO_YX 2,15
 	ld a,(ix+002h)		;352a	dd 7e 02	. ~ .
 	ld iy,0d183h		;352d	fd 21 83 d1	. ! . .
 	ld c,006h		;3531	0e 06		. .
@@ -8083,7 +8085,7 @@ l3555h:
 	ld (ix+002h),a		;3559	dd 77 02	. w .
 l355ch:
 	call 03b0ch		;355c	cd 0c 3b	. . ;
-	M_OUT_B_9 3,15
+	M_GOTO_YX 3,15
 	push bc			;3564	c5		.
 	ld c,a			;3565	4f		O
 	ld a,(ix+001h)		;3566	dd 7e 01	. ~ .
@@ -8096,15 +8098,15 @@ l355ch:
 	ld (ix+001h),010h	;3572	dd 36 01 10	. 6 . .
 l3576h:
 	M_OUT_VAR vUserCodes, 0x42
-	M_OUT_B_9 4,15
+	M_GOTO_YX 4,15
 	ld a,001h		;3581	3e 01		> .
 	and (ix+000h)		;3583	dd a6 00	. . .
 	call sub_3b79h		;3586	cd 79 3b	. y ;
-	M_OUT_B_9 5,15
+	M_GOTO_YX 5,15
 	ld a,002h		;358e	3e 02		> .
 	and (ix+000h)		;3590	dd a6 00	. . .
 	call sub_3b79h		;3593	cd 79 3b	. y ;
-	M_OUT_B_9 6,15
+	M_GOTO_YX 6,15
 	ld a,004h		;359b	3e 04		> .
 	and (ix+000h)		;359d	dd a6 00	. . .
 	call sub_3b79h		;35a0	cd 79 3b	. y ;
@@ -8217,19 +8219,19 @@ l364ch:
 	ld a,(ix+005h)		;3656	dd 7e 05	. ~ .
 	ld (ix+008h),a		;3659	dd 77 08	. w .
 l365ch:
-	M_OUT_B_9 10,15
+	M_GOTO_YX 10,15
 	call sub_3879h		;3661	cd 79 38	. y 8
 	ld b,006h		;3664	06 06		. .
 	call sub_3866h		;3666	cd 66 38	. f 8
-	M_OUT_B_9 19,15
+	M_GOTO_YX 19,15
 	ld hl,053d6h		;366e	21 d6 53	! . S
 	call 0b86dh		;3671	cd 6d b8	. m .
-	M_OUT_B_9 22,1
+	M_GOTO_YX 22,1
 	ld hl,053ceh		;3679	21 ce 53	! . S
 	call sub_15b0h		;367c	cd b0 15	. . .
 	ld b,000h		;367f	06 00		. .
 	call sub_3866h		;3681	cd 66 38	. f 8
-	M_OUT_B_9 1,15
+	M_GOTO_YX 1,15
 	ld iy,0d161h		;368a	21 61 d1	! a .
 	ld b,(ix+003h)		;368d	dd 46 03	. F .
 	dec b			;3690	05		.
@@ -8268,7 +8270,7 @@ l36b2h:
 	jp nz,l3691h		;36bb	c2 91 36	. . 6
 	inc b			;36be	04		.
 	ld (ix+003h),b		;36bf	dd 70 03	. p .
-	M_OUT_B_9 2,15
+	M_GOTO_YX 2,15
 	ld iy,0d183h		;36c7	fd 21 83 d1	. ! . .
 	ld d,(ix+002h)		;36cb	dd 56 02	. V .
 l36ceh:
@@ -8326,23 +8328,23 @@ l370ah:
 	ld (ix+002h),d		;3716	dd 72 02	. r .
 	ld b,001h		;3719	06 01		. .
 	call sub_3866h		;371b	cd 66 38	. f 8
-	M_OUT_B_9 3,16
+	M_GOTO_YX 3,16
 	M_SOMETHING1 vUserCodes, 0x42
 	ld b,002h		;3729	06 02		. .
 	call sub_3866h		;372b	cd 66 38	. f 8
-	M_OUT_B_9 4,15
+	M_GOTO_YX 4,15
 	ld hl,v53c2		;3733	21 c2 53	! . S
 	ld b,001h		;3736	06 01		. .
 	call sub_3ae0h		;3738	cd e0 3a	. . :
-	M_OUT_B_9 5,15
+	M_GOTO_YX 5,15
 	ld b,002h		;3740	06 02		. .
 	call sub_3ae0h		;3742	cd e0 3a	. . :
-	M_OUT_B_9 6,15
+	M_GOTO_YX 6,15
 	ld b,004h		;374a	06 04		. .
 	call sub_3ae0h		;374c	cd e0 3a	. . :
 	ld b,000h		;374f	06 00		. .
 	call sub_3866h		;3751	cd 66 38	. f 8
-	M_OUT_B_9 10,15
+	M_GOTO_YX 10,15
 	ld iy,0d27ah		;3759	fd 21 7a d2	. ! z .
 	ld b,(ix+004h)		;375d	dd 46 04	. F .
 l3760h:
@@ -8414,7 +8416,7 @@ l37b5h:
 	pop bc			;37c0	c1		.
 	jp nz,l37dah		;37c1	c2 da 37	. . 7
 	ld (053c9h),a		;37c4	32 c9 53	2 . S
-	M_OUT_B_9 15,15
+	M_GOTO_YX 15,15
 	ld c,00bh		;37cc	0e 0b		. .
 	call 03b0ch		;37ce	cd 0c 3b	. . ;
 	call sub_38fbh		;37d1	cd fb 38	. . 8
@@ -8427,14 +8429,14 @@ l37dah:
 	jp c,l37f1h		;37e0	da f1 37	. . 7
 	ld a,b			;37e3	78		x
 	ld (053c9h),a		;37e4	32 c9 53	2 . S
-	M_OUT_B_9 15,15
+	M_GOTO_YX 15,15
 	ld c,00bh		;37ec	0e 0b		. .
 	call 03b0ch		;37ee	cd 0c 3b	. . ;
 l37f1h:
 	call sub_38fbh		;37f1	cd fb 38	. . 8
 	ld b,000h		;37f4	06 00		. .
 	call sub_3866h		;37f6	cd 66 38	. f 8
-	M_OUT_B_9 15,15
+	M_GOTO_YX 15,15
 	ld iy,0d27ah		;37fe	fd 21 7a d2	. ! z .
 	ld a,(053c9h)		;3802	3a c9 53	: . S
 	ld b,a			;3805	47		G
@@ -8477,11 +8479,11 @@ l3827h:
 l383ah:
 	ld b,006h		;383a	06 06		. .
 	call sub_3866h		;383c	cd 66 38	. f 8
-	M_OUT_B_9 19,15
+	M_GOTO_YX 19,15
 	ld hl,053d6h		;3844	21 d6 53	! . S
 	call 0b87bh		;3847	cd 7b b8	. { .
 	ld (053cch),a		;384a	32 cc 53	2 . S
-	M_OUT_B_9 22,1
+	M_GOTO_YX 22,1
 	ld hl,053ceh		;3852	21 ce 53	! . S
 	call sub_162bh		;3855	cd 2b 16	. + .
 	ld de,04a3eh		;3858	11 3e 4a	. > J
@@ -8493,7 +8495,7 @@ sub_3866h:
 	push iy			;3866	fd e5		. .
 	ld iy,0d194h		;3868	fd 21 94 d1	. ! . .
 	ld c,020h		;386c	0e 20		.  
-	M_OUT_B_9 25,1
+	M_GOTO_YX 25,1
 	call 03b0ch
 	pop iy			;3876	fd e1		. .
 	ret			;3878	c9		.
@@ -8573,7 +8575,7 @@ l38ech:
 sub_38fbh:
 	ld b,003h		;38fb	06 03		. .
 	call sub_3866h		;38fd	cd 66 38	. f 8
-	M_OUT_B_9 11,16
+	M_GOTO_YX 11,16
 	ld hl, 0x53c7
 	ld a,(hl)		;3908	7e		~
 	and 07fh		;3909	e6 7f		. .
@@ -8641,7 +8643,7 @@ l3959h:
 	M_OUT_8 1
 	ld hl,053c8h
 	call sub_38c7h		;3973	cd c7 38	. . 8
-	M_OUT_B_9 16,15
+	M_GOTO_YX 16,15
 	M_OUT_VAR 0x53d2, 0x42
 	ld hl,053cbh		;3981	21 cb 53	! . S
 	M_RIGHT 1
@@ -8665,7 +8667,7 @@ l399ah:
 	inc hl			;39a8	23		#
 	xor a			;39a9	af		.
 	ld (hl),a		;39aa	77		w
-	M_OUT_B_9 16,15
+	M_GOTO_YX 16,15
 	xor a			;39b0	af		.
 	ld (053d2h),a		;39b1	32 d2 53	2 . S
 	M_OUT_VAR 0x53d2, 0x42
@@ -8689,7 +8691,7 @@ l39cbh:
 	jp z,l3a3ch		;39d2	ca 3c 3a	. < :
 	ld b,005h		;39d5	06 05		. .
 	call sub_3866h		;39d7	cd 66 38	. f 8
-	M_OUT_B_9 16,16
+	M_GOTO_YX 16,16
 	ld hl,053cah		;39df	21 ca 53	! . S
 	ld a,(hl)		;39e2	7e		~
 	and 07fh		;39e3	e6 7f		. .
@@ -9039,13 +9041,13 @@ l3bf2h:
 	add iy,de		;3c2d	fd 19		. .
 	ex (sp),iy		;3c2f	fd e3		. .
 	inc (iy+000h)		;3c31	fd 34 00	. 4 .
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE
 	jp l3bf2h		;3c38	c3 f2 3b	. . ;
 l3c3bh:
 	pop hl			;3c3b	e1		.
 	ld hl,0	;3c3c	21 00 00	! . .
 	ld (053c7h),hl		;3c3f	22 c7 53	" . S
-	M_OUT_B_9 6,1
+	M_GOTO_YX 6,1
 	push iy			;3c47	fd e5		. .
 	ld iy,053c9h		;3c49	fd 21 c9 53	. ! . S
 	ld a,000h		;3c4d	3e 00		> .
@@ -9091,7 +9093,7 @@ l3c4fh:
 	push af			;3c9b	f5		.
 	ld (053c6h),a		;3c9c	32 c6 53	2 . S
 l3c9fh:
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE
 	ld de,8		;3ca3	11 08 00	. . .
 	add iy,de		;3ca6	fd 19		. .
 	pop af			;3ca8	f1		.
@@ -9259,15 +9261,15 @@ l3dc6h:
 	call sub_2a82h		;3dc6	cd 82 2a	. . *
 	M_CALL_WITH_MMAP0 sub_c21dh
 	call sub_978dh
-	M_OUT_B_9 1,1
+	M_GOTO_YX 1,1
 	call sub_9a27h
 	jr z,l3de1h		;3dd9	28 06		( .
 	call 097d9h		;3ddb	cd d9 97	. . .
 	jp l3e88h		;3dde	c3 88 3e	. . >
 l3de1h:
-	M_OUT_B_9 3,16
+	M_GOTO_YX 3,16
 	M_INPUT v53c2, 0x42
-	M_OUT_B_9 7,16
+	M_GOTO_YX 7,16
 	ld b,1
 	ld de,26
 	ld iy,053c4h		;3df6	fd 21 c4 53	. ! . S
@@ -9896,7 +9898,7 @@ MENU_8200:
 	call nz,sub_2326h		;820a	c4 26 23 	. & # 
 	call sub_2a82h		;820d	cd 82 2a 	. . * 
 	M_OUT_MSG 0xd488, 0xd9 ; "SELECT" 05 05 "E-EDIT" 05 "F-FORMATED EDIT" 05 "D-DISPLAY RESUME" 05 "R-RECALL PAGE" 05 "S-STORE PAGE" 05 "N-NEXT PAGE" 05 "L-LAST PAGE" 05 "C-CLOCK SET" 05 "P-PAGE COPY" 05 "M-MEMORY SET" 05 "X-EXTERNAL LINE LEVELS" 05 "B-BLOCK EDIT" 05 "H-HELP MENU FOR CONTROL CODES" 05 "SETUP-NEXT MENU"
-	M_OUT_B_9 1,9
+	M_GOTO_YX 1,9
 	ld hl,MENU_TABLE1
 	call HANDLE_MENU		;821e	cd 37 82 	. 7 . 
 	jp (hl)			;8221	e9 	. 
@@ -9904,7 +9906,7 @@ MENU_8200:
 MENU_8222:
 	call sub_2a82h		;8222	cd 82 2a 	. . * 
 	M_OUT_MSG 0xd561, 0xba ; "SELECT" 05 05 "C-CHANNEL REGION SETUP" 05 "S-SEQUENCE" 05 "E-EVENTS" 05 "N-NEXT EVENT" 05 "L-LAST EVENT" 05 "D-DATA EXTERNAL SOURCE" 05 "W-WEATHER SETUP" 05 "B-BATCH TRANSFER" 05 "R-REMOTE EDIT" 05 "K-KEYBOARD DIRECT" 05 "A-AUTHORIZATION CODES"
-	M_OUT_B_9 1,9
+	M_GOTO_YX 1,9
 	ld hl,MENU_TABLE2
 	call HANDLE_MENU		;8233	cd 37 82 	. 7 . 
 	jp (hl)			;8236	e9 	. 
@@ -10375,9 +10377,9 @@ sub_84f9h:
 	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
 	ld a,003h		;852b	3e 03 	> . 
 	ld (05cbah),a		;852d	32 ba 5c 	2 . \ 
-	M_OUT_B_9 5,1
+	M_GOTO_YX 5,1
 	M_OUT_MSG 0xd68d, 0x7e ; "DIRECTION     (S=SEND F=FETCH)" 05 05 "SOURCE  SOURCE  DESTIN  PRESENT" 05 " FIRST   LAST    FIRST  TRANSFER" 05 " 0000    0000    0000    0000"
-	M_OUT_B_9 5,12
+	M_GOTO_YX 5,12
 l8540h:
 	call NEXT_MACRO_OR_KEY		;8540	cd a7 17 	. . . 
 	and 0dfh		;8543	e6 df 	. . 
@@ -10388,7 +10390,7 @@ l8540h:
 l854dh:
 	ld (053c4h),a		;854d	32 c4 53 	2 . S 
 	call OUT_CH		;8550	cd 84 10 	. . . 
-	M_OUT_B_9 9,5
+	M_GOTO_YX 9,5
 	ld hl,053c6h		;8558	21 c6 53 	! . S 
 	ld b,006h		;855b	06 06 	. . 
 l855dh:
@@ -11842,38 +11844,42 @@ l905ah:
 	ld hl,0		;9065	21 00 00 	! . . 
 	call sub_88dch		;9068	cd dc 88 	. . . 
 l906bh:
-	M_OUT_MSG 0xd73a, 0x16 ; "LIMIT REMOTE ACCESS?  "
-	ld a,(v53c2)		;9071	3a c2 53 	: . S 
-	or a			;9074	b7 	. 
-	jr nz,l907bh		;9075	20 04 	  . 
-	ld a,04eh		;9077	3e 4e 	> N 
-	jr l907dh		;9079	18 02 	. . 
-l907bh:
-	ld a,059h		;907b	3e 59 	> Y 
-l907dh:
-	call OUT_CH		;907d	cd 84 10 	. . . 
+	M_OUT_MSG 0xd73a, 0x16 		; "LIMIT REMOTE ACCESS?  "
+	ld a,(v53c2)				; #### Strange, v53c2 is used for other things too
+	or a
+	jr nz,_yes					; non-zero, remote access is limited
+	ld a,'N'
+	jr _print_current
+_yes:
+	ld a,'Y'
+_print_current:
+	call OUT_CH
 
 	; Implements "CODES Key Operation."
 	; Manual page 3-51
 	M_OUT_MSG 0xd750, 0x2a ; "  (Y / N)" 05 "USER CODE  START PAGE  STOP PAGE"
-	ld iy,vUserCodes
-	ld b,24
+
+	ld iy,vUserCodes			; The start of user code info
+	ld b,24						; 24 lines
+
 _line_loop:
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE			; Next line
 	M_RIGHT 1
 	M_OUT_MSG 0x0000, 0x06		; User code on 6 character
 	M_RIGHT 7
-	M_OUT_VAR 0x0006, 0x04		; Start page
+	M_OUT_VAR 0x0006, 0x04		; Start page is at offset 6, printed with 4 digits
 	M_RIGHT 7
-	M_OUT_VAR 0x0008, 0x04		; Stop page
+	M_OUT_VAR 0x0008, 0x04		; Stop page is at offset 8, printed with 4 digits
+
 	ld de,10
-	add iy,de
+	add iy,de					; Move to next entry
 	djnz _line_loop
 
-	M_OUT_B_9 01,23
+	M_GOTO_YX 01,23				; Cursor on 'Y' or 'N'
+
 _key_again:
 	call NEXT_MACRO_OR_KEY
-	and %11011111 		; Uppercase 
+	and %11011111 				; Uppercase 
 	cp 'N'
 	jr nz,_check_yes
 	xor a
@@ -11891,7 +11897,7 @@ _l90d2h:
 _check_done:
 	cp "\n"
 	jr nz,_key_again
-	M_OUT_B_9 3,7
+	M_GOTO_YX 3,7
 	ld b,018h		;90e4	06 18 	. . 
 	ld iy,vUserCodes		;90e6	fd 21 c3 53 	. ! . S 
 l90eah:
@@ -11915,7 +11921,7 @@ l90feh:
 	M_SOMETHING2 0x04
 	jr l90feh		;9119	18 e3 	. . 
 l911bh:
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE
 	call RIGHT_INLINE		;911f	cd 70 15 	. p . 
 	ld b,011h		;9122	06 11 	. . 
 	ld a,(bc)			;9124	0a 	. 
@@ -12135,22 +12141,22 @@ l92f3h:
 	call OUT_CH		;92f6	cd 84 10 	. . . 
 	M_OUT_MSG 0xd699, 0x2b ; "  (S=SEND F=FETCH)" 05 05 "SOURCE  SOURCE  DESTIN "
 	M_OUT_MSG 0xd6cc, 0x18 ; 05 " FIRST   LAST    FIRST "
-	M_OUT_B_9 16,2
+	M_GOTO_YX 16,2
 l930ah:
 	M_OUT_VAR 0x53d0, 0x04
-	M_OUT_B_9 16,10
+	M_GOTO_YX 16,10
 	M_OUT_VAR 0x53d2, 0x04
-	M_OUT_B_9 16,18
+	M_GOTO_YX 16,18
 	M_OUT_VAR 0x53d4, 0x04
-	M_OUT_B_9 10,31
+	M_GOTO_YX 10,31
 	ret
 sub_932ch:
-	M_OUT_B_9 10,31
+	M_GOTO_YX 10,31
 	M_INPUT v53c7, 0x42
-	M_OUT_B_9 11,16
+	M_GOTO_YX 11,16
 	M_INPUT v53c9, 0x46
 l9342h:
-	M_OUT_B_9 12,12
+	M_GOTO_YX 12,12
 l9347h:
 	call NEXT_MACRO_OR_KEY		;9347	cd a7 17 	. . . 
 	and 0dfh		;934a	e6 df 	. . 
@@ -12166,11 +12172,11 @@ l9358h:
 	jr l9342h		;935e	18 e2 	. . 
 l9360h:
 	; FReD ####
-	M_OUT_B_9 16,5
+	M_GOTO_YX 16,5
 	M_SOMETHING1 v53d0, 0x04
-	M_OUT_B_9 16,13
+	M_GOTO_YX 16,13
 	M_SOMETHING1 v53d2, 0x04
-	M_OUT_B_9 16,21
+	M_GOTO_YX 16,21
 	M_SOMETHING1 v53d4, 0x04
 	ret			;9381	c9 	. 
 sub_9382h:
@@ -12888,10 +12894,10 @@ sub_978dh:
 	ld a,(053dbh)		;978d	3a db 53 	: . S 
 	cp 0aah		;9790	fe aa 	. . 
 	ret nz			;9792	c0 	. 
-	M_OUT_B_9 21,1
+	M_GOTO_YX 21,1
 	M_OUT_MSG 0x95f8, 0x15 ; "ENABLE PUBLIC ACCESS "
 	ld ix,053ceh		;979e	dd 21 ce 53 	. ! . S 
-	M_OUT_B_9 21, 22
+	M_GOTO_YX 21, 22
 	ld a,(ix+0)
 	and 001h		;97aa	e6 01 	. . 
 l97ach:
@@ -12905,7 +12911,7 @@ l97bah:
 	cp 0aah		;97ba	fe aa 	. . 
 	ret nz			;97bc	c0 	. 
 l97bdh:
-	M_OUT_B_9 21,22
+	M_GOTO_YX 21,22
 	ld b,1
 	ld hl,053ceh
 	call sub_3ae0h		;97c7	cd e0 3a 	. . : 
@@ -12927,43 +12933,43 @@ l97d9h:
 	and 0c7h		;97ed	e6 c7 	. . 
 	ld (053ceh),a		;97ef	32 ce 53 	2 . S 
 	call sub_2a82h		;97f2	cd 82 2a 	. . * 
-	M_OUT_B_9 1,1
+	M_GOTO_YX 1,1
 	; FReD : fix data at 960d
 	M_OUT_MSG 0x960d, 0xf2 ; "EDIT CAT DEF TABLE " 05 05 "REPEAT CATEGORIES " 05 05 "REGION # FOR CATEGORY TEXT " 05 "CATEGORY DEF START PAGE " 05 "CATEGORY DEF STOP PAGE " 05 05 "REGION # FOR REQUEST QUEUE " 05 "REQUEST QUEUE PAGE # " 05 05 "EDIT PROTECTED FUNCTIONS N" 05 05 05 "INIT CAT DEF TABLE " 05 05 "CLEAR CATEGORY COUNTS "
 	ld a,(05cbah)
 	cp 005h		;9803	fe 05 	. . 
 	jr nz,l9814h		;9805	20 0d 	  . 
-	M_OUT_B_9 1,20
+	M_GOTO_YX 1,20
 	M_OUT_MSG 0x9764, 0x0b ; "USING BATCH"
 	jr l9829h		;9812	18 15 	. . 
 l9814h:
 	ld a,(053ceh)		;9814	3a ce 53 	: . S 
 	or 010h		;9817	f6 10 	. . 
 	ld (053ceh),a		;9819	32 ce 53 	2 . S 
-	M_OUT_B_9 1,20
+	M_GOTO_YX 1,20
 	ld a,(053ceh)
 	and 010h		;9824	e6 10 	. . 
 	call sub_3b79h		;9826	cd 79 3b 	. y ; 
 l9829h:
-	M_OUT_B_9 3,19
+	M_GOTO_YX 3,19
 	ld a,(053ceh)		;982e	3a ce 53 	: . S 
 	and 002h		;9831	e6 02 	. . 
 	call sub_3b79h		;9833	cd 79 3b 	. y ; 
-	M_OUT_B_9 5,28
+	M_GOTO_YX 5,28
 	M_OUT_VAR 0x53cf, 0x41
-	M_OUT_B_9 6,25
+	M_GOTO_YX 6,25
 	M_OUT_VAR 0x53d0, 0x04
-	M_OUT_B_9 7,25
+	M_GOTO_YX 7,25
 	M_OUT_VAR 0x53d2, 0x04
-	M_OUT_B_9 9,28
+	M_GOTO_YX 9,28
 	M_OUT_VAR 0x53d4, 0x41
-	M_OUT_B_9 10,22
+	M_GOTO_YX 10,22
 	M_OUT_VAR 0x53d5, 0x04
-	M_OUT_B_9 15,20
+	M_GOTO_YX 15,20
 	ld a,(053ceh)		;9872	3a ce 53 	: . S 
 	and 008h		;9875	e6 08 	. . 
 	call sub_3b79h		;9877	cd 79 3b 	. y ; 
-	M_OUT_B_9 17,23
+	M_GOTO_YX 17,23
 	ld a,(053ceh)
 	and 020h		;9882	e6 20 	.   
 	call sub_3b79h		;9884	cd 79 3b 	. y ; 
@@ -12971,7 +12977,7 @@ l9887h:
 	ld a,(05cbah)		;9887	3a ba 5c 	: . \ 
 	cp 005h		;988a	fe 05 	. . 
 	jr z,l98a1h		;988c	28 13 	( . 
-	M_OUT_B_9 1,20
+	M_GOTO_YX 1,20
 	ld b,0x10
 	ld hl,053ceh
 	call sub_3ae0h		;9898	cd e0 3a 	. . : 
@@ -12979,39 +12985,39 @@ l9887h:
 	and 010h		;989e	e6 10 	. . 
 	ret nz			;98a0	c0 	. 
 l98a1h:
-	M_OUT_B_9 3,19
+	M_GOTO_YX 3,19
 	ld b,002h		;98a6	06 02 	. . 
 	ld hl,053ceh		;98a8	21 ce 53 	! . S 
 	call sub_3ae0h		;98ab	cd e0 3a 	. . : 
-	M_OUT_B_9 5,28
+	M_GOTO_YX 5,28
 	M_SOMETHING1 v53cf, 0x41
 l98b9h:
-	M_OUT_B_9 6,28
+	M_GOTO_YX 6,28
 	M_SOMETHING1 v53d0, 0x04
-	M_OUT_B_9 7,28
+	M_GOTO_YX 7,28
 	M_SOMETHING1 v53d2, 0x04
 	ld hl,(053d2h)		;98cf	2a d2 53 	* . S 
 	ld de,(053d0h)		;98d2	ed 5b d0 53 	. [ . S 
 	call CMP_HLDE		;98d6	cd 20 0f 	.   . 
 	jr c,l98b9h		;98d9	38 de 	8 . 
-	M_OUT_B_9 9,28
+	M_GOTO_YX 9,28
 	M_SOMETHING1 v53d4, 0x41
-	M_OUT_B_9 10,25
+	M_GOTO_YX 10,25
 	M_SOMETHING1 v53d5, 0x04
-	M_OUT_B_9 12,26
+	M_GOTO_YX 12,26
 	ld hl,053ceh		;98f6	21 ce 53 	! . S 
 	res 2,(hl)		;98f9	cb 96 	. . 
 	ld b,004h		;98fb	06 04 	. . 
 	call sub_3ae0h		;98fd	cd e0 3a 	. . : 
 	bit 2,(hl)		;9900	cb 56 	. V 
 	ret z			;9902	c8 	. 
-	M_OUT_B_9 13,1
+	M_GOTO_YX 13,1
 	M_OUT_MSG 0x972f, 0x0f ; "ENTER PASSWORD "
-	M_OUT_B_9 13,16
+	M_GOTO_YX 13,16
 	ld hl,0
 	ld (053dch),hl		;9916	22 dc 53 	" . S 
 	M_OUT_VAR 0x53dc, 0x03
-	M_OUT_B_9 13,18
+	M_GOTO_YX 13,18
 	M_SOMETHING1 v53dc, 0x03
 	ld a,(053ceh)		;992a	3a ce 53 	: . S 
 	and 040h		;992d	e6 40 	. @ 
@@ -13028,29 +13034,29 @@ l9941h:
 	call CMP_HLDE		;9948	cd 20 0f 	.   . 
 	ret nz			;994b	c0 	. 
 l994ch:
-	M_OUT_B_9 15,20
+	M_GOTO_YX 15,20
 	ld b,008h		;9951	06 08 	. . 
 	ld hl,053ceh		;9953	21 ce 53 	! . S 
 	call sub_3ae0h		;9956	cd e0 3a 	. . : 
 	bit 3,(hl)		;9959	cb 5e 	. ^ 
 	ret nz			;995b	c0 	. 
-	M_OUT_B_9 17,23
+	M_GOTO_YX 17,23
 	ld b,0x20
 	ld hl,053ceh
 	call sub_3ae0h		;9966	cd e0 3a 	. . : 
 	ld a,(053ceh)		;9969	3a ce 53 	: . S 
 	and 020h		;996c	e6 20 	.   
 	ret z			;996e	c8 	. 
-	M_OUT_B_9 19,1
+	M_GOTO_YX 19,1
 	M_OUT_MSG 0x973e, 0x26 ; "ENTER START NUMBER " 05 "ENTER STOP NUMBER "
-	M_OUT_B_9 19,20
+	M_GOTO_YX 19,20
 	M_OUT_VAR 0x53e0, 0x03
 l9985h:
-	M_OUT_B_9 20,19
+	M_GOTO_YX 20,19
 	M_OUT_VAR 0x53e2, 0x03
-	M_OUT_B_9 19,22
+	M_GOTO_YX 19,22
 	M_SOMETHING1 v53e0, 0x03
-	M_OUT_B_9 20,21
+	M_GOTO_YX 20,21
 	M_SOMETHING1 v53e2, 0x03
 	ret			;99a6	c9 	. 
 sub_99a7h:
@@ -13076,18 +13082,18 @@ sub_99a7h:
 	jp nz,sub_9c4ah		;99d8	c2 4a 9c 	. J . 
 	ret			;99db	c9 	. 
 l99dch:
-	M_OUT_B_9 2,1
+	M_GOTO_YX 2,1
 	M_OUT_MSG 0x96ff, 0x16 ; "ENTER CATEGORY NUMBER "
-	M_OUT_B_9 2,23
+	M_GOTO_YX 2,23
 	M_OUT_VAR 0x60c7, 0x03
-	M_OUT_B_9 2,25
+	M_GOTO_YX 2,25
 	M_SOMETHING1 v60c7, 0x03
 	ld hl,(060c7h)		;99fd	2a c7 60 	* . ` 
 	call sub_9b71h		;9a00	cd 71 9b 	. q . 
 	ld a,c			;9a03	79 	y 
 	cp 0ffh		;9a04	fe ff 	. . 
 	jr nz,l9a16h		;9a06	20 0e 	  . 
-	M_OUT_B_9 3,1
+	M_GOTO_YX 3,1
 	M_OUT_MSG 0x9715,0x1a
 	jp l9887h		;9a13	c3 87 98 	. . . 
 l9a16h:
@@ -15561,7 +15567,7 @@ lac0fh:
 	call sub_88dch		;ac31	cd dc 88 	. . . 
 lac34h:
 	M_OUT_MSG 0xd77a, 0x55 ; 0F "EXTERNAL DATA SELECT  " 05 05 "1 AP" 05 "2 UPI" 05 "3 REUTERS" 05 "4 NOAA" 05 "5 STOCKS" 05 "6 BROADCAST" 05 "7 DOW JONES"
-	M_OUT_B_9 1,22
+	M_GOTO_YX 1,22
 	ld h,7
 	call INPUT_NUM		;ac41	cd 48 3d 	. H = 
 	push hl			;ac44	e5 	. 
@@ -15732,9 +15738,9 @@ _again:
 
 sub_adf5h:
 	push iy		;adf5	fd e5 	. . 
-	M_OUT_B_9 3,1
+	M_GOTO_YX 3,1
 	M_OUT_MSG 0xd7f6, 0x14 ; "START PAGE STOP PAGE"
-	M_OUT_B_9 4,5
+	M_GOTO_YX 4,5
 	call OUT_VAR3_INC		;ae07	cd c5 ae 	. . . 
 	M_RIGHT 7
 	call OUT_VAR3_INC		;ae0e	cd c5 ae 	. . . 
@@ -15747,7 +15753,7 @@ sub_ae18h:
 	ld a,c
 	or 0x30
 	call OUT_CH
-	M_OUT_B_9 3,16
+	M_GOTO_YX 3,16
 	M_OUT_CH 0x0f
 	ld b,c			;ae31	41 	A 
 	push iy		;ae32	fd e5 	. . 
@@ -15772,7 +15778,7 @@ _skip:
 	M_OUT_8 1
 	M_OUT_B 1
 	djnz _loop2
-	M_OUT_B_9 3,18
+	M_GOTO_YX 3,18
 	ld b,c
 	pop iy
 lae71h:
@@ -15840,7 +15846,7 @@ sub_aed9h:
 laeefh:
 	call sub_af44h		;aeef	cd 44 af 	. D . 
 	djnz laeefh		;aef2	10 fb 	. . 
-	M_OUT_B_9 15,2
+	M_GOTO_YX 15,2
 	M_OUT_CH 0x0f 
 	M_OUT_MSG 0xd95b, 0x07 ; "INPUT  "
 	ld a,(iy+000h)		;af03	fd 7e 00 	. ~ . 
@@ -15850,14 +15856,14 @@ laeefh:
 laf0eh:
 	M_OUT_MSG 0x0000, 0x01 ; F3 
 	M_OUT_MSG 0xd962, 0x12 ; "  A=ASCII,B=BAUDOT"
-	M_OUT_B_9 6,5
+	M_GOTO_YX 6,5
 	M_OUT_CH 0x0e
 	ld iy,05417h		;af22	fd 21 17 54 	. ! . T
 	ld b,008h		;af27	06 08 	. . 
 laf29h:
 	call sub_af7fh		;af29	cd 7f af 	.  . 
 	djnz laf29h		;af2c	10 fb 	. . 
-	M_OUT_B_9 15,9
+	M_GOTO_YX 15,9
 _again:
 	M_INPUT v545f, 0x01
 	ld a,(v545f)
@@ -15886,7 +15892,7 @@ laf68h:
 	inc bc			;af6e	03 	. 
 	; FReD : weird
 	M_OUT_MSG 0x0005, 0x04 ; FF FF FF FF 
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE
 	ld de,00009h		;af79	11 09 00 	. . . 
 	add iy,de		;af7c	fd 19 	. . 
 	ret			;af7e	c9 	. 
@@ -15922,7 +15928,7 @@ lafb8h:
 	rlca			;afbe	07 	. 
 	; Stores in IY+5
 	M_INPUT 0x0005, 0x44
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE
 	call RIGHT_INLINE		;afc9	cd 70 15 	. p . 
 	inc b			;afcc	04 	. 
 	pop iy		;afcd	fd e1 	. . 
@@ -16184,14 +16190,14 @@ lb1dfh:
 lb1eah:
 	call sub_2a82h		;b1ea	cd 82 2a 	. . * 
 	M_OUT_CH 0x0f
-	M_OUT_B_9 3,1
+	M_GOTO_YX 3,1
 	ld iy, 053cah
 	call sub_b5e7h
 lb1fdh:
 	ld a,(05b9fh)		;b1fd	3a 9f 5b 	: . [ 
 	cp 0 
 	jr z,_skip 
-	M_OUT_B_9 5,1
+	M_GOTO_YX 5,1
 	M_OUT_MSG 0xd9e1, 0x11 ; "CLOCK CHIP ACTIVE"
 _skip:
 	ld b,0
@@ -16233,7 +16239,7 @@ lb25fh:
 	inc a			;b266	3c 	< 
 	cp 008h		;b267	fe 08 	. . 
 	jr c,lb215h		;b269	38 aa 	8 . 
-	M_OUT_B_9 3,14
+	M_GOTO_YX 3,14
 	call sub_b600h
 	ld bc,12		;b273	01 0c 00 	. . . 
 	ld de,05b93h		;b276	11 93 5b 	. . [ 
@@ -16422,7 +16428,7 @@ sub_b3b5h:
 WEATHER_SETUP:
 	call sub_2a82h		;b3bb	cd 82 2a 	. . * 
 	M_OUT_MSG 0xdb32, 0x33 ; 0F "WEATHER MENU SELECT" 05 05 "1 U.S. SYSTEM" 05 "2 METRIC SYSTEM"
-	M_OUT_B_9 1,21
+	M_GOTO_YX 1,21
 	ld h,0x02
 	call INPUT_NUM		;b3cb	cd 48 3d 	. H = 
 	ld a,l			;b3ce	7d 	} 
@@ -16528,7 +16534,7 @@ lb469h:
 	inc ix		;b472	dd 23 	. # 
 	djnz lb41dh		;b474	10 a7 	. . 
 	ld (hl),0ffh		;b476	36 ff 	6 . 
-	M_OUT_B_9 6,1
+	M_GOTO_YX 6,1
 	ld iy,v53c2		;b47d	fd 21 c2 53 	. ! . S 
 	call sub_b5e7h		;b481	cd e7 b5 	. . . 
 	M_OUT_CH 0x04
@@ -16672,7 +16678,7 @@ lb53fh:
 	ld a,(hl)
 	cp 0ffh
 	jp nz,lb48ah
-	M_OUT_B_9 6,14
+	M_GOTO_YX 6,14
 	ld iy,v53c2
 	call sub_b600h		; Something with keyboard reading
 	ld hl,053c6h		;b55b	21 c6 53 	! . S 
@@ -16794,7 +16800,7 @@ lb60bh:
 	M_OUT_MSG 0xdc18, 0x39 ; "ACTION  L     L=LINE LEVELS" 05 "              T=OUTPUT TO VTR"
 	ld a,04ch		;b62b	3e 4c 	> L 
 	ld (v53c2),a		;b62d	32 c2 53 	2 . S 
-	M_OUT_B_9 1,9
+	M_GOTO_YX 1,9
 _again:
 	M_INPUT v53c2,0x51
 	ld a,(v53c2)		;b63b	3a c2 53 	: . S 
@@ -17217,7 +17223,7 @@ lb8fbh:
 	call RIGHT_INLINE		;b90a	cd 70 15 	. p . 
 	inc bc			;b90d	03 	. 
 	M_OUT_VAR 0x53c4, 0x04
-	M_OUT_B_9 6,5
+	M_GOTO_YX 6,5
 	M_SOMETHING1 v53c2, 0x14
 	call RIGHT_INLINE		;b91f	cd 70 15 	. p . 
 	rlca			;b922	07 	. 
@@ -17305,16 +17311,16 @@ sub_b9d1h:
 	ld a,(CFG5)
 	cp 0aah		;b9dd	fe aa 	. . 
 	jr nz,$+13		;b9df	20 0b 	  . 
-	M_OUT_B_9 8,12
+	M_GOTO_YX 8,12
 	M_OUT_MSG 0xdd1c, 0x08 ; "T=TAPE" 05 05 
 	ld a,(CFG10)		;b9e6	cd c8 13 	. . . 
 	cp 0aah		;b9ef	fe aa 	. . 
 	ret nz			;b9f1	c0 	. 
-	M_OUT_B_9 8,21
+	M_GOTO_YX 8,21
 	M_OUT_MSG 0xdd24, 0x0c ; "B=BATCH T." 05 05 
 	ret
 sub_b9feh:
-	M_OUT_B_9 1,8
+	M_GOTO_YX 1,8
 	M_OUT_VAR 0x5fa4, 0x03
 	call RIGHT_INLINE		;ba09	cd 70 15 	. p . 
 	ld a,(bc)			;ba0c	0a 	. 
@@ -17325,7 +17331,7 @@ sub_b9feh:
 lba16h:
 	ld (iy+000h),a		;ba16	fd 77 00 	. w . 
 	call OUT_CH		;ba19	cd 84 10 	. . . 
-	M_OUT_B_9 3,9
+	M_GOTO_YX 3,9
 	ld a,(iy+001h)		;ba21	fd 7e 01 	. ~ . 
 	cp 03ch		;ba24	fe 3c 	. < 
 	jr c,lba2ch		;ba26	38 04 	8 . 
@@ -17429,10 +17435,10 @@ lbae1h:
 	call OUT_CH		;bae1	cd 84 10 	. . . 
 	ret			;bae4	c9 	. 
 sub_bae5h:
-	M_OUT_B_9 9,1
+	M_GOTO_YX 9,1
 	ld c,14
 	call sub_bf24h		;baec	cd 24 bf 	. $ . 
-	M_OUT_B_9 9,1
+	M_GOTO_YX 9,1
 	ld a,(iy+4)
 	cp 'L'
 	jr z,lbb0ah		;baf9	28 0f 	( . 
@@ -17445,9 +17451,9 @@ sub_bae5h:
 	ret
 lbb0ah:
 	M_OUT_MSG 0xd149, 0x0c ; "LINE LEVELS "
-	M_OUT_B_9 11,10
+	M_GOTO_YX 11,10
 	M_OUT_MSG 0xd157, 0x0a ; "1  2  3  4"
-	M_OUT_B_9 13,10
+	M_GOTO_YX 13,10
 	ld hl,053c7h		;bb20	21 c7 53 	! . S 
 	ld a,(hl)			;bb23	7e 	~ 
 	inc hl			;bb24	23 	# 
@@ -17456,7 +17462,7 @@ lbb0ah:
 	ret			;bb2b	c9 	. 
 lbb2ch:
 	M_OUT_MSG 0xdd30, 0x50 ; "TYPE     F=FILE CHANGE, I=INSERT" 05 "TIMING   I=IMMEDIATE, D=DELAYED" 05 "REGION   1 TO 6"
-	M_OUT_B_9 9,8
+	M_GOTO_YX 9,8
 	ld a,(iy+005h)		;bb37	fd 7e 05 	. ~ . 
 	cp 049h		;bb3a	fe 49 	. I 
 	jr z,lbb43h		;bb3c	28 05 	( . 
@@ -17490,10 +17496,10 @@ lbb70h:
 lbb75h:
 	add a,030h		;bb75	c6 30 	. 0 
 	call OUT_CH		;bb77	cd 84 10 	. . . 
-	M_OUT_B_9 13,1
+	M_GOTO_YX 13,1
 	ld c,10
 	call sub_bf24h		;bb81	cd 24 bf 	. $ . 
-	M_OUT_B_9 13,1
+	M_GOTO_YX 13,1
 	ld a,(iy+5)
 	cp 'I'
 	jr nz,lbb94h		;bb8e	20 04 	  . 
@@ -17503,7 +17509,7 @@ lbb94h:
 	cp 046h		;bb94	fe 46 	. F 
 	ret nz			;bb96	c0 	. 
 	M_OUT_MSG 0xdd80, 0x45 ; "FILE  START   STOP  CHANGE" 05 "       PAGE   PAGE   FILE" 05 05 "  1" 05 "  2" 05 "  3" 05 "  4"
-	M_OUT_B_9 16,8
+	M_GOTO_YX 16,8
 	push iy		;bba2	fd e5 	. . 
 	ld iy,053cah		;bba4	fd 21 ca 53 	. ! . S 
 	ld c,004h		;bba8	0e 04 	. . 
@@ -17533,9 +17539,9 @@ sub_bbcbh:
 	M_OUT_VAR 0x0000, 0x04
 	ret			;bbd7	c9 	. 
 sub_bbd8h:
-	M_OUT_B_9 13,1
+	M_GOTO_YX 13,1
 	M_OUT_MSG 0xddc5, 0x25 ; "      START   STOP" 05 "       PAGE   PAGE"
-	M_OUT_B_9 16,8
+	M_GOTO_YX 16,8
 	push iy		;bbe8	fd e5 	. . 
 	ld iy,053cah		;bbea	fd 21 ca 53 	. ! . S 
 	call sub_bbcbh		;bbee	cd cb bb 	. . . 
@@ -17561,7 +17567,7 @@ sub_bc13h:
 	ld b,007h		;bc16	06 07 	. . 
 	call sub_3866h		;bc18	cd 66 38 	. f 8 
 sub_bc1bh:
-	M_OUT_B_9 1,8
+	M_GOTO_YX 1,8
 	M_OUT_VAR 0x5fa4, 0x03
 	call OUT_8_INLINE		;bc26	cd 6c 15 	. l . 
 	ld bc,0e4cdh		;bc29	01 cd e4 	. . . 
@@ -17575,16 +17581,16 @@ lbc31h:
 	cp 0aah		;bc34	fe aa 	. . 
 	ret nz			;bc36	c0 	. 
 	ld hl,053c9h		;bc37	21 c9 53 	! . S 
-	M_OUT_B_9 10,1
+	M_GOTO_YX 10,1
 	jp sub_15b0h
 lbc42h:
 	ld a,(0000eh)		;bc42	3a 0e 00 	: . . 
 	cp 0aah		;bc45	fe aa 	. . 
 	ret nz			;bc47	c0 	. 
-	M_OUT_B_9 10,1
+	M_GOTO_YX 10,1
 	jp sub_92cch
 sub_bc50h:
-	M_OUT_B_9 1,21
+	M_GOTO_YX 1,21
 	ld hl, v53c2
 	call 0xbea7
 	call OUT_B_INLINE		;bc5b	cd 68 15 	. h . 
@@ -17740,23 +17746,23 @@ sub_bd75h:
 	jr z,lbd8fh		;bd82	28 0b 	( . 
 	cp 042h		;bd84	fe 42 	. B 
 	ret nz			;bd86	c0 	. 
-	M_OUT_B_9 10,1
+	M_GOTO_YX 10,1
 	jp sub_932ch
 lbd8fh:
-	M_OUT_B_9 10,1
+	M_GOTO_YX 10,1
 	ld hl,v53c9
 	jp sub_162bh		;bd97	c3 2b 16 	. + . 
 lbd9ah:
 	ld b,006h		;bd9a	06 06 	. . 
 	call sub_3866h		;bd9c	cd 66 38 	. f 8 
-	M_OUT_B_9 13,10
+	M_GOTO_YX 13,10
 	ld hl,053c8h		;bda4	21 c8 53 	! . S 
 	call sub_b87bh		;bda7	cd 7b b8 	. { . 
 	ld (053c7h),a		;bdaa	32 c7 53 	2 . S 
 	call sub_bec1h		;bdad	cd c1 be 	. . . 
 	ret			;bdb0	c9 	. 
 lbdb1h:
-	M_OUT_B_9 9,8
+	M_GOTO_YX 9,8
 	ld c,(iy+005h)		;bdb6	fd 4e 05 	. N . 
 lbdb9h:
 	call NEXT_MACRO_OR_KEY		;bdb9	cd a7 17 	. . . 
@@ -17777,7 +17783,7 @@ lbdd4h:
 	cp c			;bdd7	b9 	. 
 	ld (iy+005h),c		;bdd8	fd 71 05 	. q . 
 	call nz,sub_bae5h		;bddb	c4 e5 ba 	. . . 
-	M_OUT_B_9 10,8
+	M_GOTO_YX 10,8
 lbde3h:
 	call NEXT_MACRO_OR_KEY		;bde3	cd a7 17 	. . . 
 	cp 00ah		;bde6	fe 0a 	. . 
@@ -17811,7 +17817,7 @@ lbe21h:
 	call sub_bed4h		;be21	cd d4 be 	. . . 
 	ret			;be24	c9 	. 
 sub_be25h:
-	M_OUT_B_9 24,1
+	M_GOTO_YX 24,1
 	M_OUT_MSG 0xddea, 0x12 ; "STORE EVENT NUMBER"
 	call RIGHT_INLINE		;be30	cd 70 15 	. p . 
 	ld (bc),a			;be33	02 	. 
@@ -17850,12 +17856,12 @@ lbe76h:
 	ldir		;be89	ed b0 	. . 
 	ret			;be8b	c9 	. 
 sub_be8ch:
-	M_OUT_B_9 24,1
+	M_GOTO_YX 24,1
 	M_OUT_MSG 0xddfc, 0x1e ; "      EVENT NUMBER      STORED"
 	call OUT_8_INLINE		;be97	cd 6c 15 	. l . 
 	ld a,(bc)			;be9a	0a 	. 
 	M_OUT_VAR 0x5fa4, 0x03
-	M_OUT_B_9 1,8
+	M_GOTO_YX 1,8
 	ret
 lbea7h:
 	call NEXT_MACRO_OR_KEY		;bea7	cd a7 17 	. . . 
@@ -17872,7 +17878,7 @@ lbeb7h:
 	call OUT_8_INLINE		;bebb	cd 6c 15 	. l . 
 	ld bc,0e618h		;bebe	01 18 e6 	. . . 
 sub_bec1h:
-	M_OUT_B_9 25,1
+	M_GOTO_YX 25,1
 	ld a,' '
 	ld b,32
 	call OUT_CH_REPEAT
@@ -17885,7 +17891,7 @@ sub_beceh:
 	add hl,hl			;bed2	29 	) 
 	ret			;bed3	c9 	. 
 sub_bed4h:
-	M_OUT_B_9 16,11
+	M_GOTO_YX 16,11
 	ld a,(iy+005h)		;bed9	fd 7e 05 	. ~ . 
 	cp 'F'
 	jr nz,lbf0ch		;bede	20 2c 	  , 
@@ -18286,20 +18292,20 @@ sub_c21dh:
 	ld a,(CFG7)		;c21d	3a 3c 00 	: < . 
 	cp 0bbh		;c220	fe bb 	. . 
 	jr nz,$+13		;c222	20 0b 	  . 
-	M_OUT_B_9 25,1
+	M_GOTO_YX 25,1
 	M_OUT_MSG 0xc443, 0x1b ; "CTRL-S = DISCONNECT BATTERY"
 	ld a,0x98
 	ld (04f76h),a		;c231	32 76 4f 	2 v O 
-	M_OUT_B_9 3,1
+	M_GOTO_YX 3,1
 	M_OUT_MSG 0xc3a4, 0x3a ; 0F "CHANNEL NAME" 05 05 "REGION   DISPLAY LINES" 05 "NUMBER    PER REGION"
-	M_OUT_B_9 3,15
+	M_GOTO_YX 3,15
 	M_OUT_MSG v53c2, 0x02 ; *** RAM data ***
-	M_OUT_B_9 6,1
+	M_GOTO_YX 6,1
 	ld iy,053c4h		;c24f	fd 21 c4 53 	. ! . S 
 	ld b,000h		;c253	06 00 	. . 
 lc255h:
 	inc b			;c255	04 	. 
-	M_OUT_CH 0x05
+	M_OUT_CH NEWLINE
 	call RIGHT_INLINE		;c25a	cd 70 15 	. p . 
 	db 0x03
 	ld a,b			;c25e	78 	x 
@@ -18339,7 +18345,7 @@ lc255h:
 	M_OUT_VAR 0x53ca, 0x04
 	ret			;c2b0	c9 	. 
 sub_c2b1h:
-	M_OUT_B_9 15,30
+	M_GOTO_YX 15,30
 	M_OUT_MSG 0x53d7, 0x01 ; *** RAM data ***
 	call OUT_8_INLINE
 	db 0x01
@@ -18359,7 +18365,7 @@ sub_c2c1h:
 lc2dbh:
 	ld hl,(053cch)		;c2db	2a cc 53 	* . S 
 	ld (05426h),hl		;c2de	22 26 54 	" & T 
-	M_OUT_B_9 17,22
+	M_GOTO_YX 17,22
 	ld a,(053d7h)
 	cp 'N'
 	jr nz,lc2f5h		;c2eb	20 08 	  . 
@@ -18369,7 +18375,7 @@ lc2f5h:
 	ld hl,00200h		;c2f5	21 00 02 	! . . 
 	ld (053cch),hl		;c2f8	22 cc 53 	" . S 
 	push hl			;c2fb	e5 	. 
-	M_OUT_B_9 17,19
+	M_GOTO_YX 17,19
 	call 0x1431
 	db 0xcc, 0x53, 0x04
 	pop hl			;c307	e1 	. 
@@ -18394,7 +18400,7 @@ lc324h:
 	ld (053d8h),hl		;c332	22 d8 53 	" . S 
 	ld (053cah),hl		;c335	22 ca 53 	" . S 
 	ld (053cch),de		;c338	ed 53 cc 53 	. S . S 
-	M_OUT_B_9 19,19
+	M_GOTO_YX 19,19
 	M_OUT_VAR 0x53ca, 0x04
 	ld hl,(053cch)		;c347	2a cc 53 	* . S 
 	ld de,(05426h)		;c34a	ed 5b 26 54 	. [ & T 
