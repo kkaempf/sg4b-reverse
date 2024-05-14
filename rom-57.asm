@@ -40,7 +40,9 @@ fUS_SI: equ 0x5466			;	Flags. Bit 0 = US TEMP, Bit 1 = SI TEMP
 pWEATHER_CONF: equ 0x5467	;	Config for weather display, one entry for each *digits* with a 'X' if skipped
 SCRATCH4: equ 0x4f7a		;	Used a 4 bytes zone for STR/NUM conversions
 
-NEWLINE: equ 0x05
+							;	Display codes
+CRLF: equ 0x05
+RIGHT: equ 0x09
 
 ; TODO:
 ;	Find all inlines ( ex (sp),hl )
@@ -2669,7 +2671,7 @@ JTABLE:
 	dw TARGET2
 	dw TARGET3
 	dw TARGET4
-	dw TARGET5
+	dw TARGET_CRLF
 	dw JNONE
 	dw JNONE
 	dw TARGET8
@@ -2711,7 +2713,7 @@ OUTPRNT:
 	call sub_1191h
 	ld a,(CURSORX)
 	cp 40
-	call nc,TARGET5	; Next line ?
+	call nc,TARGET_CRLF	; Next line ?
 	pop hl
 	pop de
 	pop bc
@@ -2857,7 +2859,7 @@ TARGET_RIGHT:
 	call sub_1191h
 	ld a,(CURSORX)
 	cp 40
-	call nc,TARGET5
+	call nc,TARGET_CRLF
 	pop hl
 	pop af
 	ret
@@ -3015,8 +3017,8 @@ TARGETF:
 	pop af
 	ret
 
-; NEWLINE
-TARGET5:
+; CRLF
+TARGET_CRLF:
 	push af
 	push hl
 	call TARGETB
@@ -3619,7 +3621,7 @@ sub_15b0h:
 	ret nz			;15b5	c0		.
 	push bc			;15b6	c5		.
 	push iy			;15b7	fd e5		. .
-	M_OUT_MSG 0x174c, 0x1a ; "TAPE ACTION" 05 "PLAYER NUMBER "
+	M_OUT_MSG 0x174c, 0x1a ; "TAPE ACTION" CRLF "PLAYER NUMBER "
 	ld a,(hl)		;15bf	7e		~
 	push af			;15c0	f5		.
 	or a			;15c1	b7		.
@@ -4169,7 +4171,7 @@ l19a4h:
 	ld hl,01766h		;19a7	21 66 17	! f .
 	push hl			;19aa	e5		.
 	call sub_2a82h		;19ab	cd 82 2a	. . *
-	M_OUT_MSG 0xd011, 0x36 ; "TO DISCONNECT BATTERY BACKUP" 05 "FOR SHIPPING TYPE CTRL-D" 05 
+	M_OUT_MSG 0xd011, 0x36 ; "TO DISCONNECT BATTERY BACKUP" CRLF "FOR SHIPPING TYPE CTRL-D" CRLF 
 	ld de,FIFO_KBD		;19b4	11 e4 40	. . @
 l19b7h:
 	call sub_0ee1h		;19b7	cd e1 0e	. . .
@@ -4179,7 +4181,7 @@ l19b7h:
 l19c1h:
 	cp 004h			;19c1	fe 04		. .
 	jr nz,l19d0h		;19c3	20 0b		  .
-	M_OUT_MSG 0xd047, 0x23 ; "BATTERY DISCONNECTED" 05 "TURN POWER OFF"
+	M_OUT_MSG 0xd047, 0x23 ; "BATTERY DISCONNECTED" CRLF "TURN POWER OFF"
 	out (070h),a		;19cb	d3 70		. p
 	jp l1934h		;19cd	c3 34 19	. 4 .
 l19d0h:
@@ -6365,7 +6367,7 @@ l2896h:
 	or a			;28d7	b7		.
 	jp nz,l2783h		;28d8	c2 83 27	. . '
 l28dbh:
-	M_OUT_MSG 0xd07a, 0x08 ; 09 09 "STORED"
+	M_OUT_MSG 0xd07a, 0x08 ; RIGHT RIGHT "STORED"
 	jp l1934h		;28e1	c3 34 19	. 4 .
 sub_28e4h:
 	push hl			;28e4	e5		.
@@ -6640,7 +6642,7 @@ l2adfh:
 	call SETMEMMAP	;2aea	cd 1a 0f	. . .
 	ret			;2aed	c9		.
 sub_2aeeh:
-	M_OUT_MSG 0xd082, 0x05
+	M_OUT_MSG 0xd082, 0x05 ; "PAGE "
 	M_OUT_VAR 0x4f89, 0x04
 	M_OUT_8 1
 	M_SOMETHING1 04f89h, 4
@@ -8034,7 +8036,7 @@ l34bdh:
 	ld hl,053d6h		;34f0	21 d6 53	! . S
 	call 0b845h		;34f3	cd 45 b8	. E .
 	call sub_2a82h		;34f6	cd 82 2a	. . *
-	M_OUT_MSG 0xd09b, 0xc6 ; 0F "DISPLAY TYPE" 05 "DISPLAY SPEED" 05 "DISPLAY TIME     SECONDS" 05 "PAGE SKIP" 05 "PAGE LINK" 05 "PAGE WAIT" 05 05 "      DISPLAY TIME WINDOW" 05 05 "FIRST DAY" 05 "      TIME" 05 05 "            THROUGH" 05 05 "LAST DAY" 05 "     TIME" 05 05 "LINE LEVELS   1  2  3  4"
+	M_OUT_MSG 0xd09b, 0xc6 ; 0F "DISPLAY TYPE" CRLF "DISPLAY SPEED" CRLF "DISPLAY TIME     SECONDS" CRLF "PAGE SKIP" CRLF "PAGE LINK" CRLF "PAGE WAIT" CRLF CRLF "      DISPLAY TIME WINDOW" CRLF CRLF "FIRST DAY" CRLF "      TIME" CRLF CRLF "            THROUGH" CRLF CRLF "LAST DAY" CRLF "     TIME" CRLF CRLF "LINE LEVELS   1  2  3  4"
 	M_GOTO_YX 1,15
 	ld ix,v53c2
 	ld iy,0d161h
@@ -8616,7 +8618,7 @@ _skip:
 	ld a,c			;393f	79		y
 	pop bc			;3940	c1		.
 	jp nz,l390eh		;3941	c2 0e 39	. . 9
-	M_OUT_MSG 0xd2bb, 0x03 ; 09 ":" 09 
+	M_OUT_MSG 0xd2bb, 0x03 ; RIGHT ":" RIGHT 
 	ld a,l
 	push bc			;394b	c5		.
 	ld c,a			;394c	4f		O
@@ -8745,7 +8747,7 @@ _skip:
 	ld a,c			;3a2b	79		y
 	pop bc			;3a2c	c1		.
 	jp nz,l39e9h		;3a2d	c2 e9 39	. . 9
-	M_OUT_MSG 0xd2bb, 0x03 ; 09 ":" 09 
+	M_OUT_MSG 0xd2bb, 0x03 ; RIGHT ":" RIGHT 
 	ld a,l
 	pop hl			;3a37	e1		.
 	inc hl			;3a38	23		#
@@ -9014,7 +9016,7 @@ l3bcfh:
 	ld bc,00027h		;3bdf	01 27 00	. ' .
 	ldir			;3be2	ed b0		. .
 l3be4h:
-	M_OUT_MSG 0xd2d5, 0x37 ; 0F 05 05 "FILE  START  STOP  CHANGE" 05 "      PAGE   PAGE   FILE" 05 05 
+	M_OUT_MSG 0xd2d5, 0x37 ; 0F CRLF CRLF "FILE  START  STOP  CHANGE" CRLF "      PAGE   PAGE   FILE" CRLF CRLF 
 	ld hl, v53c9
 	push hl			;3bed	e5		.
 	ld (iy+000h),001h	;3bee	fd 36 00 01	. 6 . .
@@ -9041,7 +9043,7 @@ l3bf2h:
 	add iy,de		;3c2d	fd 19		. .
 	ex (sp),iy		;3c2f	fd e3		. .
 	inc (iy+000h)		;3c31	fd 34 00	. 4 .
-	M_OUT_CH NEWLINE
+	M_OUT_CH CRLF
 	jp l3bf2h		;3c38	c3 f2 3b	. . ;
 l3c3bh:
 	pop hl			;3c3b	e1		.
@@ -9093,7 +9095,7 @@ l3c4fh:
 	push af			;3c9b	f5		.
 	ld (053c6h),a		;3c9c	32 c6 53	2 . S
 l3c9fh:
-	M_OUT_CH NEWLINE
+	M_OUT_CH CRLF
 	ld de,8		;3ca3	11 08 00	. . .
 	add iy,de		;3ca6	fd 19		. .
 	pop af			;3ca8	f1		.
@@ -9897,7 +9899,7 @@ MENU_8200:
 	bit 4,(hl)		;8208	cb 66 	. f 
 	call nz,sub_2326h		;820a	c4 26 23 	. & # 
 	call sub_2a82h		;820d	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd488, 0xd9 ; "SELECT" 05 05 "E-EDIT" 05 "F-FORMATED EDIT" 05 "D-DISPLAY RESUME" 05 "R-RECALL PAGE" 05 "S-STORE PAGE" 05 "N-NEXT PAGE" 05 "L-LAST PAGE" 05 "C-CLOCK SET" 05 "P-PAGE COPY" 05 "M-MEMORY SET" 05 "X-EXTERNAL LINE LEVELS" 05 "B-BLOCK EDIT" 05 "H-HELP MENU FOR CONTROL CODES" 05 "SETUP-NEXT MENU"
+	M_OUT_MSG 0xd488, 0xd9 ; "SELECT" CRLF CRLF "E-EDIT" CRLF "F-FORMATED EDIT" CRLF "D-DISPLAY RESUME" CRLF "R-RECALL PAGE" CRLF "S-STORE PAGE" CRLF "N-NEXT PAGE" CRLF "L-LAST PAGE" CRLF "C-CLOCK SET" CRLF "P-PAGE COPY" CRLF "M-MEMORY SET" CRLF "X-EXTERNAL LINE LEVELS" CRLF "B-BLOCK EDIT" CRLF "H-HELP MENU FOR CONTROL CODES" CRLF "SETUP-NEXT MENU"
 	M_GOTO_YX 1,9
 	ld hl,MENU_TABLE1
 	call HANDLE_MENU		;821e	cd 37 82 	. 7 . 
@@ -9905,7 +9907,7 @@ MENU_8200:
 
 MENU_8222:
 	call sub_2a82h		;8222	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd561, 0xba ; "SELECT" 05 05 "C-CHANNEL REGION SETUP" 05 "S-SEQUENCE" 05 "E-EVENTS" 05 "N-NEXT EVENT" 05 "L-LAST EVENT" 05 "D-DATA EXTERNAL SOURCE" 05 "W-WEATHER SETUP" 05 "B-BATCH TRANSFER" 05 "R-REMOTE EDIT" 05 "K-KEYBOARD DIRECT" 05 "A-AUTHORIZATION CODES"
+	M_OUT_MSG 0xd561, 0xba ; "SELECT" CRLF CRLF "C-CHANNEL REGION SETUP" CRLF "S-SEQUENCE" CRLF "E-EVENTS" CRLF "N-NEXT EVENT" CRLF "L-LAST EVENT" CRLF "D-DATA EXTERNAL SOURCE" CRLF "W-WEATHER SETUP" CRLF "B-BATCH TRANSFER" CRLF "R-REMOTE EDIT" CRLF "K-KEYBOARD DIRECT" CRLF "A-AUTHORIZATION CODES"
 	M_GOTO_YX 1,9
 	ld hl,MENU_TABLE2
 	call HANDLE_MENU		;8233	cd 37 82 	. 7 . 
@@ -9994,8 +9996,8 @@ MENU_TABLE2:
 	db ' '
 	dw MENU_8222
 	call sub_2a82h		;82a6	cd 82 2a 	. . * 
-	M_OUT_MSG 0xd30c, 0xf6 ; "CONTROL KEY FUNCTIONS" 05 05 "LINE SEPARATOR" 05 " C-COLOR" 05 " T-TOP ON/OFF" 05 " B-BOTTOM ON/OFF" 05 "WORD CONTROL CHARACTERS" 05 " F-ALTERNATE FONT" 05 " X-EXTERNAL VIDEO" 05 "EDIT FUNCTIONS" 05 " L-ERASE TO END OF LINE" 05 " P-ERASE TO END OF PAGE" 05 " A-ERASE PAGE ATTRIBUTES" 05 " S-CHARACTER INSERT" 05 
-	M_OUT_MSG 0xd402, 0x86 ; " D-CHARACTER DELETE" 05 " V-LINE INSERT" 05 " K-LINE DELETE" 05 " R-BORDER" 05 "SYSTEM FUNCTIONS" 05 " E-SELECT CHANNEL FOR EDITING" 05 " O-OFF LINE BATCH TRANSFER" 0F 
+	M_OUT_MSG 0xd30c, 0xf6 ; "CONTROL KEY FUNCTIONS" CRLF CRLF "LINE SEPARATOR" CRLF " C-COLOR" CRLF " T-TOP ON/OFF" CRLF " B-BOTTOM ON/OFF" CRLF "WORD CONTROL CHARACTERS" CRLF " F-ALTERNATE FONT" CRLF " X-EXTERNAL VIDEO" CRLF "EDIT FUNCTIONS" CRLF " L-ERASE TO END OF LINE" CRLF " P-ERASE TO END OF PAGE" CRLF " A-ERASE PAGE ATTRIBUTES" CRLF " S-CHARACTER INSERT" CRLF 
+	M_OUT_MSG 0xd402, 0x86 ; " D-CHARACTER DELETE" CRLF " V-LINE INSERT" CRLF " K-LINE DELETE" CRLF " R-BORDER" CRLF "SYSTEM FUNCTIONS" CRLF " E-SELECT CHANNEL FOR EDITING" CRLF " O-OFF LINE BATCH TRANSFER" 0F 
 	ret
 
 ; ???
@@ -10279,7 +10281,7 @@ l83d5h:
 	ld a,04bh		;842b	3e 4b 	> K 
 	ld (05cc1h),a		;842d	32 c1 5c 	2 . \ 
 	call sub_848eh		;8430	cd 8e 84 	. . . 
-	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
+	M_OUT_MSG 0xd63a, 0x09 ; CRLF "ON LINE "
 	ld a,001h		;8439	3e 01 	> . 
 	ld (05cbah),a		;843b	32 ba 5c 	2 . \ 
 	jp l1934h		;843e	c3 34 19 	. 4 . 
@@ -10308,7 +10310,7 @@ sub_8441h:
 	ld de,05fb2h		;847d	11 b2 5f 	. . _ 
 	ld bc,4
 	ldir 
-	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
+	M_OUT_MSG 0xd63a, 0x09 ; CRLF "ON LINE "
 	jp l1934h		;848b	c3 34 19 	. 4 . 
 sub_848eh:
 	ld a,(0000fh)		;848e	3a 0f 00 	: . . 
@@ -10333,7 +10335,7 @@ l84aah:
 	jr z,l84ddh		;84b3	28 28 	( ( 
 	jr l84a2h		;84b5	18 eb 	. . 
 l84b7h:
-	M_OUT_MSG 0xd70b, 0x11 ; 05 "LOGON ID        "
+	M_OUT_MSG 0xd70b, 0x11 ; CRLF "LOGON ID        "
 	M_INPUT v5cbf, 0x46
 l84c3h:
 	call sub_0334h		;84c3	cd 34 03 	. 4 . 
@@ -10351,7 +10353,7 @@ l84ddh:
 	pop hl			;84e0	e1 	. 
 	jp l1934h		;84e1	c3 34 19 	. 4 . 
 sub_84e4h:
-	M_OUT_MSG 0xd71c, 0x14 ; 05 "NO ACCESS          "
+	M_OUT_MSG 0xd71c, 0x14 ; CRLF "NO ACCESS          "
 	ld a,(0000fh)		;84ea	3a 0f 00 	: . . 
 	cp 0aah		;84ed	fe aa 	. . 
 	call z,sub_93dah		;84ef	cc da 93 	. . . 
@@ -10374,11 +10376,11 @@ sub_84f9h:
 	ld a,042h		;851d	3e 42 	> B 
 	ld (05cc1h),a		;851f	32 c1 5c 	2 . \ 
 	call sub_848eh		;8522	cd 8e 84 	. . . 
-	M_OUT_MSG 0xd63a, 0x09 ; 05 "ON LINE "
+	M_OUT_MSG 0xd63a, 0x09 ; CRLF "ON LINE "
 	ld a,003h		;852b	3e 03 	> . 
 	ld (05cbah),a		;852d	32 ba 5c 	2 . \ 
 	M_GOTO_YX 5,1
-	M_OUT_MSG 0xd68d, 0x7e ; "DIRECTION     (S=SEND F=FETCH)" 05 05 "SOURCE  SOURCE  DESTIN  PRESENT" 05 " FIRST   LAST    FIRST  TRANSFER" 05 " 0000    0000    0000    0000"
+	M_OUT_MSG 0xd68d, 0x7e ; "DIRECTION     (S=SEND F=FETCH)" CRLF CRLF "SOURCE  SOURCE  DESTIN  PRESENT" CRLF " FIRST   LAST    FIRST  TRANSFER" CRLF " 0000    0000    0000    0000"
 	M_GOTO_YX 5,12
 l8540h:
 	call NEXT_MACRO_OR_KEY		;8540	cd a7 17 	. . . 
@@ -10784,11 +10786,11 @@ sub_88b5h:
 	M_OUT_8 1
 	ret
 sub_88c4h:
-	M_OUT_MSG 0xd65e, 0x0f ; 05 "ERROR" 05 "COMPLETE"
+	M_OUT_MSG 0xd65e, 0x0f ; CRLF "ERROR" CRLF "COMPLETE"
 	call sub_8fa5h		;88ca	cd a5 8f 	. . . 
 	jp l1934h		;88cd	c3 34 19 	. 4 . 
 l88d0h:
-	M_OUT_MSG 0xd664, 0x09 ; 05 "COMPLETE"
+	M_OUT_MSG 0xd664, 0x09 ; CRLF "COMPLETE"
 	call sub_8fa5h		;88d6	cd a5 8f 	. . . 
 	jp l1934h		;88d9	c3 34 19 	. 4 . 
 sub_88dch:
@@ -11761,7 +11763,7 @@ sub_8fa5h:
 	ld (05ea1h),bc		;8fd0	ed 43 a1 5e 	. C . ^ 
 	ld a,099h		;8fd4	3e 99 	> . 
 	out (014h),a		;8fd6	d3 14 	. . 
-	M_OUT_MSG 0xd730, 0x0a ; 05 "OFF LINE "
+	M_OUT_MSG 0xd730, 0x0a ; CRLF "OFF LINE "
 	jr l8fe3h		;8fde	18 03 	. . 
 l8fe0h:
 	call sub_91e4h		;8fe0	cd e4 91 	. . . 
@@ -11844,7 +11846,7 @@ l905ah:
 	ld hl,0		;9065	21 00 00 	! . . 
 	call sub_88dch		;9068	cd dc 88 	. . . 
 l906bh:
-	M_OUT_MSG 0xd73a, 0x16 		; "LIMIT REMOTE ACCESS?  "
+	M_OUT_MSG 0xd73a, 0x16 ; "LIMIT REMOTE ACCESS?  "
 	ld a,(v53c2)				; #### Strange, v53c2 is used for other things too
 	or a
 	jr nz,_yes					; non-zero, remote access is limited
@@ -11857,15 +11859,15 @@ _print_current:
 
 	; Implements "CODES Key Operation."
 	; Manual page 3-51
-	M_OUT_MSG 0xd750, 0x2a ; "  (Y / N)" 05 "USER CODE  START PAGE  STOP PAGE"
+	M_OUT_MSG 0xd750, 0x2a ; "  (Y / N)" CRLF "USER CODE  START PAGE  STOP PAGE"
 
 	ld iy,vUserCodes			; The start of user code info
 	ld b,24						; 24 lines
 
 _line_loop:
-	M_OUT_CH NEWLINE			; Next line
+	M_OUT_CH CRLF			; Next line
 	M_RIGHT 1
-	M_OUT_MSG 0x0000, 0x06		; User code on 6 character
+	M_OUT_MSG 0x0000, 0x06 ; F3 C3 8E 01 "W" FF 
 	M_RIGHT 7
 	M_OUT_VAR 0x0006, 0x04		; Start page is at offset 6, printed with 4 digits
 	M_RIGHT 7
@@ -11921,7 +11923,7 @@ l90feh:
 	M_SOMETHING2 0x04
 	jr l90feh		;9119	18 e3 	. . 
 l911bh:
-	M_OUT_CH NEWLINE
+	M_OUT_CH CRLF
 	call RIGHT_INLINE		;911f	cd 70 15 	. p . 
 	ld b,011h		;9122	06 11 	. . 
 	ld a,(bc)			;9124	0a 	. 
@@ -12129,9 +12131,9 @@ l92bbh:
 sub_92cch:
 	M_OUT_MSG 0xd66d, 0x1d ; "BATCH TRANSFER  SYSTEM NAME  "
 	M_OUT_MSG 0x53c7, 0x02 ; *** RAM data ***
-	M_OUT_MSG 0xd70b, 0x0b ; 05 "LOGON ID  "
+	M_OUT_MSG 0xd70b, 0x0b ; CRLF "LOGON ID  "
 	M_OUT_MSG v53c9, 0x06 ; *** RAM data ***
-	M_OUT_MSG 0xd68c, 0x0c ; 05 "DIRECTION  "
+	M_OUT_MSG 0xd68c, 0x0c ; CRLF "DIRECTION  "
 	ld a,(053cfh)		;92ea	3a cf 53 	: . S 
 	cp 046h		;92ed	fe 46 	. F 
 	jr z,l92f3h		;92ef	28 02 	( . 
@@ -12139,8 +12141,8 @@ sub_92cch:
 l92f3h:
 	ld (053cfh),a		;92f3	32 cf 53 	2 . S 
 	call OUT_CH		;92f6	cd 84 10 	. . . 
-	M_OUT_MSG 0xd699, 0x2b ; "  (S=SEND F=FETCH)" 05 05 "SOURCE  SOURCE  DESTIN "
-	M_OUT_MSG 0xd6cc, 0x18 ; 05 " FIRST   LAST    FIRST "
+	M_OUT_MSG 0xd699, 0x2b ; "  (S=SEND F=FETCH)" CRLF CRLF "SOURCE  SOURCE  DESTIN "
+	M_OUT_MSG 0xd6cc, 0x18 ; CRLF " FIRST   LAST    FIRST "
 	M_GOTO_YX 16,2
 l930ah:
 	M_OUT_VAR 0x53d0, 0x04
@@ -12935,7 +12937,7 @@ l97d9h:
 	call sub_2a82h		;97f2	cd 82 2a 	. . * 
 	M_GOTO_YX 1,1
 	; FReD : fix data at 960d
-	M_OUT_MSG 0x960d, 0xf2 ; "EDIT CAT DEF TABLE " 05 05 "REPEAT CATEGORIES " 05 05 "REGION # FOR CATEGORY TEXT " 05 "CATEGORY DEF START PAGE " 05 "CATEGORY DEF STOP PAGE " 05 05 "REGION # FOR REQUEST QUEUE " 05 "REQUEST QUEUE PAGE # " 05 05 "EDIT PROTECTED FUNCTIONS N" 05 05 05 "INIT CAT DEF TABLE " 05 05 "CLEAR CATEGORY COUNTS "
+	M_OUT_MSG 0x960d, 0xf2 ; "EDIT CAT DEF TABLE " CRLF CRLF "REPEAT CATEGORIES " CRLF CRLF "REGION # FOR CATEGORY TEXT " CRLF "CATEGORY DEF START PAGE " CRLF "CATEGORY DEF STOP PAGE " CRLF CRLF "REGION # FOR REQUEST QUEUE " CRLF "REQUEST QUEUE PAGE # " CRLF CRLF "EDIT PROTECTED FUNCTIONS N" CRLF CRLF CRLF "INIT CAT DEF TABLE " CRLF CRLF "CLEAR CATEGORY COUNTS "
 	ld a,(05cbah)
 	cp 005h		;9803	fe 05 	. . 
 	jr nz,l9814h		;9805	20 0d 	  . 
@@ -13048,7 +13050,7 @@ l994ch:
 	and 020h		;996c	e6 20 	.   
 	ret z			;996e	c8 	. 
 	M_GOTO_YX 19,1
-	M_OUT_MSG 0x973e, 0x26 ; "ENTER START NUMBER " 05 "ENTER STOP NUMBER "
+	M_OUT_MSG 0x973e, 0x26 ; "ENTER START NUMBER " CRLF "ENTER STOP NUMBER "
 	M_GOTO_YX 19,20
 	M_OUT_VAR 0x53e0, 0x03
 l9985h:
@@ -15566,7 +15568,7 @@ lac0fh:
 	ld hl,0		;ac2e	21 00 00 	! . . 
 	call sub_88dch		;ac31	cd dc 88 	. . . 
 lac34h:
-	M_OUT_MSG 0xd77a, 0x55 ; 0F "EXTERNAL DATA SELECT  " 05 05 "1 AP" 05 "2 UPI" 05 "3 REUTERS" 05 "4 NOAA" 05 "5 STOCKS" 05 "6 BROADCAST" 05 "7 DOW JONES"
+	M_OUT_MSG 0xd77a, 0x55 ; 0F "EXTERNAL DATA SELECT  " CRLF CRLF "1 AP" CRLF "2 UPI" CRLF "3 REUTERS" CRLF "4 NOAA" CRLF "5 STOCKS" CRLF "6 BROADCAST" CRLF "7 DOW JONES"
 	M_GOTO_YX 1,22
 	ld h,7
 	call INPUT_NUM		;ac41	cd 48 3d 	. H = 
@@ -15613,8 +15615,8 @@ lac5dh:
 	cp 0ffh		;ac74	fe ff 	. . 
 	jp nz,laed0h		;ac76	c2 d0 ae 	. . . 
 	M_OUT_MSG 0xd7cf, 0x03 ; 0F "AP"
-	M_OUT_MSG 0xd7de, 0x47 ; " NEWS SPLITS" 05 "PAGE BLOCK START PAGE STOP PAGE" 05 "    1" 08 0B "2" 08 0B "3" 08 0B "4" 08 0B "5" 08 0B "6" 08 0B "7" 08 0B "8"
-	M_OUT_MSG 0xd825, 0x6b ; 05 05 "NEWS CATEGORY   BLOCK" 05 "GENERAL NEWS" 05 "REGIONAL NEWS" 05 "FINANCIAL" 05 "STOCKS" 05 "SPORTS" 05 "SPORTS SCORES" 05 "BULLETINS" 05 "FEATURES"
+	M_OUT_MSG 0xd7de, 0x47 ; " NEWS SPLITS" CRLF "PAGE BLOCK START PAGE STOP PAGE" CRLF "    1" 08 0B "2" 08 0B "3" 08 0B "4" 08 0B "5" 08 0B "6" 08 0B "7" 08 0B "8"
+	M_OUT_MSG 0xd825, 0x6b ; CRLF CRLF "NEWS CATEGORY   BLOCK" CRLF "GENERAL NEWS" CRLF "REGIONAL NEWS" CRLF "FINANCIAL" CRLF "STOCKS" CRLF "SPORTS" CRLF "SPORTS SCORES" CRLF "BULLETINS" CRLF "FEATURES"
 	M_OUT_C 6
 	M_RIGHT 15
 	ld c,008h		;ac93	0e 08 	. . 
@@ -15627,9 +15629,9 @@ lac5dh:
 	cp 0ffh		;aca6	fe ff 	. . 
 	jp nz,laed0h		;aca8	c2 d0 ae 	. . . 
 	M_OUT_MSG 0xd7d2, 0x04 ; 0F "UPI"
-	M_OUT_MSG 0xd7de, 0x44 ; " NEWS SPLITS" 05 "PAGE BLOCK START PAGE STOP PAGE" 05 "    1" 08 0B "2" 08 0B "3" 08 0B "4" 08 0B "5" 08 0B "6" 08 0B "7"
-	M_OUT_MSG 0xd825, 0x4b ; 05 05 "NEWS CATEGORY   BLOCK" 05 "GENERAL NEWS" 05 "REGIONAL NEWS" 05 "FINANCIAL" 05 "STOCKS" 05 "SPORTS" 05 
-	M_OUT_MSG 0xd87e, 0x12 ; "BULLETINS" 05 "FEATURES"
+	M_OUT_MSG 0xd7de, 0x44 ; " NEWS SPLITS" CRLF "PAGE BLOCK START PAGE STOP PAGE" CRLF "    1" 08 0B "2" 08 0B "3" 08 0B "4" 08 0B "5" 08 0B "6" 08 0B "7"
+	M_OUT_MSG 0xd825, 0x4b ; CRLF CRLF "NEWS CATEGORY   BLOCK" CRLF "GENERAL NEWS" CRLF "REGIONAL NEWS" CRLF "FINANCIAL" CRLF "STOCKS" CRLF "SPORTS" CRLF 
+	M_OUT_MSG 0xd87e, 0x12 ; "BULLETINS" CRLF "FEATURES"
 	M_OUT_C 5
 	M_RIGHT 15
 	ld c,007h		;accb	0e 07 	. . 
@@ -15641,9 +15643,9 @@ lac5dh:
 	ld a,(CFG9)		;acdb	3a 15 00 	: . . 
 	cp 0aah		;acde	fe aa 	. . 
 	jp nz,laed0h		;ace0	c2 d0 ae 	. . . 
-	M_OUT_MSG 0xd7d6, 0x3d ; 0F "REUTERS NEWS SPLITS" 05 "PAGE BLOCK START PAGE STOP PAGE" 05 "    1" 08 0B "2"
-	M_OUT_MSG 0xd825, 0x24 ; 05 05 "NEWS CATEGORY   BLOCK" 05 "GENERAL NEWS"
-	M_OUT_MSG 0xd857, 0x0a ; 05 "FINANCIAL"
+	M_OUT_MSG 0xd7d6, 0x3d ; 0F "REUTERS NEWS SPLITS" CRLF "PAGE BLOCK START PAGE STOP PAGE" CRLF "    1" 08 0B "2"
+	M_OUT_MSG 0xd825, 0x24 ; CRLF CRLF "NEWS CATEGORY   BLOCK" CRLF "GENERAL NEWS"
+	M_OUT_MSG 0xd857, 0x0a ; CRLF "FINANCIAL"
 	M_OUT_CH '/' 
 	M_OUT_MSG 0xd869, 0x06 ; "SPORTS"
 	M_RIGHT 7
@@ -15841,7 +15843,7 @@ sub_aed9h:
 	ld a,(00017h)		;aee0	3a 17 00 	: . . 
 	cp 0ffh		;aee3	fe ff 	. . 
 	jr nz,laed0h		;aee5	20 e9 	  . 
-	M_OUT_MSG 0xd90b, 0x50 ; 0F "      NOAA WEATHER SERVICE" 05 05 " START  STOP  WORD  OPEN" 05 " PAGE   PAGE  WRAP  CODE" 05 05 
+	M_OUT_MSG 0xd90b, 0x50 ; 0F "      NOAA WEATHER SERVICE" CRLF CRLF " START  STOP  WORD  OPEN" CRLF " PAGE   PAGE  WRAP  CODE" CRLF CRLF 
 	ld b,008h		;aeed	06 08 	. . 
 laeefh:
 	call sub_af44h		;aeef	cd 44 af 	. D . 
@@ -15892,7 +15894,7 @@ laf68h:
 	inc bc			;af6e	03 	. 
 	; FReD : weird
 	M_OUT_MSG 0x0005, 0x04 ; FF FF FF FF 
-	M_OUT_CH NEWLINE
+	M_OUT_CH CRLF
 	ld de,00009h		;af79	11 09 00 	. . . 
 	add iy,de		;af7c	fd 19 	. . 
 	ret			;af7e	c9 	. 
@@ -15928,7 +15930,7 @@ lafb8h:
 	rlca			;afbe	07 	. 
 	; Stores in IY+5
 	M_INPUT 0x0005, 0x44
-	M_OUT_CH NEWLINE
+	M_OUT_CH CRLF
 	call RIGHT_INLINE		;afc9	cd 70 15 	. p . 
 	inc b			;afcc	04 	. 
 	pop iy		;afcd	fd e1 	. . 
@@ -16427,7 +16429,7 @@ sub_b3b5h:
 
 WEATHER_SETUP:
 	call sub_2a82h		;b3bb	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdb32, 0x33 ; 0F "WEATHER MENU SELECT" 05 05 "1 U.S. SYSTEM" 05 "2 METRIC SYSTEM"
+	M_OUT_MSG 0xdb32, 0x33 ; 0F "WEATHER MENU SELECT" CRLF CRLF "1 U.S. SYSTEM" CRLF "2 METRIC SYSTEM"
 	M_GOTO_YX 1,21
 	ld h,0x02
 	call INPUT_NUM		;b3cb	cd 48 3d 	. H = 
@@ -16550,7 +16552,7 @@ lb48ah:
 	call OUT_CH		;b494	cd 84 10 	. . . 
 	jr lb48ah		;b497	18 f1 	. . 
 lb499h:
-	M_OUT_CH 0x09
+	M_OUT_CH RIGHT
 	jr lb48ah		;b49d	18 eb 	. . 
 lb49fh:
 	push de			;b49f	d5 	. 
@@ -16562,7 +16564,7 @@ lb4a0h:
 	cp 030h		;b4a6	fe 30 	. 0 
 	jr nz,lb4b0h		;b4a8	20 06 	  . 
 lb4aah:
-	M_OUT_CH 0x09
+	M_OUT_CH RIGHT
 	jr lb4a0h		;b4ae	18 f0 	. . 
 lb4b0h:
 	M_OUT_CH 0x0e
@@ -16661,7 +16663,7 @@ lb534h:
 	pop de
 	pop hl
 	M_OUT_CH 0x0f 
-	M_OUT_CH 0x09
+	M_OUT_CH RIGHT
 
 	; hl++;  while (*de++ in ['.','0]) hl++
 lb53eh:
@@ -16797,7 +16799,7 @@ lb60bh:
 	cp 0aah		;b61e	fe aa 	. . 
 	jr nz,lb64dh		;b620	20 2b 	  + 
 	call sub_2a82h		;b622	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdc18, 0x39 ; "ACTION  L     L=LINE LEVELS" 05 "              T=OUTPUT TO VTR"
+	M_OUT_MSG 0xdc18, 0x39 ; "ACTION  L     L=LINE LEVELS" CRLF "              T=OUTPUT TO VTR"
 	ld a,04ch		;b62b	3e 4c 	> L 
 	ld (v53c2),a		;b62d	32 c2 53 	2 . S 
 	M_GOTO_YX 1,9
@@ -16885,7 +16887,7 @@ lb6c5h:
 	ret			;b6cb	c9 	. 
 
 sub_b6cch:
-	M_OUT_MSG 0xdb6a, 0xae ; 05 "LINE LEVELS" 05 05 "OUT     1  2  3  4" 05 05 05 " H=HIGH, L=LOW, N=NO CHANGE" 05 05 05 "IN      1  2" 05 05 "ACTION        N=NONE, P=PAGE END" 05 "              S=SEQUENCE RESET" 05 05 "REGION        1 TO 6 OR A=ALL" 05 
+	M_OUT_MSG 0xdb6a, 0xae ; CRLF "LINE LEVELS" CRLF CRLF "OUT     1  2  3  4" CRLF CRLF CRLF " H=HIGH, L=LOW, N=NO CHANGE" CRLF CRLF CRLF "IN      1  2" CRLF CRLF "ACTION        N=NONE, P=PAGE END" CRLF "              S=SEQUENCE RESET" CRLF CRLF "REGION        1 TO 6 OR A=ALL" CRLF 
 	M_OUT_C 10
 	M_RIGHT 8
 	ld b,004h		;b6da	06 04 	. . 
@@ -17218,7 +17220,7 @@ lb8d8h:
 	call sub_88dch		;b8f8	cd dc 88 	. . . 
 lb8fbh:
 	call sub_2a82h		;b8fb	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdc51, 0x29 ; " BLOCK EDIT" 05 05 " FIRST  LAST" 05 " PAGE   PAGE" 05 05 " "
+	M_OUT_MSG 0xdc51, 0x29 ; " BLOCK EDIT" CRLF CRLF " FIRST  LAST" CRLF " PAGE   PAGE" CRLF CRLF " "
 	M_OUT_VAR 0x53c2, 0x04
 	call RIGHT_INLINE		;b90a	cd 70 15 	. p . 
 	inc bc			;b90d	03 	. 
@@ -17307,17 +17309,17 @@ sub_b9cah:
 	ret			;b9d0	c9 	. 
 sub_b9d1h:
 	call sub_2a82h		;b9d1	cd 82 2a 	. . * 
-	M_OUT_MSG 0xdc7a, 0xa2 ; "EVENT        ACTIVE     Y OR N" 05 05 "MINUTE      0 TO 59" 05 "HOUR        1 TO 12, A=ALL" 05 "AM/PM       A=AM, P=PM" 05 "DAY         1 TO 7, A=ALL" 05 "ACTION      L=LEVELS, S=SEQUENCE" 05 05 
+	M_OUT_MSG 0xdc7a, 0xa2 ; "EVENT        ACTIVE     Y OR N" CRLF CRLF "MINUTE      0 TO 59" CRLF "HOUR        1 TO 12, A=ALL" CRLF "AM/PM       A=AM, P=PM" CRLF "DAY         1 TO 7, A=ALL" CRLF "ACTION      L=LEVELS, S=SEQUENCE" CRLF CRLF 
 	ld a,(CFG5)
 	cp 0aah		;b9dd	fe aa 	. . 
 	jr nz,$+13		;b9df	20 0b 	  . 
 	M_GOTO_YX 8,12
-	M_OUT_MSG 0xdd1c, 0x08 ; "T=TAPE" 05 05 
+	M_OUT_MSG 0xdd1c, 0x08 ; "T=TAPE" CRLF CRLF 
 	ld a,(CFG10)		;b9e6	cd c8 13 	. . . 
 	cp 0aah		;b9ef	fe aa 	. . 
 	ret nz			;b9f1	c0 	. 
 	M_GOTO_YX 8,21
-	M_OUT_MSG 0xdd24, 0x0c ; "B=BATCH T." 05 05 
+	M_OUT_MSG 0xdd24, 0x0c ; "B=BATCH T." CRLF CRLF 
 	ret
 sub_b9feh:
 	M_GOTO_YX 1,8
@@ -17461,7 +17463,7 @@ lbb0ah:
 	call sub_b86dh		;bb28	cd 6d b8 	. m . 
 	ret			;bb2b	c9 	. 
 lbb2ch:
-	M_OUT_MSG 0xdd30, 0x50 ; "TYPE     F=FILE CHANGE, I=INSERT" 05 "TIMING   I=IMMEDIATE, D=DELAYED" 05 "REGION   1 TO 6"
+	M_OUT_MSG 0xdd30, 0x50 ; "TYPE     F=FILE CHANGE, I=INSERT" CRLF "TIMING   I=IMMEDIATE, D=DELAYED" CRLF "REGION   1 TO 6"
 	M_GOTO_YX 9,8
 	ld a,(iy+005h)		;bb37	fd 7e 05 	. ~ . 
 	cp 049h		;bb3a	fe 49 	. I 
@@ -17508,7 +17510,7 @@ lbb75h:
 lbb94h:
 	cp 046h		;bb94	fe 46 	. F 
 	ret nz			;bb96	c0 	. 
-	M_OUT_MSG 0xdd80, 0x45 ; "FILE  START   STOP  CHANGE" 05 "       PAGE   PAGE   FILE" 05 05 "  1" 05 "  2" 05 "  3" 05 "  4"
+	M_OUT_MSG 0xdd80, 0x45 ; "FILE  START   STOP  CHANGE" CRLF "       PAGE   PAGE   FILE" CRLF CRLF "  1" CRLF "  2" CRLF "  3" CRLF "  4"
 	M_GOTO_YX 16,8
 	push iy		;bba2	fd e5 	. . 
 	ld iy,053cah		;bba4	fd 21 ca 53 	. ! . S 
@@ -17540,7 +17542,7 @@ sub_bbcbh:
 	ret			;bbd7	c9 	. 
 sub_bbd8h:
 	M_GOTO_YX 13,1
-	M_OUT_MSG 0xddc5, 0x25 ; "      START   STOP" 05 "       PAGE   PAGE"
+	M_OUT_MSG 0xddc5, 0x25 ; "      START   STOP" CRLF "       PAGE   PAGE"
 	M_GOTO_YX 16,8
 	push iy		;bbe8	fd e5 	. . 
 	ld iy,053cah		;bbea	fd 21 ca 53 	. ! . S 
@@ -18297,7 +18299,7 @@ sub_c21dh:
 	ld a,0x98
 	ld (04f76h),a		;c231	32 76 4f 	2 v O 
 	M_GOTO_YX 3,1
-	M_OUT_MSG 0xc3a4, 0x3a ; 0F "CHANNEL NAME" 05 05 "REGION   DISPLAY LINES" 05 "NUMBER    PER REGION"
+	M_OUT_MSG 0xc3a4, 0x3a ; 0F "CHANNEL NAME" CRLF CRLF "REGION   DISPLAY LINES" CRLF "NUMBER    PER REGION"
 	M_GOTO_YX 3,15
 	M_OUT_MSG v53c2, 0x02 ; *** RAM data ***
 	M_GOTO_YX 6,1
@@ -18305,7 +18307,7 @@ sub_c21dh:
 	ld b,000h		;c253	06 00 	. . 
 lc255h:
 	inc b			;c255	04 	. 
-	M_OUT_CH NEWLINE
+	M_OUT_CH CRLF
 	call RIGHT_INLINE		;c25a	cd 70 15 	. p . 
 	db 0x03
 	ld a,b			;c25e	78 	x 
@@ -18327,11 +18329,11 @@ lc255h:
 	ld a,c			;c27a	79 	y 
 	pop bc			;c27b	c1 	. 
 	jp nz,lc255h		;c27c	c2 55 c2 	. U . 
-	M_OUT_MSG 0xc416, 0x2d ; 05 05 "SEQUENCE FROM" 05 "     EXTERNAL DEVICE?  (Y/N) "
+	M_OUT_MSG 0xc416, 0x2d ; CRLF CRLF "SEQUENCE FROM" CRLF "     EXTERNAL DEVICE?  (Y/N) "
 	call sub_c2b1h		;c285	cd b1 c2 	. . . 
-	M_OUT_MSG 0xc3f1, 0x14 ; 05 05 "NUMBER OF EVENTS  "
+	M_OUT_MSG 0xc3f1, 0x14 ; CRLF CRLF "NUMBER OF EVENTS  "
 	M_OUT_VAR 0x53cc, 0x04
-	M_OUT_MSG 0xc405, 0x0a ; "  MAX 512" 05 
+	M_OUT_MSG 0xc405, 0x0a ; "  MAX 512" CRLF 
 	call RIGHT_INLINE
 	jr 0xc26c		;c29d	18 cd 	. . 
 	ret z			;c29f	c8 	. 
