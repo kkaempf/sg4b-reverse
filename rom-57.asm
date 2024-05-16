@@ -9,6 +9,9 @@ vUserCodes: equ 0x53c3	; See manual page 3-51
 						; 24 entries of 10 bytes
 						;  6 char code, 2 bytes start page, 2 bytes stop page
 
+v52bf: equ 0x52bf		; Related to v52c0. Related to DMS/interrupt 10
+v52c0: equ 0x52c0
+
 v53c4: equ 0x53c4
 v53c6: equ 0x53c6
 v53c7: equ 0x53c7
@@ -31,6 +34,7 @@ v548a: equ 0x548a
 f5b6d: equ 0x5b6d
 v5cbf: equ 0x5cbf
 v5fa4: equ 0x5fa4
+v5fa7: equ 0x5fa7
 f5fb6: equ 0x5fb6
 v6030: equ 0x6030
 v6031: equ 0x6031
@@ -386,8 +390,10 @@ CFG7:
 	db 0xbb		; Hard coded config
 CFG8:
 	db 0x00		; Hard coded config
+CFG11:
+	db 0xff
 
-	db 0xff, 0x00
+	db 0x00
 	
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
 	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
@@ -857,7 +863,7 @@ WARM_BOOT:
 	out (005h),a		;02c3	d3 05		. .
 	xor a			;02c5	af		.
 	ld (f5fb6),a		;02c6	32 b6 5f	2 . _
-	ld de,052afh		;02c9	11 af 52	. . R
+	ld de,STACK_BASE+2		;02c9	11 af 52	. . R
 	ld hl,01766h		;02cc	21 66 17	! f .
 l02cfh:
 	ld sp,04ff1h		;02cf	31 f1 4f	1 . O
@@ -868,7 +874,7 @@ l02cfh:
 	ld hl,l2b8ch		;02de	21 8c 2b	! . +
 	ld sp,050b9h		;02e1	31 b9 50	1 . P
 	call sub_034eh		;02e4	cd 4e 03	. N .
-	ld hl,l3147h		;02e7	21 47 31	! G 1
+	ld hl,EVENT_LOOP		;02e7	21 47 31	! G 1
 	ld sp,0511dh		;02ea	31 1d 51	1 . Q
 	call sub_034eh		;02ed	cd 4e 03	. N .
 	ld hl,0914ah		;02f0	21 4a 91	! J .
@@ -888,51 +894,59 @@ l0302h:
 	call RETURN_FROM_INTER		;030f	cd 64 03	. d .
 	call 08b2eh		;0312	cd 2e 8b	. . .
 l0315h:
-	ld hl,052afh		;0315	21 af 52	! . R
-	in a,(0ffh)		;0318	db ff		. .
+	ld hl,STACK_BASE+2
+	in a,(0ffh)		; ???
 l031ah:
-	ld e,(hl)		;031a	5e		^
-	inc hl			;031b	23		#
-	ld d,(hl)		;031c	56		V
-	ld a,d			;031d	7a		z
-	or e			;031e	b3		.
-	jr z,l0315h		;031f	28 f4		( .
-	dec hl			;0321	2b		+
-	ld (STACK_BASE),hl	;0322	22 ad 52	" . R
-	ex de,hl		;0325	eb		.
-	ld sp,hl		;0326	f9		.
-	pop af			;0327	f1		.
-	call SETMEMMAP	;0328	cd 1a 0f	. . .
-	pop iy			;032b	fd e1		. .
-	pop ix			;032d	dd e1		. .
-	pop hl			;032f	e1		.
-	pop de			;0330	d1		.
-	pop bc			;0331	c1		.
-	pop af			;0332	f1		.
-	ret			;0333	c9		.
-sub_0334h:
-	push af			;0334	f5		.
-	push bc			;0335	c5		.
-	push de			;0336	d5		.
-	push hl			;0337	e5		.
-	push ix			;0338	dd e5		. .
-	push iy			;033a	fd e5		. .
-	ld a,(CUR_MAP)		;033c	3a 22 41	: " A
-	push af			;033f	f5		.
-	ld hl,0	;0340	21 00 00	! . .
-	add hl,sp		;0343	39		9
-	ex de,hl		;0344	eb		.
-	ld hl,(STACK_BASE)	;0345	2a ad 52	* . R
-	ld (hl),e		;0348	73		s
-	inc hl			;0349	23		#
-	ld (hl),d		;034a	72		r
-	inc hl			;034b	23		#
-	jr l031ah		;034c	18 cc		. .
+	ld e,(hl)
+	inc hl
+	ld d,(hl)		; Get DE from TOP of stack
+	ld a,d
+	or e
+	jr z,l0315h		; if no stack (DE==0) use STACK_BASE+2
+	dec hl
+	ld (STACK_BASE),hl	;Store at the bottom of the stack
+	ex de,hl		;
+	ld sp,hl		;
+	pop af			;
+	call SETMEMMAP
+	pop iy
+	pop ix
+	pop hl
+	pop de
+	pop bc
+	pop af
+	ret
 
+; All this needs a bit more investigation
+; I think there is soething stored at the bottom of the stack (STACK_BASE)
+; and these routines restore everything for each
+; "machine cycle" (treatment of one event)
+
+sub_0334h:
+	push af
+	push bc
+	push de
+	push hl
+	push ix
+	push iy
+	ld a,(CUR_MAP)	; Will be reset later
+	push af
+	ld hl,0
+	add hl,sp
+	ex de,hl		; DE = SP
+	ld hl,(STACK_BASE)	; Get HL from pointer in the stack
+	ld (hl),e		; Store previous SP	
+	inc hl
+	ld (hl),d
+	inc hl
+	jr l031ah		; Sort-of just undoes what we just did...
+
+; Usage unclear
 ; This overwrites SP with 7 times HL + 0x0000
 ; Stores a pointer to that in (DE++)
 ; then jumps at the address that was initially top of stack
 ; INPUT SP,HL,DE
+; (Maybe the 7 are space for registers AF,BC,DE,HL,IX,IY and PC?)
 sub_034eh:
 	pop bc			; Address of return address
 	push hl			; Write 7 times HL
@@ -986,7 +1000,7 @@ INTER_10:
 
 	ld hl,05fa3h		;0388	21 a3 5f	! . _
 	inc (hl)		;038b	34		4
-	ld hl,052bfh		;038c	21 bf 52	! . R
+	ld hl,v52bf		;038c	21 bf 52	! . R
 	inc (hl)		;038f	34		4
 	call sub_1582h		;0390	cd 82 15	. . .
 	call 0949bh		;0393	cd 9b 94	. . .
@@ -7494,8 +7508,8 @@ l310eh:
 	jr z,$+58		;310e	28 38		( 8
 	inc h			;3110	24		$
 	jr c,$+33		;3111	38 1f		8 .
-	jr c,l312dh		;3113	38 18		8 .
-	jr c,l3127h		;3115	38 10		8 .
+	jr c,0x312d		;3113	38 18		8 .
+	jr c,0x3127		;3115	38 10		8 .
 	jr c,l311ch		;3117	38 03		8 .
 	jr c,l311eh		;3119	38 03		8 .
 	ld b,e			;311b	43		C
@@ -7505,66 +7519,41 @@ l311ch:
 l311eh:
 	ret			;311e	c9		.
 l311fh:
-	jr nz,l3141h		;311f	20 20		   
-l3121h:
-	jr nz,l3143h		;3121	20 20		   
-	jr nz,l3145h		;3123	20 20		   
-	jr nz,l3147h		;3125	20 20		   
-l3127h:
-	jr nz,$+34		;3127	20 20		   
-	jr nz,$+34		;3129	20 20		   
-	jr nz,l314dh		;312b	20 20		   
-l312dh:
-	jr nz,$+34		;312d	20 20		   
-	jr nz,l3151h		;312f	20 20		   
-	jr nz,$+34		;3131	20 20		   
-	jr nz,l3155h		;3133	20 20		   
-	jr nz,$+34		;3135	20 20		   
-	jr nz,l3159h		;3137	20 20		   
-	jr nz,$+34		;3139	20 20		   
-	jr nz,$+34		;313b	20 20		   
-	jr nz,l315fh		;313d	20 20		   
-	jr nz,$+34		;313f	20 20		   
-l3141h:
-	jr nz,$+34		;3141	20 20		   
-l3143h:
-	jr nz,l3165h		;3143	20 20		   
-l3145h:
-	jr nz,$+34		;3145	20 20		   
-l3147h:
-	ld sp,0511dh		;3147	31 1d 51	1 . Q
-	ld hl,l3147h		;314a	21 47 31	! G 1
-l314dh:
-	push hl			;314d	e5		.
-	ld a,(052bfh)		;314e	3a bf 52	: . R
-l3151h:
-	ld b,a			;3151	47		G
-	ld a,(052c0h)		;3152	3a c0 52	: . R
-l3155h:
-	cp b			;3155	b8		.
+	; 40 spaces
+	db "                                        "
+
+; 0511dh has be initialized with sub_034eh
+; Purpose unclear
+EVENT_LOOP:
+	ld sp,0511dh
+	ld hl,EVENT_LOOP
+	push hl			; We'll return here
+	ld a,(v52bf)
+	ld b,a
+	ld a,(v52c0)
+	cp b
 	jr nz,l3185h		;3156	20 2d		  -
 	xor a			;3158	af		.
-l3159h:
 	call SETMEMMAP	;3159	cd 1a 0f	. . .
-	call sub_c86ch		;315c	cd 6c c8	. l .
-l315fh:
-	call 0a0c6h		;315f	cd c6 a0	. . .
-	call 0a47bh		;3162	cd 7b a4	. { .
-l3165h:
-	call 0a683h		;3165	cd 83 a6	. . .
-	call 0a82ah		;3168	cd 2a a8	. * .
-	call 09413h		;316b	cd 13 94	. . .
+	call HANDLE_SERIAL		; Something serial
+	call HANDLE_KBD		; Something keyboard
+	call HANDLE_FIFO4_1		; Something FIFO4 if CFG9!=0xaa
+	call HANDLE_FIFO4_2		; Something FIFO4 if CFG9==0xaa
+	call HANDLE_FIFO6		; Something FIFO6
+	call sub_9413h
 	ld a,(05b7bh)		;316e	3a 7b 5b	: { [
-	and 001h		;3171	e6 01		. .
-	call nz,09d2dh		;3173	c4 2d 9d	. - .
-	call 094b5h		;3176	cd b5 94	. . .
-	call sub_33dch		;3179	cd dc 33	. . 3
-	call sub_33ffh		;317c	cd ff 33	. . 3
-	call sub_3496h		;317f	cd 96 34	. . 4
-	jp sub_0334h		;3182	c3 34 03	. 4 .
+	and %00000001
+	call nz,sub_9d2dh		;3173	c4 2d 9d	. - .
+	call sub_94b5h		; Do something if v5fa7==0xaa
+	call sub_33dch		; Do something if CFG1==0x0aa
+	call sub_33ffh		; Do something if CFG5!=0xaa
+	call sub_3496h		; Do something depending on CFG11 and others
+	jp sub_0334h		; A pretty unclear function, this one...
+						; I suspect it jumps to the next task
+
 l3185h:
 	inc a			;3185	3c		<
-	ld (052c0h),a		;3186	32 c0 52	2 . R
+	ld (v52c0),a		;3186	32 c0 52	2 . R
 	ld b,032h		;3189	06 32		. 2
 	ld a,(CFG2)		;318b	3a 07 00	: . .
 	cp 0aah			;318e	fe aa		. .
@@ -8045,7 +8034,7 @@ sub_3480h:
 	ldir			;3493	ed b0		. .
 	ret			;3495	c9		.
 sub_3496h:
-	ld a,(0003eh)		;3496	3a 3e 00	: > .
+	ld a,(CFG11)		;3496	3a 3e 00	: > .
 	cp 0aah			;3499	fe aa		. .
 	jr nz,l34bdh		;349b	20 20		   
 	ld a,(05b98h)		;349d	3a 98 5b	: . [
@@ -12134,6 +12123,7 @@ l9401h:
 	xor a			;940e	af 	. 
 	ld (06038h),a		;940f	32 38 60 	2 8 ` 
 	ret			;9412	c9 	. 
+sub_9413h:
 	call sub_949bh		;9413	cd 9b 94 	. . . 
 	ld a,(053bch)		;9416	3a bc 53 	: . S 
 	ld b,a			;9419	47 	G 
@@ -12234,7 +12224,8 @@ sub_949bh:
 	ld hl,05bafh		;94b0	21 af 5b 	! . [ 
 	inc (hl)			;94b3	34 	4 
 	ret			;94b4	c9 	. 
-	ld a,(05fa7h)		;94b5	3a a7 5f 	: . _ 
+sub_94b5h:
+	ld a,(v5fa7)		;94b5	3a a7 5f 	: . _ 
 	cp 0aah		;94b8	fe aa 	. . 
 	ret nz			;94ba	c0 	. 
 	ld a,003h		;94bb	3e 03 	> . 
@@ -12252,7 +12243,7 @@ l94d1h:
 	ld hl,0		;94dc	21 00 00 	! . . 
 	ld (05fa8h),hl		;94df	22 a8 5f 	" . _ 
 	xor a			;94e2	af 	. 
-	ld (05fa7h),a		;94e3	32 a7 5f 	2 . _ 
+	ld (v5fa7),a		;94e3	32 a7 5f 	2 . _ 
 	ret			;94e6	c9 	. 
 l94e7h:
 	call sub_950fh		;94e7	cd 0f 95 	. . . 
@@ -13402,6 +13393,7 @@ l9d28h:
 	add ix,de		;9d28	dd 19 	. . 
 	djnz l9d28h		;9d2a	10 fc 	. . 
 	ret			;9d2c	c9 	. 
+sub_9d2dh:
 	ld a,(06054h)		;9d2d	3a 54 60 	: T ` 
 	cp 0ffh		;9d30	fe ff 	. . 
 	jr nz,l9d50h		;9d32	20 1c 	  . 
@@ -13861,6 +13853,8 @@ la0bfh:
 	pop bc			;a0c3	c1 	. 
 	pop af			;a0c4	f1 	. 
 	ret			;a0c5	c9 	. 
+
+HANDLE_KBD:
 	ld a,(05b7bh)		;a0c6	3a 7b 5b 	: { [ 
 	and 001h		;a0c9	e6 01 	. . 
 	ret nz			;a0cb	c0 	. 
@@ -14382,6 +14376,7 @@ sub_a468h:
 	ld a,000h		;a475	3e 00 	> . 
 	ld (05bb9h),a		;a477	32 b9 5b 	2 . [ 
 	ret			;a47a	c9 	. 
+HANDLE_FIFO4_1:
 	ld a,(CFG9)		;a47b	3a 15 00 	: . . 
 	cp 0aah		;a47e	fe aa 	. . 
 	ret z			;a480	c8 	. 
@@ -14676,6 +14671,7 @@ la67eh:
 	ld (05bffh),a		;a67f	32 ff 5b 	2 . [ 
 la682h:
 	ret			;a682	c9 	. 
+HANDLE_FIFO4_2:
 	ld a,(CFG9)		;a683	3a 15 00 	: . . 
 	cp 0aah		;a686	fe aa 	. . 
 	ret nz			;a688	c0 	. 
@@ -14892,6 +14888,7 @@ la824h:
 	ret nz			;a826	c0 	. 
 	ld a,05ch		;a827	3e 5c 	> \ 
 	ret			;a829	c9 	. 
+HANDLE_FIFO6:
 	ld de,FIFO6		;a82a	11 f4 40 	. . @ 
 	call FIFO_READ		;a82d	cd e1 0e 	. . . 
 	ret c			;a830	d8 	. 
@@ -16263,7 +16260,7 @@ sub_b36fh:
 	sla a		;b376	cb 27 	. ' 
 	ld (05fd5h),a		;b378	32 d5 5f 	2 . _ 
 	ld a,0aah		;b37b	3e aa 	> . 
-	ld (05fa7h),a		;b37d	32 a7 5f 	2 . _ 
+	ld (v5fa7),a		;b37d	32 a7 5f 	2 . _ 
 	jr lb38ch		;b380	18 0a 	. . 
 sub_b382h:
 	ld b,03ch		;b382	06 3c 	. < 
@@ -18919,7 +18916,8 @@ lc85eh:
 	ld a,008h		;c867	3e 08 	> . 
 	out (030h),a		;c869	d3 30 	. 0 
 	ret			;c86b	c9 	. 
-sub_c86ch:
+
+HANDLE_SERIAL:
 	ld de,FIFO_SERIAL		;c86c	11 e0 40 	. . @ 
 	call FIFO_READ		;c86f	cd e1 0e 	. . . 
 	ret c			;c872	d8 	. 
