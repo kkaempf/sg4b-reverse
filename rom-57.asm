@@ -117,7 +117,9 @@ PORT_DMA: equ 0x62				; DMA port
 PORT_MEM: equ 0xfe				; Memory mapping
 
 ; Pointers to circular buffers (32 bytes) to handle data input
-; First two bytes = head, then tail (? checkme)
+; First two bytes = where to insert
+; Last two bytes = where to read
+; Buffers need to be aligned on 32 bytes boundaries
 FIFO_SERIAL: equ 0x40e0			;	Serial
 FIFO_KBD: equ 0x40e4			;	Keyboard
 FIFO3: equ 0x40e8				;	PORT: 0x10 Serial?
@@ -2392,40 +2394,48 @@ l0ed6h:
 	ret			;0ee0	c9		.
 
 ; #### Some FIFO test, maybe full or empty?
-sub_0ee1h:
-	push bc			;0ee1	c5		.
-	push de			;0ee2	d5		.
-	push hl			;0ee3	e5		.
-	ex de,hl		;0ee4	eb		.
-	ld a,(hl)		;0ee5	7e		~
-	inc hl			;0ee6	23		#
-	inc hl			;0ee7	23		#
-	cp (hl)			;0ee8	be		.
-	scf			;0ee9	37		7
-	jr z,l0f03h		;0eea	28 17		( .
-	ld e,(hl)		;0eec	5e		^
-	inc hl			;0eed	23		#
-	ld d,(hl)		;0eee	56		V
-	ex de,hl		;0eef	eb		.
-	ld b,(hl)		;0ef0	46		F
-	and 0e0h		;0ef1	e6 e0		. .
-	ld c,a			;0ef3	4f		O
-	inc hl			;0ef4	23		#
-	ld a,l			;0ef5	7d		}
-	and 01fh		;0ef6	e6 1f		. .
-	or c			;0ef8	b1		.
-	dec de			;0ef9	1b		.
-	ld (de),a		;0efa	12		.
-	ld a,e			;0efb	7b		{
-	cp 0e6h			;0efc	fe e6		. .
-	ld a,b			;0efe	78		x
-	call z,01041h		;0eff	cc 41 10	. A .
-	or a			;0f02	b7		.
-l0f03h:
-	pop hl			;0f03	e1		.
-	pop de			;0f04	d1		.
-	pop bc			;0f05	c1		.
-	ret			;0f06	c9		.
+; INPUT
+;   DE contains a FIFO pointer (to two pointers to FIFO buffer)
+; OUTPUT
+;   C = 1 is FIFO empty
+;   A = char from FIFO
+;   Z = 1 if char is 
+; FIFO have 0x20 bytes so first 3 bits of lower address of buffer is the FIFO number
+; And starts at memory ending in 00000
+FIFO_READ:
+	push bc
+	push de
+	push hl
+	ex de,hl
+	ld a,(hl)		; Low byte of FIFO pointer
+	inc hl
+	inc hl
+	cp (hl)			; Other FIFO pointer
+	scf				; Carry = 1
+	jr z,_exit		; Empty
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	ex de,HL		; HL = second FIFO pointer
+	ld b,(hl)
+	and %11100000	; Keep top 3 bits (FIFO #)
+	ld c,a			; C += FIFO number
+	inc hl			; Increment pointer
+	ld a,l			;
+	and %00011111	; Wrap around
+	or c			; Add back top 3 bits
+	dec de			;
+	ld (de),a		; Store back
+	ld a,e			;
+	cp LOW(FIFO_KBD)+2	; Special case for FIFO_KBD
+	ld a,b			; 
+	call z,KBD_TRANSLATE ; If KBD translate key to German
+	or a
+_exit:
+	pop hl
+	pop de
+	pop bc
+	ret
 
 ; Port reading into FIFO
 ;	C: port to read from
@@ -2645,9 +2655,10 @@ KEYTABLE:
 	db 0x94, 0x84, 0x91, 0x9e, 0x93, 0x8f, 0x20, 0x90
 	db 0x92, 0x9e, 0x9e, 0x20, 0x99, 0x85, 0x9e, 0x9a 
 	db 0x8d, 0x86, 0x96, 0x89, 0x8e, 0x87, 0x98, 0x9c
-	db 0x97, 0x95, 0x81, 0x8c, 0x82, 0x83, 0x20, 0xc5
-
-; FReD : to do, find the call site (ld b,d + djnz xxx)
+	db 0x97, 0x95, 0x81, 0x8c, 0x82, 0x83, 0x20
+	
+KBD_TRANSLATE:
+	push bc
 	push hl
 	ld b,a
 	ld a,(CFG4)
@@ -3863,7 +3874,7 @@ sub_1704h:
 	or a			;1707	b7		.
 	ret nz			;1708	c0		.
 	ld de,FIFO7		;1709	11 f8 40	. . @
-	call sub_0ee1h		;170c	cd e1 0e	. . .
+	call FIFO_READ		;170c	cd e1 0e	. . .
 	ret c			;170f	d8		.
 	ld (0602fh),a		;1710	32 2f 60	2 / `
 	ld a,003h		;1713	3e 03		> .
@@ -3975,7 +3986,7 @@ NEXT_KEY:
 	cp 005h
 	ld b,00ah		;17de	06 0a		. .
 	jr z,TYPE_KEY		;17e0	28 13		( .
-	call sub_0ee1h		;17e2	cd e1 0e	. . .
+	call FIFO_READ		;17e2	cd e1 0e	. . .
 	jr nc,l17ech		;17e5	30 05		0 .
 	call sub_0334h		;17e7	cd 34 03	. 4 .
 	jr NEXT_KEY		;17ea	18 ea		. .
@@ -4219,7 +4230,7 @@ l19a4h:
 	M_OUT_MSG 0xd011, 0x36 ; "TO DISCONNECT BATTERY BACKUP" CRLF "FOR SHIPPING TYPE CTRL-D" CRLF 
 	ld de,FIFO_KBD		;19b4	11 e4 40	. . @
 l19b7h:
-	call sub_0ee1h		;19b7	cd e1 0e	. . .
+	call FIFO_READ		;19b7	cd e1 0e	. . .
 	jr nc,l19c1h		;19ba	30 05		0 .
 	call sub_0334h		;19bc	cd 34 03	. 4 .
 	jr l19b7h		;19bf	18 f6		. .
@@ -11087,7 +11098,7 @@ sub_8b78h:
 	ret z			;8b82	c8 	. 
 l8b83h:
 	ld de,FIFO5		;8b83	11 f0 40 	. . @ 
-	call sub_0ee1h		;8b86	cd e1 0e 	. . . 
+	call FIFO_READ		;8b86	cd e1 0e 	. . . 
 	jr nc,l8b9ah		;8b89	30 0f 	0 . 
 	ld a,(05cbbh)		;8b8b	3a bb 5c 	: . \ 
 	cp 002h		;8b8e	fe 02 	. . 
@@ -13408,7 +13419,7 @@ l9d28h:
 	call sub_9ca7h		;9d4d	cd a7 9c 	. . . 
 l9d50h:
 	ld de,FIFO3
-	call sub_0ee1h		;9d53	cd e1 0e 	. . . 
+	call FIFO_READ		;9d53	cd e1 0e 	. . . 
 	jp c,l9debh		;9d56	da eb 9d 	. . . 
 	and 03fh		;9d59	e6 3f 	. ? 
 	cp 03ah		;9d5b	fe 3a 	. : 
@@ -13854,7 +13865,7 @@ la0bfh:
 	and 001h		;a0c9	e6 01 	. . 
 	ret nz			;a0cb	c0 	. 
 	ld de,FIFO3 
-	call sub_0ee1h		;a0cf	cd e1 0e 	. . . 
+	call FIFO_READ		;a0cf	cd e1 0e 	. . . 
 	ret c			;a0d2	d8 	. 
 	ld c,a			;a0d3	4f 	O 
 	ld a,(00014h)		;a0d4	3a 14 00 	: . . 
@@ -14375,7 +14386,7 @@ sub_a468h:
 	cp 0aah		;a47e	fe aa 	. . 
 	ret z			;a480	c8 	. 
 	ld de,FIFO4		;a481	11 ec 40 	. . @ 
-	call sub_0ee1h		;a484	cd e1 0e 	. . . 
+	call FIFO_READ		;a484	cd e1 0e 	. . . 
 	ret c			;a487	d8 	. 
 	ld c,a			;a488	4f 	O 
 	ld a,(CFG9)		;a489	3a 15 00 	: . . 
@@ -14669,7 +14680,7 @@ la682h:
 	cp 0aah		;a686	fe aa 	. . 
 	ret nz			;a688	c0 	. 
 	ld de,FIFO4		;a689	11 ec 40 	. . @ 
-	call sub_0ee1h		;a68c	cd e1 0e 	. . . 
+	call FIFO_READ		;a68c	cd e1 0e 	. . . 
 	ret c			;a68f	d8 	. 
 	res 7,a		;a690	cb bf 	. . 
 	ld b,003h		;a692	06 03 	. . 
@@ -14882,7 +14893,7 @@ la824h:
 	ld a,05ch		;a827	3e 5c 	> \ 
 	ret			;a829	c9 	. 
 	ld de,FIFO6		;a82a	11 f4 40 	. . @ 
-	call sub_0ee1h		;a82d	cd e1 0e 	. . . 
+	call FIFO_READ		;a82d	cd e1 0e 	. . . 
 	ret c			;a830	d8 	. 
 	ld c,a			;a831	4f 	O 
 	ld a,(00017h)		;a832	3a 17 00 	: . . 
@@ -16397,7 +16408,7 @@ lb467h:
 	ld c,000h		;b467	0e 00 	. . 
 lb469h:
 	cp 05ch		;b469	fe 5c 	. \ 
-	call z,01041h		;b46b	cc 41 10 	. A . 
+	call z,KBD_TRANSLATE		;b46b	cc 41 10 	. A . 
 	call OUT_CH		;b46e	cd 84 10 	. . . 
 	inc de			;b471	13 	. 
 	inc ix		;b472	dd 23 	. # 
@@ -18910,7 +18921,7 @@ lc85eh:
 	ret			;c86b	c9 	. 
 sub_c86ch:
 	ld de,FIFO_SERIAL		;c86c	11 e0 40 	. . @ 
-	call sub_0ee1h		;c86f	cd e1 0e 	. . . 
+	call FIFO_READ		;c86f	cd e1 0e 	. . . 
 	ret c			;c872	d8 	. 
 	ld b,006h		;c873	06 06 	. . 
 	call sub_1ae6h		;c875	cd e6 1a 	. . . 
