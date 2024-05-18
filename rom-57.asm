@@ -117,8 +117,44 @@ PORT_DATAKBD_DATA: equ 0x01		; Keyboard data port
 PORT_SERIAL_CMD: equ 0x02		; Serial port A (external) command
 PORT_DATAKBD_CMD: equ 0x03		; Keyboard command port
 
+PORT_04: equ 0x04				; Unknown
+PORT_05: equ 0x05				; Unknown
+
+PORT_06: equ 0x06				; Unknown
+PORT_07: equ 0x07				; Unknown
+
+PORT_12: equ 0x12				; Unknown (DART Command)
+
+PORT_13: equ 0x13				; Something serial command (of PORT_14?)
+PORT_14: equ 0x14				; Unknown
+
+PORT_16: equ 0x16				; Unknown
+PORT_17: equ 0x17				; Unknown
+
+PORT_20: equ 0x20				; Unknown
+PORT_21: equ 0x21				; Unknown
+PORT_22: equ 0x22				; Unknown
+PORT_23: equ 0x23				; Unknown
+PORT_24: equ 0x24				; Unknown
+PORT_25: equ 0x25				; Unknown
+PORT_26: equ 0x26				; Unknown
+PORT_27: equ 0x27				; Unknown
+; PORT_22 to PORT_2F exists (see usage of PORT_20 around c4a9)
+PORT_2C: equ 0x2c				; Unknown (link with 2D)
+PORT_2D: equ 0x2d				; Unknown (link with 2C)
+PORT_2E: equ 0x2e				; Unknown
+PORT_2F: equ 0x2f				; Unknown
+
+
+PORT_30: equ 0x30				; Unknown (datetime?) -- link with PORT_31 and PORT_20 too?
+PORT_31: equ 0x31				; Unknown
+
 PORT_DMA: equ 0x62				; DMA port
+
+PORT_70: equ 0x70				; Unknown (battery? shutdown?)
+
 PORT_MEM: equ 0xfe				; Memory mapping
+PORT_FF: equ 0xff				; Unknown
 
 ; Pointers to circular buffers (32 bytes) to handle data input
 ; First two bytes = where to insert
@@ -247,10 +283,15 @@ CFG10:
 	dw INTER_10
 
 ;	Unknown
-	db 0xff, 0xff, 0xff
+	db 0xff, 0xff
+CFG12:
+	db 0xff
 CFG9:
 	db 0xff
-	db 0xff, 0xff
+	db 0xff
+
+CFG13:
+	db 0xff
 
 ; DART documentation (https://www.cpcwiki.eu/index.php?title=Z80-DART/Z80-SIO_chip)
 
@@ -352,6 +393,7 @@ PORT_SERIAL_INIT:
 	;									Rx interrupt on all chars, parity does not affects vector
 	;									Wait/Ready disable
 
+PORT_12_INITA:
 ; Other DART init
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
 	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
@@ -394,7 +436,8 @@ CFG11:
 	db 0xff
 
 	db 0x00
-	
+
+PORT_16_INIT:
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
 	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
 	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
@@ -409,9 +452,11 @@ CFG11:
 	;									Rx interrupt on all chars, parity does not affects vector
 	;									Wait/Ready disable
 
+PORT_17_INIT2:
 	db 0x04, 0x4c, 0x05, 0xe8, 0x03, 0xc1, 0x01, 0x1c
 	; Idem above
 
+PORT_17_INIT3:
 	db 0x04, 0x8c, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
 	; 0x04 0x4c : %01 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x16
 	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
@@ -426,6 +471,7 @@ CFG11:
 	;									Rx interrupt on all chars, parity does not affects vector
 	;									Wait/Ready disable
 
+PORT_12_INITB:
 	db 0x04, 0xcc, 0x05, 0xe8, 0x03, 0x01, 0x01, 0x1c
 	; 0x04 0x4c : %11 00 11 0 0   =>	No Parity + 2 stop bits + Clock mode = x64
 	; 0x05 0xe8 : %1 11 0 1 0 0 0 =>	RTS disabled
@@ -480,7 +526,8 @@ ENDIF
 	dw INTER_DEFAULT
 	dw INTER_8C
 	dw INTER_8E
-PORT13_INIT2C:
+
+PORT13_INIT2C:		; Reused for port 17
 	db 0x04, 0x44, 0x05, 0x60, 0x03, 0x81, 0x01, 0x1c
 	; 0x04 0x44 : %01 00 01 0 0   =>	No Parity + 1 stop bits + Clock mode = x16
 	; 0x05 0x60 : %0 11 0 0 0 0 0 =>	RTS disabled
@@ -521,6 +568,7 @@ PORT13_INIT:
 	; 0x10 : %00 010 000		  => 	Reset Ext/Status Interrupts, next register 0
 	; 0x02 0x70 				  =>	Interrupt vector 0x70 + status
 
+PORT_17_INIT:
 	db 0x30, 0x10, 0x02, 0x80
 	; Idem above, interrupt vector 0x80 + status
 
@@ -657,7 +705,7 @@ INTER_76:
 INTER_8C:
 	exx			;0132	d9		.
 	push af			;0133	f5		.
-	ld c,014h		;0134	0e 14		. .
+	ld c,PORT_14
 	in a,(c)		;0136	ed 78		. x
 	ld b,a			;0138	47		G
 	cp 013h			;0139	fe 13		. .
@@ -856,37 +904,44 @@ WARM_BOOT:
 	call 0b3a9h		;02b2	cd a9 b3	. . .
 	ld a,(05b87h)		;02b5	3a 87 5b	: . [
 	ld b,a			;02b8	47		G
-	in a,(005h)		;02b9	db 05		. .
+	in a,(PORT_05)		;02b9	db 05		. .
 	and 030h		;02bb	e6 30		. 0
 	ld (053bch),a		;02bd	32 bc 53	2 . S
 	ld a,(053bdh)		;02c0	3a bd 53	: . S
-	out (005h),a		;02c3	d3 05		. .
+	out (PORT_05),a		;02c3	d3 05		. .
 	xor a			;02c5	af		.
 	ld (f5fb6),a		;02c6	32 b6 5f	2 . _
+
 	ld de,STACK_BASE+2		;02c9	11 af 52	. . R
-	ld hl,01766h		;02cc	21 66 17	! f .
-l02cfh:
+
+	ld hl,TASK_1
 	ld sp,04ff1h		;02cf	31 f1 4f	1 . O
 	call sub_034eh		;02d2	cd 4e 03	. N .
-	ld hl,l24c1h		;02d5	21 c1 24	! . $
+
+	ld hl,TASK_2		;02d5	21 c1 24	! . $
 	ld sp,05055h		;02d8	31 55 50	1 U P
 	call sub_034eh		;02db	cd 4e 03	. N .
-	ld hl,l2b8ch		;02de	21 8c 2b	! . +
+
+	ld hl,TASK_3		;02de	21 8c 2b	! . +
 	ld sp,050b9h		;02e1	31 b9 50	1 . P
 	call sub_034eh		;02e4	cd 4e 03	. N .
-	ld hl,EVENT_LOOP		;02e7	21 47 31	! G 1
+
+	ld hl,TASK_4		;02e7	21 47 31	! G 1
 	ld sp,0511dh		;02ea	31 1d 51	1 . Q
 	call sub_034eh		;02ed	cd 4e 03	. N .
-	ld hl,0914ah		;02f0	21 4a 91	! J .
+
+	ld hl,TASK_5		;02f0	21 4a 91	! J .
 	ld sp,05181h		;02f3	31 81 51	1 . Q
 	call sub_034eh		;02f6	cd 4e 03	. N .
-	ld hl,08b71h		;02f9	21 71 8b	! q .
+
+	ld hl,TASK_6		;02f9	21 71 8b	! q .
 	ld sp,051e5h		;02fc	31 e5 51	1 . Q
 	call sub_034eh		;02ff	cd 4e 03	. N .
-l0302h:
-	ld hl,l08aeh		;0302	21 ae 08	! . .
+
+	ld hl,TASK_7		;0302	21 ae 08	! . .
 	ld sp,05249h		;0305	31 49 52	1 I R
 	call sub_034eh		;0308	cd 4e 03	. N .
+
 	xor a			;030b	af		.
 	ld (de),a		;030c	12		.
 	inc de			;030d	13		.
@@ -895,7 +950,7 @@ l0302h:
 	call 08b2eh		;0312	cd 2e 8b	. . .
 l0315h:
 	ld hl,STACK_BASE+2
-	in a,(0ffh)		; ???
+	in a,(PORT_FF)		; ???
 l031ah:
 	ld e,(hl)
 	inc hl
@@ -918,7 +973,7 @@ l031ah:
 	ret
 
 ; All this needs a bit more investigation
-; I think there is soething stored at the bottom of the stack (STACK_BASE)
+; I think there is something stored at the bottom of the stack (STACK_BASE)
 ; and these routines restore everything for each
 ; "machine cycle" (treatment of one event)
 
@@ -1121,7 +1176,7 @@ l0461h:
 	ld (ix+007h),003h	;0479	dd 36 07 03	. 6 . .
 	jr l0492h		;047d	18 13		. .
 l047fh:
-	in a,(005h)		;047f	db 05		. .
+	in a,(PORT_05)		;047f	db 05		. .
 	ld b,a			;0481	47		G
 		;	b = b XOR 0xff if NEEDSOFFSETDE is MAGIC5
 	ld a,(NEEDSOFFSETDE)
@@ -1737,14 +1792,15 @@ l08a6h:
 	pop de			;08ab	d1		.
 	pop bc			;08ac	c1		.
 	ret			;08ad	c9		.
-l08aeh:
-	ld sp,05249h		;08ae	31 49 52	1 I R
-	ld b,007h		;08b1	06 07		. .
-l08b3h:
-	call sub_0334h		;08b3	cd 34 03	. 4 .
-	djnz l08b3h		;08b6	10 fb		. .
-	ld hl,l08aeh		;08b8	21 ae 08	! . .
-	push hl			;08bb	e5		.
+
+TASK_7:
+	ld sp,05249h
+	ld b,7
+_loop:
+	call sub_0334h
+	djnz _loop
+	ld hl,TASK_7
+	push hl
 	ld a,(05fe1h)		;08bc	3a e1 5f	: . _
 	or a			;08bf	b7		.
 	ret z			;08c0	c8		.
@@ -2159,8 +2215,6 @@ sub_0b55h:
 	inc ix			;0b62	dd 23		. #
 	ret			;0b64	c9		.
 
-
-
 ; start of data
 l0b65h:
 	db 0x75, 0x0b, 0x85                                 ; 0b60 
@@ -2209,9 +2263,6 @@ l0b65h:
 	db 0x9b, 0x1c, 0x1c, 0x9c, 0x1d, 0x1d, 0x9d, 0x1e   ; 0cb8
 	db 0x1e, 0x9e, 0x1f, 0x1f, 0x9f, 0x00, 0x00, 0x80   ; 0cc0
 	db 0x80, 0x01, 0x01, 0x81, 0x02, 0x02, 0x82, 0x82   ; 0cc8
-
-	l0ccdh: equ 0x0ccd		; maybe important
-
 	db 0x03, 0x03, 0x83, 0x04, 0x04, 0x84, 0x84, 0x05   ; 0cd0
 	db 0x05, 0x85, 0x06, 0x06, 0x86, 0x86, 0x07, 0x07   ; 0cd8
 	db 0x87, 0x08, 0x08, 0x88, 0x88, 0x09, 0x09, 0x89   ; 0ce0
@@ -3674,7 +3725,7 @@ l15a0h:
 	and (hl)		;15a2	a6		.
 l15a3h:
 	cpl			;15a3	2f		/
-	out (004h),a		;15a4	d3 04		. .
+	out (PORT_04),a		;15a4	d3 04		. .
 	ld a,(0602eh)		;15a6	3a 2e 60	: . `
 	cp 000h			;15a9	fe 00		. .
 	jr nz,l15aeh		;15ab	20 01		  .
@@ -3916,12 +3967,11 @@ l173fh:
 
 	db "TAPE ACTION" ; 174c
 	db 5 ; 1757
-	db "PLAYER NUMBER 1" ; 1758
+	db "PLAYER NUMBER " ; 1758
 
-; How do we end here?
-
-	pop af			;1767	f1		.
-	ld c,a			;1768	4f		O
+; edition management task?
+TASK_1:
+	ld sp, 0x4ff1
 	call NEXT_MACRO_OR_KEY	;1769	cd a7 17	. . .
 	ld hl,FLAGS
 	bit FLAG_DISP,(hl)		;176f	cb 66		. f
@@ -4010,7 +4060,7 @@ l17ech:
 	ld b,a			;17f1	47		G
 	call sub_82b6h		; Some kind of key mapping
 TYPE_KEY:
-	in a,(0ffh)		;17f5	db ff		. .
+	in a,(PORT_FF)		;17f5	db ff		. .
 	ld hl,04f78h		;17f7	21 78 4f	! x O
 	cp 0ffh			;17fa	fe ff		. .
 	jr z,l1839h		;17fc	28 3b		( ;
@@ -4119,7 +4169,7 @@ l18b0h:
 	cp 099h			;18b8	fe 99		. .
 	call z,08fa5h		;18ba	cc a5 8f	. . .
 	ld a,b			;18bd	78		x
-	out (014h),a		;18be	d3 14		. .
+	out (PORT_14),a		;18be	d3 14		. .
 	jp NEXT_KEY		;18c0	c3 d6 17	. . .
 l18c3h:
 	ld a,b			;18c3	78		x
@@ -4172,7 +4222,7 @@ l1916h:
 	cp 001h			;191a	fe 01		. .
 	jp nz,l17aah		;191c	c2 aa 17	. . .
 	ld a,b			;191f	78		x
-	out (014h),a		;1920	d3 14		. .
+	out (PORT_14),a		;1920	d3 14		. .
 	jp l17aah		;1922	c3 aa 17	. . .
 l1925h:
 	xor a			;1925	af		.
@@ -4252,7 +4302,7 @@ l19c1h:
 	cp 004h			;19c1	fe 04		. .
 	jr nz,l19d0h		;19c3	20 0b		  .
 	M_OUT_MSG 0xd047, 0x23 ; "BATTERY DISCONNECTED" CRLF "TURN POWER OFF"
-	out (070h),a		;19cb	d3 70		. p
+	out (PORT_70),a		;19cb	d3 70		. p
 	jp l1934h		;19cd	c3 34 19	. 4 .
 l19d0h:
 	M_OUT_MSG 0xd06a, 0x10 ; "REQUEST CANCELED"
@@ -4371,9 +4421,9 @@ l1a86h:
 	jp l1986h		;1a92	c3 86 19	. . .
 l1a95h:
 	ld a,00fh		;1a95	3e 0f		> .
-	out (020h),a		;1a97	d3 20		.  
+	out (PORT_20),a		;1a97	d3 20		.  
 	ld a,000h		;1a99	3e 00		> .
-	out (02fh),a		;1a9b	d3 2f		. /
+	out (PORT_2F),a		;1a9b	d3 2f		. /
 	call NEXT_MACRO_OR_KEY	;1a9d	cd a7 17	. . .
 	jp l1925h		;1aa0	c3 25 19	. % .
 ; Input a = 0xNM
@@ -5893,10 +5943,11 @@ sub_24b2h:
 	add hl,de		;24be	19		.
 	pop de			;24bf	d1		.
 	ret			;24c0	c9		.
-l24c1h:
+
+TASK_2:
 	ld sp,05055h		;24c1	31 55 50	1 U P
 	call sub_0334h		;24c4	cd 34 03	. 4 .
-	ld hl,l24c1h		;24c7	21 c1 24	! . $
+	ld hl,TASK_2		;24c7	21 c1 24	! . $
 	push hl			;24ca	e5		.
 	call sub_1704h		;24cb	cd 04 17	. . .
 	ld a,(FLAGS)		;24ce	3a 79 4f	: y O
@@ -6580,12 +6631,15 @@ l29ech:
 	ld hl,04a6ah		;29ec	21 6a 4a	! j J
 	ld de,04a6eh		;29ef	11 6e 4a	. n J
 	ld bc,00048h		;29f2	01 48 00	. H .
-	ldir			;29f5	ed b0		. .
-	ld hl,04c06h		;29f7	21 06 4c	! . L
-	ld de,04c07h		;29fa	11 07 4c	. . L
-	ld (hl),020h		;29fd	36 20		6  
-	ld bc,l02cfh		;29ff	01 cf 02	. . .
+	ldir
+
+		; Copy 720 ' ' at 04c06
+	ld hl,04c06h
+	ld de,04c07h
+	ld (hl),020h
+	ld bc,719
 	ldir			;2a02	ed b0		. .
+
 	jr l29e9h		;2a04	18 e3		. .
 l2a06h:
 	ld hl,04a8ah		;2a06	21 8a 4a	! . J
@@ -6782,10 +6836,11 @@ l2b7eh:
 	call 08879h		;2b85	cd 79 88	. y .
 	ld hl,05cc6h		;2b88	21 c6 5c	! . \
 	ret			;2b8b	c9		.
-l2b8ch:
+
+TASK_3:
 	ld sp,050b9h		;2b8c	31 b9 50	1 . P
 	call sub_0334h		;2b8f	cd 34 03	. 4 .
-	ld hl,l2b8ch		;2b92	21 8c 2b	! . +
+	ld hl,TASK_3		;2b92	21 8c 2b	! . +
 	push hl			;2b95	e5		.
 	ld a,(FLAGS)		;2b96	3a 79 4f	: y O
 	bit FLAG_DISP,a			;2b99	cb 67		. g
@@ -7524,9 +7579,9 @@ l311fh:
 
 ; 0511dh has be initialized with sub_034eh
 ; Purpose unclear
-EVENT_LOOP:
+TASK_4:
 	ld sp,0511dh
-	ld hl,EVENT_LOOP
+	ld hl,TASK_4
 	push hl			; We'll return here
 	ld a,(v52bf)
 	ld b,a
@@ -7540,10 +7595,10 @@ EVENT_LOOP:
 	call HANDLE_FIFO4_1		; Something FIFO4 if CFG9!=0xaa
 	call HANDLE_FIFO4_2		; Something FIFO4 if CFG9==0xaa
 	call HANDLE_FIFO6		; Something FIFO6
-	call sub_9413h
-	ld a,(05b7bh)		;316e	3a 7b 5b	: { [
+	call sub_9413h			; Something PORT_05
+	ld a,(05b7bh)
 	and %00000001
-	call nz,sub_9d2dh		;3173	c4 2d 9d	. - .
+	call nz,sub_9d2dh		; Something PORT_12 and FIFO3
 	call sub_94b5h		; Do something if v5fa7==0xaa
 	call sub_33dch		; Do something if CFG1==0x0aa
 	call sub_33ffh		; Do something if CFG5!=0xaa
@@ -7582,10 +7637,10 @@ l31afh:
 	ld a,(CFG7)		;31b6	3a 3c 00	: < .
 	cp 0bbh			;31b9	fe bb		. .
 	jr nz,l31c1h		;31bb	20 04		  .
-	in a,(030h)		;31bd	db 30		. 0
+	in a,(PORT_30)		;31bd	db 30		. 0
 	jr l31c3h		;31bf	18 02		. .
 l31c1h:
-	in a,(020h)		;31c1	db 20		.  
+	in a,(PORT_20)		;31c1	db 20		.  
 l31c3h:
 	ld a,(CFG6)		;31c3	3a 0d 00	: . .
 	cp 0aah			;31c6	fe aa		. .
@@ -7640,29 +7695,29 @@ l3204h:
 	jp l3248h		;3217	c3 48 32	. H 2
 l321ah:
 	ld a,005h		;321a	3e 05		> .
-	out (012h),a		;321c	d3 12		. .
+	out (PORT_12),a		;321c	d3 12		. .
 	ld a,0a0h		;321e	3e a0		> .
-	out (012h),a		;3220	d3 12		. .
+	out (PORT_12),a		;3220	d3 12		. .
 	ld a,003h		;3222	3e 03		> .
 	ld (060cch),a		;3224	32 cc 60	2 . `
 	jr l3248h		;3227	18 1f		. .
 l3229h:
 	ld a,005h		;3229	3e 05		> .
-	out (012h),a		;322b	d3 12		. .
+	out (PORT_12),a		;322b	d3 12		. .
 	ld a,020h		;322d	3e 20		>  
-	out (012h),a		;322f	d3 12		. .
+	out (PORT_12),a		;322f	d3 12		. .
 	ld a,005h		;3231	3e 05		> .
-	out (012h),a		;3233	d3 12		. .
+	out (PORT_12),a		;3233	d3 12		. .
 	ld a,0a0h		;3235	3e a0		> .
-	out (012h),a		;3237	d3 12		. .
+	out (PORT_12),a		;3237	d3 12		. .
 	sub a			;3239	97		.
 	ld (060cch),a		;323a	32 cc 60	2 . `
 	jr l3248h		;323d	18 09		. .
 l323fh:
 	ld a,005h		;323f	3e 05		> .
-	out (012h),a		;3241	d3 12		. .
+	out (PORT_12),a		;3241	d3 12		. .
 	ld a,(060ceh)		;3243	3a ce 60	: . `
-	out (012h),a		;3246	d3 12		. .
+	out (PORT_12),a		;3246	d3 12		. .
 l3248h:
 	ld hl,052c4h		;3248	21 c4 52	! . R
 	inc (hl)		;324b	34		4
@@ -7759,8 +7814,8 @@ sub_32d1h:
 	ret z			;32e3	c8		.
 	xor a			;32e4	af		.
 	ld (060cfh),a		;32e5	32 cf 60	2 . `
-	in a,(016h)		;32e8	db 16		. .
-	and 018h		;32ea	e6 18		. .
+	in a,(PORT_16)		;32e8	db 16		. .
+	and %00011000
 	ret z			;32ec	c8		.
 	ld hl,l32fdh		;32ed	21 fd 32	! . 2
 	ld de,0415dh		;32f0	11 5d 41	. ] A
@@ -7954,7 +8009,7 @@ l33f4h:
 	set 3,a			;33f7	cb df		. .
 l33f9h:
 	ld (053bdh),a		;33f9	32 bd 53	2 . S
-	out (005h),a		;33fc	d3 05		. .
+	out (PORT_05),a		;33fc	d3 05		. .
 	ret			;33fe	c9		.
 sub_33ffh:
 	ld a,(CFG5)		;33ff	3a 0c 00	: . .
@@ -7969,7 +8024,7 @@ sub_33ffh:
 	ld (05fd6h),a		;3411	32 d6 5f	2 . _
 	ld a,(05fd7h)		;3414	3a d7 5f	: . _
 	ld b,a			;3417	47		G
-	in a,(004h)		;3418	db 04		. .
+	in a,(PORT_04)		;3418	db 04		. .
 	and 030h		;341a	e6 30		. 0
 	cp b			;341c	b8		.
 	ret z			;341d	c8		.
@@ -8047,7 +8102,7 @@ sub_3496h:
 	res 2,a			;34ae	cb 97		. .
 l34b0h:
 	ld (053bdh),a		;34b0	32 bd 53	2 . S
-	out (005h),a		;34b3	d3 05		. .
+	out (PORT_05),a		;34b3	d3 05		. .
 	ret			;34b5	c9		.
 l34b6h:
 	ld a,(053bdh)		;34b6	3a bd 53	: . S
@@ -8058,7 +8113,7 @@ l34bdh:
 	ret nz			;34bf	c0		.
 	ld a,(05baeh)		;34c0	3a ae 5b	: . [
 	ld b,a			;34c3	47		G
-	in a,(005h)		;34c4	db 05		. .
+	in a,(PORT_05)		;34c4	db 05		. .
 	and 020h		;34c6	e6 20		.  
 	cp b			;34c8	b8		.
 	ret z			;34c9	c8		.
@@ -10599,7 +10654,7 @@ l883bh:
 	ret			;8843	c9 	. 
 l8844h:
 	ld a,(05cc6h)		;8844	3a c6 5c 	: . \ 
-	out (005h),a		;8847	d3 05 	. . 
+	out (PORT_05),a		;8847	d3 05 	. . 
 	ret			;8849	c9 	. 
 sub_884ah:
 	push af			;884a	f5 	. 
@@ -10913,7 +10968,7 @@ sub_8a40h:
 	ld a,l			;8a4a	7d 	} 
 	cp 020h		;8a4b	fe 20 	.   
 	jr nz,l8a53h		;8a4d	20 04 	  . 
-	in a,(0ffh)		;8a4f	db ff 	. . 
+	in a,(PORT_FF)		;8a4f	db ff 	. . 
 	cp h			;8a51	bc 	. 
 	ret z			;8a52	c8 	. 
 l8a53h:
@@ -11051,7 +11106,7 @@ sub_8b41h:
 	ld (05ea9h),a		;8b45	32 a9 5e 	2 . ^ 
 	ret			;8b48	c9 	. 
 	ld a,038h		;8b49	3e 38 	> 8 
-	out (016h),a		;8b4b	d3 16 	. . 
+	out (PORT_16),a		;8b4b	d3 16 	. . 
 	ld hl,l8b5ah		;8b4d	21 5a 8b 	! Z . 
 	push hl			;8b50	e5 	. 
 	ld a,001h		;8b51	3e 01 	> . 
@@ -11075,7 +11130,8 @@ l8b5ah:
 	ld (05eaah),a		;8b6c	32 aa 5e 	2 . ^ 
 	pop af			;8b6f	f1 	. 
 	ret			;8b70	c9 	. 
-l8b71h:
+
+TASK_6:
 	ld sp,051e5h		;8b71	31 e5 51 	1 . Q 
 	ld hl,l8c21h		;8b74	21 21 8c 	! ! . 
 	push hl			;8b77	e5 	. 
@@ -11168,7 +11224,8 @@ l8c21h:
 	xor a			;8c21	af 	. 
 	ld (05eaah),a		;8c22	32 aa 5e 	2 . ^ 
 	call sub_0334h		;8c25	cd 34 03 	. 4 . 
-	jp l8b71h		;8c28	c3 71 8b 	. q . 
+	jp TASK_6		;8c28	c3 71 8b 	. q . 
+
 l8c2bh:
 	ld a,082h		;8c2b	3e 82 	> . 
 	ld (05cbah),a		;8c2d	32 ba 5c 	2 . \ 
@@ -11503,7 +11560,7 @@ l8eb4h:
 	jp l8f7fh		;8ebc	c3 7f 8f 	.  . 
 l8ebfh:
 	ld a,(05cc6h)		;8ebf	3a c6 5c 	: . \ 
-	out (005h),a		;8ec2	d3 05 	. . 
+	out (PORT_05),a		;8ec2	d3 05 	. . 
 	jp l8f7fh		;8ec4	c3 7f 8f 	.  . 
 l8ec7h:
 	ld hl,(05cc3h)		;8ec7	2a c3 5c 	* . \ 
@@ -11634,7 +11691,7 @@ sub_8fa5h:
 	ld bc,00009h		;8fcd	01 09 00 	. . . 
 	ld (05ea1h),bc		;8fd0	ed 43 a1 5e 	. C . ^ 
 	ld a,099h		;8fd4	3e 99 	> . 
-	out (014h),a		;8fd6	d3 14 	. . 
+	out (PORT_14),a		;8fd6	d3 14 	. . 
 	M_OUT_MSG 0xd730, 0x0a ; CRLF "OFF LINE "
 	jr l8fe3h		;8fde	18 03 	. . 
 l8fe0h:
@@ -11811,10 +11868,11 @@ l911bh:
 l9145h:
 	ldir		;9145	ed b0 	. . 
 	jp l1925h		;9147	c3 25 19 	. % . 
-l914ah:
+
+TASK_5:
 	ld sp,05181h		;914a	31 81 51 	1 . Q 
 	call sub_0334h		;914d	cd 34 03 	. 4 . 
-	ld hl,l914ah		;9150	21 4a 91 	! J . 
+	ld hl,TASK_5		;9150	21 4a 91 	! J . 
 	push hl			;9153	e5 	. 
 	ld a,(0000fh)		;9154	3a 0f 00 	: . . 
 	cp 0aah		;9157	fe aa 	. . 
@@ -11834,8 +11892,8 @@ l916ch:
 	and 004h		;9176	e6 04 	. . 
 	jr nz,l9185h		;9178	20 0b 	  . 
 	ld a,010h		;917a	3e 10 	> . 
-	out (016h),a		;917c	d3 16 	. . 
-	in a,(016h)		;917e	db 16 	. . 
+	out (PORT_16),a		;917c	d3 16 	. . 
+	in a,(PORT_16)		;917e	db 16 	. . 
 	bit 5,a		;9180	cb 6f 	. o 
 	call nz,sub_91e4h		;9182	c4 e4 91 	. . . 
 l9185h:
@@ -11849,16 +11907,16 @@ l9190h:
 	or a			;9193	b7 	. 
 	jr nz,l91cbh		;9194	20 35 	  5 
 	ld a,010h		;9196	3e 10 	> . 
-	out (016h),a		;9198	d3 16 	. . 
+	out (PORT_16),a		;9198	d3 16 	. . 
 	ld a,(0000fh)		;919a	3a 0f 00 	: . . 
 	cp 0aah		;919d	fe aa 	. . 
 	jr nz,l91a9h		;919f	20 08 	  . 
-	in a,(016h)		;91a1	db 16 	. . 
+	in a,(PORT_16)		;91a1	db 16 	. . 
 	and 004h		;91a3	e6 04 	. . 
 	cp 004h		;91a5	fe 04 	. . 
 	jr l91afh		;91a7	18 06 	. . 
 l91a9h:
-	in a,(016h)		;91a9	db 16 	. . 
+	in a,(PORT_16)		;91a9	db 16 	. . 
 	and 024h		;91ab	e6 24 	. $ 
 	cp 024h		;91ad	fe 24 	. $ 
 l91afh:
@@ -11873,7 +11931,7 @@ l91afh:
 	ld a,(hl)			;91c1	7e 	~ 
 	inc hl			;91c2	23 	# 
 	ld (05e9fh),hl		;91c3	22 9f 5e 	" . ^ 
-	out (014h),a		;91c6	d3 14 	. . 
+	out (PORT_14),a		;91c6	d3 14 	. . 
 	call sub_8b36h		;91c8	cd 36 8b 	. 6 . 
 l91cbh:
 	call sub_0334h		;91cb	cd 34 03 	. 4 . 
@@ -11883,9 +11941,9 @@ l91cbh:
 	jr l9190h		;91d3	18 bb 	. . 
 sub_91d5h:
 	ld a,005h		;91d5	3e 05 	> . 
-	out (016h),a		;91d7	d3 16 	. . 
+	out (PORT_16),a		;91d7	d3 16 	. . 
 	ld a,0eah		;91d9	3e ea 	> . 
-	out (016h),a		;91db	d3 16 	. . 
+	out (PORT_16),a		;91db	d3 16 	. . 
 	ret			;91dd	c9 	. 
 l91deh:
 	ld a,(06039h)		;91de	3a 39 60 	: 9 ` 
@@ -11899,9 +11957,9 @@ sub_91e4h:
 	ret			;91ee	c9 	. 
 l91efh:
 	ld a,005h		;91ef	3e 05 	> . 
-	out (016h),a		;91f1	d3 16 	. . 
+	out (PORT_16),a		;91f1	d3 16 	. . 
 	ld a,0e8h		;91f3	3e e8 	> . 
-	out (016h),a		;91f5	d3 16 	. . 
+	out (PORT_16),a		;91f5	d3 16 	. . 
 	xor a			;91f7	af 	. 
 	ld (06039h),a		;91f8	32 39 60 	2 9 ` 
 	ret			;91fb	c9 	. 
@@ -12082,8 +12140,8 @@ l93b0h:
 l93bfh:
 	call sub_0334h		;93bf	cd 34 03 	. 4 . 
 	ld a,010h		;93c2	3e 10 	> . 
-	out (016h),a		;93c4	d3 16 	. . 
-	in a,(016h)		;93c6	db 16 	. . 
+	out (PORT_16),a		;93c4	d3 16 	. . 
+	in a,(PORT_16)		;93c6	db 16 	. . 
 	and 020h		;93c8	e6 20 	.   
 	ret nz			;93ca	c0 	. 
 	ld a,(05ea7h)		;93cb	3a a7 5e 	: . ^ 
@@ -12107,9 +12165,9 @@ l93e5h:
 	cp 000h		;93ee	fe 00 	. . 
 	jr z,l93fch		;93f0	28 0a 	( . 
 	ld a,010h		;93f2	3e 10 	> . 
-	out (016h),a		;93f4	d3 16 	. . 
-	in a,(016h)		;93f6	db 16 	. . 
-	and 020h		;93f8	e6 20 	.   
+	out (PORT_16),a		;93f4	d3 16 	. . 
+	in a,(PORT_16)		;93f6	db 16 	. . 
+	and %00100000   
 	jr nz,l93e5h		;93fa	20 e9 	  . 
 l93fch:
 	ld a,005h		;93fc	3e 05 	> . 
@@ -12127,7 +12185,7 @@ sub_9413h:
 	call sub_949bh		;9413	cd 9b 94 	. . . 
 	ld a,(053bch)		;9416	3a bc 53 	: . S 
 	ld b,a			;9419	47 	G 
-	in a,(005h)		;941a	db 05 	. . 
+	in a,(PORT_05)		;941a	db 05 	. . 
 	and 030h		;941c	e6 30 	. 0 
 	cp b			;941e	b8 	. 
 	ret z			;941f	c8 	. 
@@ -12202,11 +12260,11 @@ l9474h:
 	ld a,h			;948d	7c 	| 
 	and l			;948e	a5 	. 
 	xor b			;948f	a8 	. 
-	out (005h),a		;9490	d3 05 	. . 
+	out (PORT_05),a		;9490	d3 05 	. . 
 	ld a,b			;9492	78 	x 
 	and 00fh		;9493	e6 0f 	. . 
 	ld (053bdh),a		;9495	32 bd 53 	2 . S 
-	out (005h),a		;9498	d3 05 	. . 
+	out (PORT_05),a		;9498	d3 05 	. . 
 	ret			;949a	c9 	. 
 sub_949bh:
 	ld a,(CFG6)		;949b	3a 0d 00 	: . . 
@@ -12214,7 +12272,7 @@ sub_949bh:
 	ret nz			;94a0	c0 	. 
 	ld a,(05baeh)		;94a1	3a ae 5b 	: . [ 
 	ld b,a			;94a4	47 	G 
-	in a,(005h)		;94a5	db 05 	. . 
+	in a,(PORT_05)		;94a5	db 05 	. . 
 	and 020h		;94a7	e6 20 	.   
 	cp b			;94a9	b8 	. 
 	ret z			;94aa	c8 	. 
@@ -12225,8 +12283,8 @@ sub_949bh:
 	inc (hl)			;94b3	34 	4 
 	ret			;94b4	c9 	. 
 sub_94b5h:
-	ld a,(v5fa7)		;94b5	3a a7 5f 	: . _ 
-	cp 0aah		;94b8	fe aa 	. . 
+	ld a,(v5fa7)
+	cp 0xaa
 	ret nz			;94ba	c0 	. 
 	ld a,003h		;94bb	3e 03 	> . 
 	call SETMEMMAP		;94bd	cd 1a 0f 	. . . 
@@ -13401,8 +13459,8 @@ sub_9d2dh:
 	or a			;9d37	b7 	. 
 	jp nz,l9e27h		;9d38	c2 27 9e 	. ' . 
 	ld a,010h		;9d3b	3e 10 	> . 
-	out (012h),a		;9d3d	d3 12 	. . 
-	in a,(012h)		;9d3f	db 12 	. . 
+	out (PORT_12),a		;9d3d	d3 12 	. . 
+	in a,(PORT_12)		;9d3f	db 12 	. . 
 	and 008h		;9d41	e6 08 	. . 
 	jp z,l9e0dh		;9d43	ca 0d 9e 	. . . 
 	sub a			;9d46	97 	. 
@@ -13485,9 +13543,9 @@ l9debh:
 	or a			;9df4	b7 	. 
 	jr nz,l9e0dh		;9df5	20 16 	  . 
 	ld a,010h		;9df7	3e 10 	> . 
-	out (012h),a		;9df9	d3 12 	. . 
-	in a,(012h)		;9dfb	db 12 	. . 
-	and 008h		;9dfd	e6 08 	. . 
+	out (PORT_12),a		;9df9	d3 12 	. . 
+	in a,(PORT_12)		;9dfb	db 12 	. . 
+	and %00001000
 	jr nz,l9e0dh		;9dff	20 0c 	  . 
 	call sub_9eb4h		;9e01	cd b4 9e 	. . . 
 	ld a,(06070h)		;9e04	3a 70 60 	: p ` 
@@ -13574,9 +13632,9 @@ l9e75h:
 	ret			;9eb3	c9 	. 
 sub_9eb4h:
 	ld a,005h		;9eb4	3e 05 	> . 
-	out (012h),a		;9eb6	d3 12 	. . 
+	out (PORT_12),a		;9eb6	d3 12 	. . 
 	ld a,020h		;9eb8	3e 20 	>   
-	out (012h),a		;9eba	d3 12 	. . 
+	out (PORT_12),a		;9eba	d3 12 	. . 
 	ld a,001h		;9ebc	3e 01 	> . 
 	ld (060cch),a		;9ebe	32 cc 60 	2 . ` 
 	ld a,0ffh		;9ec1	3e ff 	> . 
@@ -13862,7 +13920,7 @@ HANDLE_KBD:
 	call FIFO_READ		;a0cf	cd e1 0e 	. . . 
 	ret c			;a0d2	d8 	. 
 	ld c,a			;a0d3	4f 	O 
-	ld a,(00014h)		;a0d4	3a 14 00 	: . . 
+	ld a,(CFG12)		;a0d4	3a 14 00 	: . . 
 	cp 0aah		;a0d7	fe aa 	. . 
 	ld a,c			;a0d9	79 	y 
 	jp z,la2afh		;a0da	ca af a2 	. . . 
@@ -15486,7 +15544,7 @@ lac5dh:
 	xor l			;ac6c	ad 	. 
 	pop hl			;ac6d	e1 	. 
 	call sub_2a82h		;ac6e	cd 82 2a 	. . * 
-	ld a,(00014h)		;ac71	3a 14 00 	: . . 
+	ld a,(CFG12)		;ac71	3a 14 00 	: . . 
 	cp 0ffh		;ac74	fe ff 	. . 
 	jp nz,laed0h		;ac76	c2 d0 ae 	. . . 
 	M_OUT_MSG 0xd7cf, 0x03 ; 0F "AP"
@@ -15554,7 +15612,7 @@ lad29h:
 	jp ladb1h		;ad4e	c3 b1 ad 	. . . 
 	pop hl			;ad51	e1 	. 
 	call sub_2a82h		;ad52	cd 82 2a 	. . * 
-	ld a,(00014h)		;ad55	3a 14 00 	: . . 
+	ld a,(CFG12)		;ad55	3a 14 00 	: . . 
 	cp 0aah		;ad58	fe aa 	. . 
 	jp nz,laed0h		;ad5a	c2 d0 ae 	. . . 
 	ld iy,v53c2		;ad5d	fd 21 c2 53 	. ! . S 
@@ -15882,7 +15940,7 @@ sub_b05ch:
 	pop de			;b079	d1 	. 
 	pop hl			;b07a	e1 	. 
 	inc hl			;b07b	23 	# 
-	in a,(0ffh)		;b07c	db ff 	. . 
+	in a,(PORT_FF)
 	jr sub_b05ch		;b07e	18 dc 	. . 
 lb080h:
 	pop hl			;b080	e1 	. 
@@ -16955,7 +17013,7 @@ sub_b821h:
 	cp 005h		;b82d	fe 05 	. . 
 	jr z,lb837h		;b82f	28 06 	( . 
 	ld a,(hl)			;b831	7e 	~ 
-	out (005h),a		;b832	d3 05 	. . 
+	out (PORT_05),a		;b832	d3 05 	. . 
 	ldir		;b834	ed b0 	. . 
 	ret			;b836	c9 	. 
 lb837h:
@@ -17834,39 +17892,39 @@ sub_bf2fh:
 ; Looks like initialisation to me
 INIT:
 	ld a,007h		;c000	3e 07 	> . 
-	out (006h),a		;c002	d3 06 	. . 
-	out (007h),a		;c004	d3 07 	. . 
+	out (PORT_06),a		;c002	d3 06 	. . 
+	out (PORT_07),a		;c004	d3 07 	. . 
 	ld a,(CFG5)		;c006	3a 0c 00 	: . . 
 	cp 0aah		;c009	fe aa 	. . 
 	jr nz,lc017h		;c00b	20 0a 	  . 
 	ld a,0cfh		;c00d	3e cf 	> . 
-	out (006h),a		;c00f	d3 06 	. . 
+	out (PORT_06),a		;c00f	d3 06 	. . 
 	ld a,000h		;c011	3e 00 	> . 
-	out (006h),a		;c013	d3 06 	. . 
+	out (PORT_06),a		;c013	d3 06 	. . 
 	jr lc01fh		;c015	18 08 	. . 
 lc017h:
 	ld a,0cfh		;c017	3e cf 	> . 
-	out (006h),a		;c019	d3 06 	. . 
+	out (PORT_06),a		;c019	d3 06 	. . 
 	ld a,0ffh		;c01b	3e ff 	> . 
-	out (006h),a		;c01d	d3 06 	. . 
+	out (PORT_06),a		;c01d	d3 06 	. . 
 lc01fh:
-	ld a,0cfh		;c01f	3e cf 	> . 
-	out (007h),a		;c021	d3 07 	. . 
-	ld a,0f0h		;c023	3e f0 	> . 
-	out (007h),a		;c025	d3 07 	. . 
+	ld a,0xcf
+	out (PORT_07),a
+	ld a,0xf0
+	out (PORT_07),a
 
 	im 2			; Interrupt mode 2
 	xor a			;
 	ld i,a			; I = 0, so CPU jumps to address stored at (0x0000+databus)
 
-	ld a,097h		;c02c	3e 97 	> . 
-	out (007h),a		;c02e	d3 07 	. . 
-	ld a,07fh		;c030	3e 7f 	>  
-	out (007h),a		;c032	d3 07 	. . 
-	ld a,010h		;c034	3e 10 	> . 
-	out (007h),a		;c036	d3 07 	. . 
-	ld a,(053bdh)		;c038	3a bd 53 	: . S 
-	ld (5),a		;c03b	32 05 00 	2 . . 
+	ld a,0x97
+	out (PORT_07),a
+	ld a,0x7f
+	out (PORT_07),a
+	ld a,0x10
+	out (PORT_07),a
+	ld a,(053bdh)
+	ld (5),a				; ??? Makes no sense, bug?
 
 		; Init keyboard
 	ld b,4
@@ -17906,45 +17964,49 @@ lc01fh:
 _init:
 	otir
 
-; FReD continue parsing init data
-	ld c,012h		;c082	0e 12 	. . 
-	ld b,008h		;c084	06 08 	. . 
-	ld hl,00028h		;c086	21 28 00 	! ( . 
-	ld a,(00014h)		;c089	3a 14 00 	: . . 
-	cp 0aah		;c08c	fe aa 	. . 
-	jr nz,lc093h		;c08e	20 03 	  . 
-	ld hl,00058h		;c090	21 58 00 	! X . 
+	ld c,PORT_12 
+	ld b,8
+	ld hl,PORT_12_INITA
+	ld a,(CFG12)
+	cp 0xaa
+	jr nz,lc093h
+	ld hl,PORT_12_INITB
 lc093h:
-	otir		;c093	ed b3 	. . 
-	ld b,004h		;c095	06 04 	. . 
-	ld c,017h		;c097	0e 17 	. . 
-	ld hl,000a8h		;c099	21 a8 00 	! . . 
-	otir		;c09c	ed b3 	. . 
-	ld hl,00090h		;c09e	21 90 00 	! . . 
-	ld b,008h		;c0a1	06 08 	. . 
-	ld a,(CFG8)		;c0a3	3a 3d 00 	: = . 
-	bit 1,a		;c0a6	cb 4f 	. O 
-	jr z,lc0adh		;c0a8	28 03 	( . 
-	ld hl,PORT13_INIT2D		;c0aa	21 d3 c0 	! . . 
+	otir
+; FReD continue parsing init data
+
+		;	Init PORT 17
+	ld b,4 
+	ld c,PORT_17
+	ld hl,PORT_17_INIT
+	otir
+
+
+	ld hl,PORT13_INIT2C		; Wrong name
+	ld b,8
+	ld a,(CFG8)
+	bit 1,a
+	jr z,lc0adh
+	ld hl,PORT13_INIT2D
 lc0adh:
-	ld a,(00017h)		;c0ad	3a 17 00 	: . . 
-	cp 0aah		;c0b0	fe aa 	. . 
-	jr z,lc0c1h		;c0b2	28 0d 	( . 
-	ld hl,00048h		;c0b4	21 48 00 	! H . 
-	ld a,(0558bh)		;c0b7	3a 8b 55 	: . U 
-	cp 041h		;c0ba	fe 41 	. A 
-	jr z,lc0c1h		;c0bc	28 03 	( . 
-	ld hl,00050h		;c0be	21 50 00 	! P . 
+	ld a,(CFG13)
+	cp 0xaa
+	jr z,lc0c1h
+	ld hl,PORT_17_INIT2
+	ld a,(0558bh)
+	cp 041h
+	jr z,lc0c1h
+	ld hl,PORT_17_INIT3
 lc0c1h:
-	otir		;c0c1	ed b3 	. . 
-	ld a,(05cbah)		;c0c3	3a ba 5c 	: . \ 
-	cp 000h		;c0c6	fe 00 	. . 
-	ret nz			;c0c8	c0 	. 
-	ld c,016h		;c0c9	0e 16 	. . 
-	ld b,008h		;c0cb	06 08 	. . 
-	ld hl,00040h		;c0cd	21 40 00 	! @ . 
-	otir		;c0d0	ed b3 	. . 
-	ret			;c0d2	c9 	. 
+	otir
+	ld a,(05cbah)
+	cp 0
+	ret nz
+	ld c,PORT_16
+	ld b,8
+	ld hl,PORT_16_INIT
+	otir
+	ret
 
 ; Special case PORT13 Initialisation data
 PORT13_INIT2D:
@@ -18353,31 +18415,31 @@ sub_c45eh:
 	ld a,(CFG7)		;c45e	3a 3c 00 	: < . 
 	cp 0bbh		;c461	fe bb 	. . 
 	jp z,lc755h		;c463	ca 55 c7 	. U . 
-	in a,(020h)		;c466	db 20 	.   
+	in a,(PORT_20)		;c466	db 20 	.   
 lc468h:
 	ld a,00fh		;c468	3e 0f 	> . 
-	out (020h),a		;c46a	d3 20 	.   
+	out (PORT_20),a		;c46a	d3 20 	.   
 	ld a,000h		;c46c	3e 00 	> . 
-	out (02fh),a		;c46e	d3 2f 	. / 
+	out (PORT_2F),a		;c46e	d3 2f 	. / 
 	ld a,005h		;c470	3e 05 	> . 
-	out (020h),a		;c472	d3 20 	.   
+	out (PORT_20),a		;c472	d3 20 	.   
 	ld a,058h		;c474	3e 58 	> X 
-	out (02eh),a		;c476	d3 2e 	. . 
+	out (PORT_2E),a		;c476	d3 2e 	. . 
 	xor a			;c478	af 	. 
 lc479h:
-	in a,(02eh)		;c479	db 2e 	. . 
+	in a,(PORT_2E)		;c479	db 2e 	. . 
 	cp 058h		;c47b	fe 58 	. X 
 	jr z,lc499h		;c47d	28 1a 	( . 
 	ld a,008h		;c47f	3e 08 	> . 
-	out (02ch),a		;c481	d3 2c 	. , 
+	out (PORT_2C),a		;c481	d3 2c 	. , 
 	ld a,008h		;c483	3e 08 	> . 
-	out (02dh),a		;c485	d3 2d 	. - 
+	out (PORT_2D),a		;c485	d3 2d 	. - 
 lc487h:
-	in a,(02ch)		;c487	db 2c 	. , 
+	in a,(PORT_2C)		;c487	db 2c 	. , 
 	and 00fh		;c489	e6 0f 	. . 
 	cp 008h		;c48b	fe 08 	. . 
 	jp nz,lc499h		;c48d	c2 99 c4 	. . . 
-	in a,(02dh)		;c490	db 2d 	. - 
+	in a,(PORT_2D)		;c490	db 2d 	. - 
 	and 00fh		;c492	e6 0f 	. . 
 	cp 008h		;c494	fe 08 	. . 
 	jp z,lc49fh		;c496	ca 9f c4 	. . . 
@@ -18387,37 +18449,39 @@ lc499h:
 	ret			;c49e	c9 	. 
 lc49fh:
 	ld a,001h		;c49f	3e 01 	> . 
-	out (020h),a		;c4a1	d3 20 	.   
+	out (PORT_20),a		;c4a1	d3 20 	.   
 	ld a,005h		;c4a3	3e 05 	> . 
 	ld (05b9fh),a		;c4a5	32 9f 5b 	2 . [ 
 	ret			;c4a8	c9 	. 
+
 sub_c4a9h:
 	ld a,(CFG7)		;c4a9	3a 3c 00 	: < . 
 	cp 0bbh		;c4ac	fe bb 	. . 
 	jp z,lc79ah		;c4ae	ca 9a c7 	. . . 
-	ld d,003h		;c4b1	16 03 	. . 
-lc4b3h:
-	ld c,020h		;c4b3	0e 20 	.   
-	ld hl,05ba0h		;c4b5	21 a0 5b 	! . [ 
-	ld b,00eh		;c4b8	06 0e 	. . 
-	in a,(c)		;c4ba	ed 78 	. x 
-	inc c			;c4bc	0c 	. 
-	inc c			;c4bd	0c 	. 
-lc4beh:
-	in a,(c)		;c4be	ed 78 	. x 
-	and 00fh		;c4c0	e6 0f 	. . 
-	ld (hl),a			;c4c2	77 	w 
-	inc c			;c4c3	0c 	. 
-	inc hl			;c4c4	23 	# 
-	djnz lc4beh		;c4c5	10 f7 	. . 
-	in a,(020h)		;c4c7	db 20 	.   
-	bit 3,a		;c4c9	cb 5f 	. _ 
-	jp z,lc4d2h		;c4cb	ca d2 c4 	. . . 
-	dec d			;c4ce	15 	. 
-	jp z,lc4b3h		;c4cf	ca b3 c4 	. . . 
-lc4d2h:
-	call sub_c4d6h		;c4d2	cd d6 c4 	. . . 
-	ret			;c4d5	c9 	. 
+	ld d,3
+_loop:
+	ld c,PORT_20
+	ld hl,05ba0h
+	ld b,14
+	in a,(c)
+	inc c
+	inc c
+_loop_port:
+	in a,(c)		; 22, 23, 24, ... 2E, 2F
+	and %00001111
+	ld (hl),a
+	inc c
+	inc hl
+	djnz _loop_port
+	in a,(PORT_20)
+	bit 3,a
+	jp z,_done
+	dec d
+	jp z,_loop
+_done:
+	call sub_c4d6h
+	ret
+
 sub_c4d6h:
 	ld a,(CFG7)		;c4d6	3a 3c 00 	: < . 
 	cp 0bbh		;c4d9	fe bb 	. . 
@@ -18569,16 +18633,17 @@ sub_c5cbh:
 	ret z			;c5d8	c8 	. 
 	call sub_c56ch		;c5d9	cd 6c c5 	. l . 
 	ld a,00fh		;c5dc	3e 0f 	> . 
-	out (020h),a		;c5de	d3 20 	.   
+	out (PORT_20),a		;c5de	d3 20 	.   
 	ld a,000h		;c5e0	3e 00 	> . 
-	out (02fh),a		;c5e2	d3 2f 	. / 
+	out (PORT_2F),a		;c5e2	d3 2f 	. / 
 	ld a,005h		;c5e4	3e 05 	> . 
-	out (020h),a		;c5e6	d3 20 	.   
+	out (PORT_20),a		;c5e6	d3 20 	.   
 	ld a,000h		;c5e8	3e 00 	> . 
-	out (02fh),a		;c5ea	d3 2f 	. / 
+	out (PORT_2F),a		;c5ea	d3 2f 	. / 
 	ld c,022h		;c5ec	0e 22 	. " 
 	ld hl,05ba0h		;c5ee	21 a0 5b 	! . [ 
 	ld b,00eh		;c5f1	06 0e 	. . 
+xxx
 lc5f3h:
 	ld a,(hl)			;c5f3	7e 	~ 
 	out (c),a		;c5f4	ed 79 	. y 
@@ -18586,13 +18651,13 @@ lc5f3h:
 	inc hl			;c5f7	23 	# 
 	djnz lc5f3h		;c5f8	10 f9 	. . 
 	ld a,001h		;c5fa	3e 01 	> . 
-	out (020h),a		;c5fc	d3 20 	.   
+	out (PORT_20),a		;c5fc	d3 20 	.   
 	ld a,003h		;c5fe	3e 03 	> . 
-	out (020h),a		;c600	d3 20 	.   
+	out (PORT_20),a		;c600	d3 20 	.   
 	ld a,00bh		;c602	3e 0b 	> . 
-	out (02fh),a		;c604	d3 2f 	. / 
+	out (PORT_2F),a		;c604	d3 2f 	. / 
 	ld a,000h		;c606	3e 00 	> . 
-	out (020h),a		;c608	d3 20 	.   
+	out (PORT_20),a		;c608	d3 20 	.   
 	ret			;c60a	c9 	. 
 sub_c60bh:
 	ld a,(CFG4)		;c60b	3a 0b 00 	: . . 
@@ -18748,61 +18813,61 @@ TIME_LABEL_DE:
 	db ",19  ZEIT"
 
 lc755h:
-	ld a,000h		;c755	3e 00 	> . 
-	out (030h),a		;c757	d3 30 	. 0 
-	out (031h),a		;c759	d3 31 	. 1 
-	ld a,058h		;c75b	3e 58 	> X 
-	out (02eh),a		;c75d	d3 2e 	. . 
-	ld a,003h		;c75f	3e 03 	> . 
-	out (02ch),a		;c761	d3 2c 	. , 
-	in a,(02eh)		;c763	db 2e 	. . 
-	cp 058h		;c765	fe 58 	. X 
-lc767h:
-	jr nz,lc76fh		;c767	20 06 	  . 
-	in a,(02ch)		;c769	db 2c 	. , 
-	cp 003h		;c76b	fe 03 	. . 
-	jr z,lc774h		;c76d	28 05 	( . 
-lc76fh:
-	xor a			;c76f	af 	. 
-	ld (05b9fh),a		;c770	32 9f 5b 	2 . [ 
-	ret			;c773	c9 	. 
+	ld a,0 
+	out (PORT_30),a
+	out (PORT_31),a
+	ld a,058h
+	out (PORT_2E),a
+	ld a,003h
+	out (PORT_2C),a
+	in a,(PORT_2E)
+	cp 058h
+	jr nz,_exit
+	in a,(PORT_2C)
+	cp 003h
+	jr z,lc774h
+_exit:
+	xor a
+	ld (05b9fh),a
+	ret
+
 lc774h:
 	xor a			;c774	af 	. 
-	out (020h),a		;c775	d3 20 	.   
+	out (PORT_20),a		;c775	d3 20 	.   
 	ld a,00ch		;c777	3e 0c 	> . 
-	out (021h),a		;c779	d3 21 	. ! 
+	out (PORT_21),a		;c779	d3 21 	. ! 
 	xor a			;c77b	af 	. 
-	out (022h),a		;c77c	d3 22 	. " 
-	out (023h),a		;c77e	d3 23 	. # 
+	out (PORT_22),a		;c77c	d3 22 	. " 
+	out (PORT_23),a		;c77e	d3 23 	. # 
 	inc a			;c780	3c 	< 
-	out (024h),a		;c781	d3 24 	. $ 
-	out (025h),a		;c783	d3 25 	. % 
+	out (PORT_24),a		;c781	d3 24 	. $ 
+	out (PORT_25),a		;c783	d3 25 	. % 
 	ld a,058h		;c785	3e 58 	> X 
-	out (026h),a		;c787	d3 26 	. & 
+	out (PORT_26),a		;c787	d3 26 	. & 
 	xor a			;c789	af 	. 
-	out (027h),a		;c78a	d3 27 	. ' 
+	out (PORT_27),a		;c78a	d3 27 	. ' 
 	ld a,018h		;c78c	3e 18 	> . 
-	out (031h),a		;c78e	d3 31 	. 1 
+	out (PORT_31),a		;c78e	d3 31 	. 1 
 	ld a,008h		;c790	3e 08 	> . 
-	out (030h),a		;c792	d3 30 	. 0 
+	out (PORT_30),a		;c792	d3 30 	. 0 
 	ld a,005h		;c794	3e 05 	> . 
 	ld (05b9fh),a		;c796	32 9f 5b 	2 . [ 
 	ret			;c799	c9 	. 
 lc79ah:
-	in a,(020h)		;c79a	db 20 	.   
-	in a,(021h)		;c79c	db 21 	. ! 
+	in a,(PORT_20)		;c79a	db 20 	.   
+	in a,(PORT_21)		;c79c	db 21 	. ! 
 	ld (05ba4h),a		;c79e	32 a4 5b 	2 . [ 
-	in a,(022h)		;c7a1	db 22 	. " 
+	in a,(PORT_22)		;c7a1	db 22 	. " 
 	ld (05ba5h),a		;c7a3	32 a5 5b 	2 . [ 
-	in a,(023h)		;c7a6	db 23 	. # 
+	in a,(PORT_23)		;c7a6	db 23 	. # 
 	ld (05ba6h),a		;c7a8	32 a6 5b 	2 . [ 
-	in a,(024h)		;c7ab	db 24 	. $ 
+	in a,(PORT_24)		;c7ab	db 24 	. $ 
 	ld (05ba1h),a		;c7ad	32 a1 5b 	2 . [ 
-	in a,(025h)		;c7b0	db 25 	. % 
+	in a,(PORT_25)		;c7b0	db 25 	. % 
 	ld (05ba2h),a		;c7b2	32 a2 5b 	2 . [ 
-	in a,(026h)		;c7b5	db 26 	. & 
+	in a,(PORT_26)		;c7b5	db 26 	. & 
 	ld (05ba3h),a		;c7b7	32 a3 5b 	2 . [ 
-	in a,(027h)		;c7ba	db 27 	. ' 
+	in a,(PORT_27)		;c7ba	db 27 	. ' 
 	ld (05ba0h),a		;c7bc	32 a0 5b 	2 . [ 
 	call lc7c3h		;c7bf	cd c3 c7 	. . . 
 	ret			;c7c2	c9 	. 
@@ -18901,9 +18966,9 @@ lc847h:
 	ret z			;c84c	c8 	. 
 	call lc80eh		;c84d	cd 0e c8 	. . . 
 	xor a			;c850	af 	. 
-	out (031h),a		;c851	d3 31 	. 1 
-	out (030h),a		;c853	d3 30 	. 0 
-	ld c,020h		;c855	0e 20 	.   
+	out (PORT_31),a		;c851	d3 31 	. 1 
+	out (PORT_30),a		;c853	d3 30 	. 0 
+	ld c,PORT_20   
 	out (c),a		;c857	ed 79 	. y 
 	ld hl,05ba0h		;c859	21 a0 5b 	! . [ 
 	ld b,007h		;c85c	06 07 	. . 
@@ -18912,9 +18977,9 @@ lc85eh:
 	outi		;c85f	ed a3 	. . 
 	jr nz,lc85eh		;c861	20 fb 	  . 
 	ld a,018h		;c863	3e 18 	> . 
-	out (031h),a		;c865	d3 31 	. 1 
+	out (PORT_31),a		;c865	d3 31 	. 1 
 	ld a,008h		;c867	3e 08 	> . 
-	out (030h),a		;c869	d3 30 	. 0 
+	out (PORT_30),a		;c869	d3 30 	. 0 
 	ret			;c86b	c9 	. 
 
 HANDLE_SERIAL:
