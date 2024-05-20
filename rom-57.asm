@@ -785,22 +785,22 @@ WAIT_RAM:
 	jp z,WARM_BOOT
 
 COLD_BOOT:
-	;	clear 0x4000-0x6fff
+	;	clear 0x4000-0x6fff (with a off-by-one bug)
 	ld bc,l3000h
 	ld de,RAM_BASE+1
 	ld hl,RAM_BASE
 	ld (hl),0
-	ldir
+	ldir		; memset( RAM_BASE, 0, 0x3001 );
 
 	ld a,003h		;01b3	3e 03		> .
 	call SETMEMMAP	;01b5	cd 1a 0f	. . .
 
-	;	clear 0xc000-0xffff
+	;	clear 0xc000-0xffff (which is in ROM???)
 	ld hl,0c000h
 	ld de,0c001h
 	ld bc,0x3fff
 	ld (hl),0
-	ldir
+	ldir		; memset( 0xc000, 0, 0x4000 );
 
 	xor a
 	call sub_087ch		;01c6	cd 7c 08	. | .
@@ -894,14 +894,14 @@ WARM_BOOT:
 	ld (FIFO7),hl
 	ld (FIFO7+2),hl
 
-	xor a			;029f	af		.
-	ld (05b6eh),a		;02a0	32 6e 5b	2 n [
-	ld (05cbah),a		;02a3	32 ba 5c	2 . \
-	ld (05cbbh),a		;02a6	32 bb 5c	2 . \
-	ld (05cbch),a		;02a9	32 bc 5c	2 . \
-	ld (05eadh),a		;02ac	32 ad 5e	2 . ^
-	ld (05eabh),a		;02af	32 ab 5e	2 . ^
-	call 0b3a9h		;02b2	cd a9 b3	. . .
+	xor a
+	ld (05b6eh),a
+	ld (05cbah),a
+	ld (05cbbh),a
+	ld (05cbch),a
+	ld (05eadh),a
+	ld (05eabh),a
+	call sub_b3a9h
 	ld a,(05b87h)		;02b5	3a 87 5b	: . [
 	ld b,a			;02b8	47		G
 	in a,(PORT_05)		;02b9	db 05		. .
@@ -4268,35 +4268,37 @@ FUN_D9:
 	call 088dch		;195e	cd dc 88	. . .
 	ld a,(05cc6h)		;1961	3a c6 5c	: . \
 	jr OUTA44		;1964	18 03		. .
+
 OUTVERSION:
-	ld a,(VERSION)		;1966	3a 04 00	: . .
+	ld a,(VERSION)
 OUTA44:	; Outputs A as a 4.4 fixed point number
-	call HEX2		;1969	cd a3 1a	. . .
-	ld a,b			;196c	78		x
-	call OUT_CH		;196d	cd 84 10	. . .
-	ld a,'.'		;1970	3e 2e		> .
-	call OUT_CH		;1972	cd 84 10	. . .
-	ld a,c			;1975	79		y
-	call OUT_CH		;1976	cd 84 10	. . .
-	ld a,005h		;1979	3e 05		> .
-	call OUT_CH		;197b	cd 84 10	. . .
+	call NUM2_2HEX2
+	ld a,b
+	call OUT_CH
+	ld a,'.'
+	call OUT_CH
+	ld a,c
+	call OUT_CH
+	ld a,CRLF
+	call OUT_CH
 l197eh:
-	call NEXT_MACRO_OR_KEY	;197e	cd a7 17	. . .
-	cp 01bh			;1981	fe 1b		. .
-	jp nz,l1925h		;1983	c2 25 19	. % .
-l1986h:
-	call NEXT_MACRO_OR_KEY	;1986	cd a7 17	. . .
-	cp 046h			;1989	fe 46		. F
-	jr z,l19e7h		;198b	28 5a		( Z
-	cp 044h			;198d	fe 44		. D
-	jp z,l1a1dh		;198f	ca 1d 1a	. . .
-	cp 053h			;1992	fe 53		. S
-	jp z,l1a60h		;1994	ca 60 1a	. ` .
-	cp 050h			;1997	fe 50		. P
+	call NEXT_MACRO_OR_KEY
+	cp 0x1b				; ESC
+	jp nz,l1925h
+SHIFT_EDIT_CMDS:	; SHIFT-EDIT ESC-CMDS
+	call NEXT_MACRO_OR_KEY
+	cp 'F'
+	jr z,CMD_FILL_WORDS
+	cp 'D'
+	jp z,CMD_DUMP
+	cp 'S'
+	jp z,CMD_STORE_BYTES
+	cp 'P'
 	jp z,l1a78h		;1999	ca 78 1a	. x .
-	cp 043h			;199c	fe 43		. C
+	cp 'C'
 	jp l1a95h		;199e	c3 95 1a	. . .
 	jp l1925h		;19a1	c3 25 19	. % .
+
 l19a4h:
 	ld sp,04ff1h		;19a4	31 f1 4f	1 . O
 	ld hl,TASK_1		;19a7	21 66 17	! f .
@@ -4321,7 +4323,7 @@ l19d0h:
 
 OUT_A_HEX2:
 	push bc			;19d9	c5		.
-	call HEX2		;19da	cd a3 1a	. . .
+	call NUM2_2HEX2		;19da	cd a3 1a	. . .
 	ld a,b			;19dd	78		x
 	call OUT_CH		;19de	cd 84 10	. . .
 	ld a,c			;19e1	79		y
@@ -4329,42 +4331,53 @@ OUT_A_HEX2:
 	pop bc			;19e5	c1		.
 	ret			;19e6	c9		.
 
-l19e7h:
-	call sub_1a00h		;19e7	cd 00 1a	. . .
-	ld h,b			;19ea	60		`
-	ld l,c			;19eb	69		i
-	ld d,b			;19ec	50		P
-	ld e,c			;19ed	59		Y
-	call sub_1a00h		;19ee	cd 00 1a	. . .
-	ld (hl),b		;19f1	70		p
-	inc hl			;19f2	23		#
-	ld (hl),c		;19f3	71		q
-	inc hl			;19f4	23		#
-	ex de,hl		;19f5	eb		.
-	call sub_1a00h		;19f6	cd 00 1a	. . .
-	dec bc			;19f9	0b		.
-	dec bc			;19fa	0b		.
-	ldir			;19fb	ed b0		. .
-	jp l197eh		;19fd	c3 7e 19	. ~ .
-sub_1a00h:
-	call sub_1a0bh		;1a00	cd 0b 1a	. . .
+; CMD_FILL_WORDS
+; 	Enter ADRS, DATA, LENGTH (in bytes)
+;   Fills ADRS to ADRS+LENGTH-1 with DATA, as words, big endian
+CMD_FILL_WORDS:
+	call INPUT_HEX4
+	ld h,b
+	ld l,c
+	ld d,b
+	ld e,c
+	call INPUT_HEX4
+	ld (hl),b
+	inc hl
+	ld (hl),c
+	inc hl
+	ex de,hl
+	call INPUT_HEX4
+	dec bc
+	dec bc
+	ldir
+	jp l197eh
+
+; Reads between 0x0000 and 0xffff on the keyboard
+; result in BC
+INPUT_HEX4:
+	call INPUT_HEX2		;1a00	cd 0b 1a	. . .
 	push af			;1a03	f5		.
-	call sub_1a0bh		;1a04	cd 0b 1a	. . .
+	call INPUT_HEX2		;1a04	cd 0b 1a	. . .
 	ld c,a			;1a07	4f		O
 	pop af			;1a08	f1		.
 	ld b,a			;1a09	47		G
 	ret			;1a0a	c9		.
-sub_1a0bh:
+
+; Reads between 0x00 and 0xff on the keyboard
+; result in b
+INPUT_HEX2:
 	call NEXT_MACRO_OR_KEY	;1a0b	cd a7 17	. . .
 	ld b,a			;1a0e	47		G
 	call OUT_CH		;1a0f	cd 84 10	. . .
 	call NEXT_MACRO_OR_KEY	;1a12	cd a7 17	. . .
 	call OUT_CH		;1a15	cd 84 10	. . .
 	ld c,a			;1a18	4f		O
-	call sub_1ac0h		;1a19	cd c0 1a	. . .
+	call HEX2_2NUM		;1a19	cd c0 1a	. . .
 	ret			;1a1c	c9		.
-l1a1dh:
-	call sub_1a6ah		;1a1d	cd 6a 1a	. j .
+
+; Dumpts from an address
+CMD_DUMP:
+	call READ_ADRS		;1a1d	cd 6a 1a	. j .
 	ld b,018h		;1a20	06 18		. .
 l1a22h:
 	ld a,005h		;1a22	3e 05		> .
@@ -4402,90 +4415,113 @@ l1a52h:
 	jr nz,l1a43h		;1a59	20 e8		  .
 	djnz l1a22h		;1a5b	10 c5		. .
 	jp l197eh		;1a5d	c3 7e 19	. ~ .
-l1a60h:
-	call sub_1a6ah		;1a60	cd 6a 1a	. j .
-l1a63h:
-	call sub_1a0bh		;1a63	cd 0b 1a	. . .
-	ld (hl),a		;1a66	77		w
-	inc hl			;1a67	23		#
-	jr l1a63h		;1a68	18 f9		. .
-sub_1a6ah:
-	call sub_1b0dh		;1a6a	cd 0d 1b	. . .
-	call sub_1a00h		;1a6d	cd 00 1a	. . .
-	ld a,005h		;1a70	3e 05		> .
-	call OUT_CH		;1a72	cd 84 10	. . .
-	ld h,b			;1a75	60		`
-	ld l,c			;1a76	69		i
-	ret			;1a77	c9		.
+
+; Fill data at an address
+CMD_STORE_BYTES:
+	call READ_ADRS
+_loop:
+	call INPUT_HEX2
+	ld (hl),a
+	inc hl
+	jr _loop
+
+; READs AN ADDRESS + CRLF
+READ_ADRS:
+	call sub_1b0dh
+	call INPUT_HEX4
+	ld a,CRLF
+	call OUT_CH
+	ld h,b
+	ld l,c
+	ret
+
 l1a78h:
 	call sub_1b0dh		;1a78	cd 0d 1b	. . .
 	call NEXT_MACRO_OR_KEY
-	call OUT_CH		; Based on the usage of 05cb9h, this inputs a single digit
+	call OUT_CH		; Based on the usage of 05cb9h, this outputs a single digit
 	and 0x0f
 	ld (05cb9h),a
-l1a86h:
+_loop:
 	call NEXT_MACRO_OR_KEY
 	cp 0x1b				; ESC
-	jr nz,l1a86h		;1a8b	20 f9		  .
+	jr nz,_loop
 	ld a,000h		;1a8d	3e 00		> .
 	ld (05cb9h),a		;1a8f	32 b9 5c	2 . \
-	jp l1986h		;1a92	c3 86 19	. . .
+	jp SHIFT_EDIT_CMDS		;1a92	c3 86 19	. . .
+
 l1a95h:
-	ld a,00fh		;1a95	3e 0f		> .
-	out (PORT_20),a		;1a97	d3 20		.  
-	ld a,000h		;1a99	3e 00		> .
-	out (PORT_2F),a		;1a9b	d3 2f		. /
-	call NEXT_MACRO_OR_KEY	;1a9d	cd a7 17	. . .
-	jp l1925h		;1aa0	c3 25 19	. % .
+	ld a,0x0f
+	out (PORT_20),a
+	ld a,0x00
+	out (PORT_2F),a
+	call NEXT_MACRO_OR_KEY
+	jp l1925h
+
 ; Input a = 0xNM
 ; Output (b,c) ascii values of N and M
-HEX2:
-	ld b,a			;1aa3	47		G
-	and 00fh		;1aa4	e6 0f		. .
-	call HEX1		;1aa6	cd b8 1a	. . .
-	ld c,a			;1aa9	4f		O
-	ld a,b			;1aaa	78		x
-	srl a			;1aab	cb 3f		. ?
-	srl a			;1aad	cb 3f		. ?
-	srl a			;1aaf	cb 3f		. ?
-	srl a			;1ab1	cb 3f		. ?
-	call HEX1		;1ab3	cd b8 1a	. . .
-	ld b,a			;1ab6	47		G
-	ret			;1ab7	c9		.
+; Example : 13 => b=0x31, c=0x33
+;         : 3F => b=0x33, c=0x46
+NUM2_2HEX2:
+	ld b,a
+	and %00001111
+	call NUM1_2HEX1
+	ld c,a
+	ld a,b
+	srl a
+	srl a
+	srl a
+	srl a
+	call NUM1_2HEX1
+	ld b,a
+	ret
+
 ; Input a = 0..f
 ; Output a = '0'..'9','A'..'F'
-HEX1:
-	add a,030h		;1ab8	c6 30		. 0
-	cp 03ah			;1aba	fe 3a		. :
-	ret c			;1abc	d8		.
-	add a,007h		;1abd	c6 07		. .
-	ret			;1abf	c9		.
-sub_1ac0h:
+NUM1_2HEX1:
+	add a,'0'
+	cp '9'+1
+	ret c
+	add a,'A'-('9'+1)
+	ret
+
+; INPUT (b,c) = 2 ASCII chars
+; OUTPUT B = value of the hex number represented by the 2 chars
+; 0x33, 0x37 => 0x37
+; 0x42, 0x43 => 0xB3
+HEX2_2NUM:
 	ld a,b			;1ac0	78		x
-	call sub_1ad3h		;1ac1	cd d3 1a	. . .
+	call HEX1_2NUM1		;1ac1	cd d3 1a	. . .
 	ld b,a			;1ac4	47		G
 	ld a,c			;1ac5	79		y
-	call sub_1ad3h		;1ac6	cd d3 1a	. . .
+	call HEX1_2NUM1		;1ac6	cd d3 1a	. . .
 	sla b			;1ac9	cb 20		.  
 	sla b			;1acb	cb 20		.  
 	sla b			;1acd	cb 20		.  
 	sla b			;1acf	cb 20		.  
 	or b			;1ad1	b0		.
 	ret			;1ad2	c9		.
-sub_1ad3h:
-	sub 030h		;1ad3	d6 30		. 0
-	cp 00ah			;1ad5	fe 0a		. .
-	ret c			;1ad7	d8		.
-	sub 007h		;1ad8	d6 07		. .
-	res 5,a			;1ada	cb af		. .
-	cp 00ah			;1adc	fe 0a		. .
-	jr c,l1ae3h		;1ade	38 03		8 .
-	cp 010h			;1ae0	fe 10		. .
-	ret			;1ae2	c9		.
-l1ae3h:
-	pop bc			;1ae3	c1		.
-	scf			;1ae4	37		7
-	ret			;1ae5	c9		.
+
+; ASCII to HEX
+; INPUT : A = ASCII
+; OUTPUT : A = HEX
+; '3' 0x33 => 0x03
+; 'B' 0x42 => 0x0B
+; carry flag set if result is valid
+; Error handling seems incoherent (A<'0' will have different behavior than A>'F')
+HEX1_2NUM1:
+	sub '0'
+	cp 10
+	ret c			; lower than '0', just return with carry set
+	sub 'A'-('9'+1)	; 'A' => '9'+1
+	res 5,a			; ASCII to number
+	cp 10			; 
+	jr c,_throw		; higher than 'F', return with carry set but one stack frame earlier
+	cp 16
+	ret
+_throw:
+	pop bc			; Skip one return!
+	scf
+	ret
 
 ; Weird routine maybe some debug. Displays a as char or '*HEX2'. Does nothing if the content of 05cb9h is zero or not equal to b.
 sub_1ae6h:
@@ -15917,7 +15953,7 @@ lb2e3h:
 	ld de,05b93h		;b2fb	11 93 5b 	. . [ 
 	call sub_b382h		;b2fe	cd 82 b3 	. . . 
 	jr c,lb31dh		;b301	38 1a 	8 . 
-	call 0b3a9h		;b303	cd a9 b3 	. . . 
+	call sub_b3a9h		;b303	cd a9 b3 	. . . 
 	call sub_b36fh		;b306	cd 6f b3 	. o . 
 	call nc,sub_b364h		;b309	d4 64 b3 	. d . 
 	call nc,sub_b388h		;b30c	d4 88 b3 	. . . 
@@ -16012,13 +16048,15 @@ lb397h:
 	ld e,01fh		;b3a1	1e 1f 	. . 
 	M_CALL_WITH_MMAP0 sub_c45eh
 	ret
-	call 09b1h
-	ld d,h			;b3ac	54 	T 
-	push bc			;b3ad	c5 	. 
-	ret			;b3ae	c9 	. 
+
+sub_b3a9h:
+	M_CALL_WITH_MMAP0 sub_c554h
+	ret
+
 sub_b3afh:
 	M_CALL_WITH_MMAP0 sub_c5cbh
-	ret			;b3b4	c9 	. 
+	ret
+
 sub_b3b5h:
 	M_CALL_WITH_MMAP0 sub_c60bh
 	ret
@@ -18221,19 +18259,22 @@ lc52fh:
 lc551h:
 	ld a,0ffh		;c551	3e ff 	> . 
 	ret			;c553	c9 	. 
-	ld a,(05b9fh)		;c554	3a 9f 5b 	: . [ 
-	or a			;c557	b7 	. 
-	ret z			;c558	c8 	. 
-	call sub_c4a9h		;c559	cd a9 c4 	. . . 
-	ld bc,00008h		;c55c	01 08 00 	. . . 
-	ld hl,05ba0h		;c55f	21 a0 5b 	! . [ 
-	ld de,05b93h		;c562	11 93 5b 	. . [ 
-	or a			;c565	b7 	. 
-	ret nz			;c566	c0 	. 
-	push hl			;c567	e5 	. 
-	ldir		;c568	ed b0 	. . 
-	pop de			;c56a	d1 	. 
-	ret			;c56b	c9 	. 
+
+sub_c554h:
+	ld a,(05b9fh)
+	or a
+	ret z
+	call sub_c4a9h
+	ld bc,8
+	ld hl,05ba0h
+	ld de,05b93h
+	or a
+	ret nz
+	push hl
+	ldir			; memcpy( 0x5b93, 0x5ba0, 8 )
+	pop de
+	ret
+
 sub_c56ch:
 	ld a,(CFG7)		;c56c	3a 3c 00 	: < . 
 	cp 0bbh		;c56f	fe bb 	. . 
