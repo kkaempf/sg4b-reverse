@@ -22,7 +22,12 @@ def get_string(binary_data, adrs, len):
 			if quotes:
 				formatted_string += '" '
 				quotes = False
-			formatted_string += f"{byte:02X} "
+			if byte == 0x05:
+				formatted_string += "CRLF "
+			elif byte == 0x09:
+				formatted_string += "RIGHT "
+			else:
+				formatted_string += f"{byte:02X} "
 	if quotes:
 		formatted_string += '"'
 
