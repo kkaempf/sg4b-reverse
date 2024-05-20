@@ -1,6 +1,7 @@
 HACK_ROM: equ 0
 
 ; variables:
+v4f89: equ 0x4f89
 p4f84: equ 0x4f84
 v53c2: equ 0x53c2
 
@@ -4263,11 +4264,11 @@ FUN_D9:
 	ld a,(05cbah)
 	cp 005h
 	jr nz,OUTVERSION
-	ld a,056h		;1959	3e 56		> V
-	ld hl,0	;195b	21 00 00	! . .
-	call 088dch		;195e	cd dc 88	. . .
-	ld a,(05cc6h)		;1961	3a c6 5c	: . \
-	jr OUTA44		;1964	18 03		. .
+	ld a,0x56
+	ld hl,0
+	call 088dch
+	ld a,(05cc6h)
+	jr OUTA44
 
 OUTVERSION:
 	ld a,(VERSION)
@@ -4296,8 +4297,8 @@ SHIFT_EDIT_CMDS:	; SHIFT-EDIT ESC-CMDS
 	cp 'P'
 	jp z,l1a78h		;1999	ca 78 1a	. x .
 	cp 'C'
-	jp l1a95h		;199e	c3 95 1a	. . .
-	jp l1925h		;19a1	c3 25 19	. % .
+	jp l1a95h		;
+	jp l1925h		; Never called, prob bug (jp z on previous line) or obfuscation to prevent commands discovery
 
 l19a4h:
 	ld sp,04ff1h		;19a4	31 f1 4f	1 . O
@@ -4322,14 +4323,14 @@ l19d0h:
 	jp l1934h
 
 OUT_A_HEX2:
-	push bc			;19d9	c5		.
-	call NUM2_2HEX2		;19da	cd a3 1a	. . .
-	ld a,b			;19dd	78		x
-	call OUT_CH		;19de	cd 84 10	. . .
-	ld a,c			;19e1	79		y
-	call OUT_CH		;19e2	cd 84 10	. . .
-	pop bc			;19e5	c1		.
-	ret			;19e6	c9		.
+	push bc
+	call NUM2_2HEX2
+	ld a,b
+	call OUT_CH
+	ld a,c
+	call OUT_CH
+	pop bc
+	ret
 
 ; CMD_FILL_WORDS
 ; 	Enter ADRS, DATA, LENGTH (in bytes)
@@ -5053,7 +5054,7 @@ l1e1fh:
 	ld (hl),020h		;1e23	36 20		6  
 	ld bc,00027h		;1e25	01 27 00	. ' .
 	ldir			;1e28	ed b0		. .
-	ld hl,(04f89h)		;1e2a	2a 89 4f	* . O
+	ld hl,(v4f89)		;1e2a	2a 89 4f	* . O
 	inc hl			;1e2d	23		#
 	inc hl			;1e2e	23		#
 	call sub_1eeah		;1e2f	cd ea 1e	. . .
@@ -5136,7 +5137,7 @@ l1eadh:
 	inc de			;1eb2	13		.
 	ld (hl),020h		;1eb3	36 20		6  
 	ldir			;1eb5	ed b0		. .
-	ld hl,(04f89h)		;1eb7	2a 89 4f	* . O
+	ld hl,(v4f89)		;1eb7	2a 89 4f	* . O
 	inc hl			;1eba	23		#
 	inc hl			;1ebb	23		#
 	call sub_1eeah		;1ebc	cd ea 1e	. . .
@@ -5194,13 +5195,13 @@ l1f21h:
 	ret			;1f29	c9		.
 sub_1f2ah:
 	push hl			;1f2a	e5		.
-	ld hl,(04f89h)		;1f2b	2a 89 4f	* . O
+	ld hl,(v4f89)		;1f2b	2a 89 4f	* . O
 	inc hl			;1f2e	23		#
 	call sub_1eeah		;1f2f	cd ea 1e	. . .
 	pop hl			;1f32	e1		.
 	ret			;1f33	c9		.
 sub_1f34h:
-	ld hl,(04f89h)		;1f34	2a 89 4f	* . O
+	ld hl,(v4f89)		;1f34	2a 89 4f	* . O
 	inc hl			;1f37	23		#
 	inc hl			;1f38	23		#
 	ld (0542ah),hl		;1f39	22 2a 54	" * T
@@ -5314,7 +5315,7 @@ l2010h:
 	dec hl			;2013	2b		+
 	ld (0542ah),hl		;2014	22 2a 54	" * T
 	ex de,hl		;2017	eb		.
-	ld hl,(04f89h)		;2018	2a 89 4f	* . O
+	ld hl,(v4f89)		;2018	2a 89 4f	* . O
 	inc hl			;201b	23		#
 	call CMP_HLDE		;201c	cd 20 0f	.   .
 	ret z			;201f	c8		.
@@ -5339,7 +5340,7 @@ sub_2048h:
 	ld a,(05cbah)		;2048	3a ba 5c	: . \
 	cp 005h			;204b	fe 05		. .
 	jp nz,l1f44h		;204d	c2 44 1f	. D .
-	ld hl,(04f89h)		;2050	2a 89 4f	* . O
+	ld hl,(v4f89)		;2050	2a 89 4f	* . O
 	ld (05cc3h),hl		;2053	22 c3 5c	" . \
 	ld de,05cc6h		;2056	11 c6 5c	. . \
 	ld hl,v53c2		;2059	21 c2 53	! . S
@@ -5353,7 +5354,7 @@ sub_206ah:
 	ld a,(05cbah)		;206a	3a ba 5c	: . \
 	cp 005h			;206d	fe 05		. .
 	jp nz,l1fe5h		;206f	c2 e5 1f	. . .
-	ld hl,(04f89h)		;2072	2a 89 4f	* . O
+	ld hl,(v4f89)		;2072	2a 89 4f	* . O
 	ld a,049h		;2075	3e 49		> I
 	call 088dch		;2077	cd dc 88	. . .
 	ret			;207a	c9		.
@@ -6482,7 +6483,7 @@ l2790h:
 	ld a,(05cbah)		;27a7	3a ba 5c	: . \
 	cp 005h			;27aa	fe 05		. .
 	jr nz,l27cdh		;27ac	20 1f		  .
-	ld hl,(04f89h)		;27ae	2a 89 4f	* . O
+	ld hl,(v4f89)		;27ae	2a 89 4f	* . O
 	call sub_2b25h		;27b1	cd 25 2b	. % +
 	cp 0ffh			;27b4	fe ff		. .
 	jp z,l2b17h		;27b6	ca 17 2b	. . +
@@ -6496,7 +6497,7 @@ l27c6h:
 	ld (hl),0ffh		;27c9	36 ff		6 .
 	jr l27e6h		;27cb	18 19		. .
 l27cdh:
-	ld hl,(04f89h)		;27cd	2a 89 4f	* . O
+	ld hl,(v4f89)		;27cd	2a 89 4f	* . O
 	inc hl			;27d0	23		#
 	call sub_07f9h		;27d1	cd f9 07	. . .
 	cp 0ffh			;27d4	fe ff		. .
@@ -6521,7 +6522,7 @@ l27e6h:
 	ld a,(05cbah)		;2801	3a ba 5c	: . \
 	cp 005h			;2804	fe 05		. .
 	jr nz,l2828h		;2806	20 20		   
-	ld hl,(04f89h)		;2808	2a 89 4f	* . O
+	ld hl,(v4f89)		;2808	2a 89 4f	* . O
 	inc hl			;280b	23		#
 	call sub_2b25h		;280c	cd 25 2b	. % +
 	or a			;280f	b7		.
@@ -6535,7 +6536,7 @@ l27e6h:
 	ld (hl),0ffh		;2824	36 ff		6 .
 	jr l2843h		;2826	18 1b		. .
 l2828h:
-	ld hl,(04f89h)		;2828	2a 89 4f	* . O
+	ld hl,(v4f89)		;2828	2a 89 4f	* . O
 	inc hl			;282b	23		#
 	inc hl			;282c	23		#
 	call sub_07f9h		;282d	cd f9 07	. . .
@@ -6561,7 +6562,7 @@ l2843h:
 	ld a,(05cbah)		;285e	3a ba 5c	: . \
 	cp 005h			;2861	fe 05		. .
 	jr nz,l2880h		;2863	20 1b		  .
-	ld hl,(04f89h)		;2865	2a 89 4f	* . O
+	ld hl,(v4f89)		;2865	2a 89 4f	* . O
 	inc hl			;2868	23		#
 	inc hl			;2869	23		#
 	call sub_2b25h		;286a	cd 25 2b	. % +
@@ -6574,7 +6575,7 @@ l2843h:
 	ld (hl),0ffh		;287c	36 ff		6 .
 	jr l2896h		;287e	18 16		. .
 l2880h:
-	ld hl,(04f89h)		;2880	2a 89 4f	* . O
+	ld hl,(v4f89)		;2880	2a 89 4f	* . O
 	inc hl			;2883	23		#
 	inc hl			;2884	23		#
 	inc hl			;2885	23		#
@@ -6613,7 +6614,7 @@ l2896h:
 	ld a,(05cbah)		;28c6	3a ba 5c	: . \
 	cp 005h			;28c9	fe 05		. .
 	jp nz,l28dbh		;28cb	c2 db 28	. . (
-	ld hl,(04f89h)		;28ce	2a 89 4f	* . O
+	ld hl,(v4f89)		;28ce	2a 89 4f	* . O
 	inc hl			;28d1	23		#
 	inc hl			;28d2	23		#
 	inc hl			;28d3	23		#
@@ -6642,7 +6643,7 @@ l28e7h:
 	pop hl			;28f5	e1		.
 	ret			;28f6	c9		.
 sub_28f7h:
-	ld hl,(04f89h)		;28f7	2a 89 4f	* . O
+	ld hl,(v4f89)		;28f7	2a 89 4f	* . O
 	ld a,h			;28fa	7c		|
 	cp 000h			;28fb	fe 00		. .
 	jr nz,l291eh		;28fd	20 1f		  .
@@ -6697,7 +6698,7 @@ l2949h:
 	ld de,04ac6h		;2951	11 c6 4a	. . J
 	ld bc,l0140h		;2954	01 40 01	. @ .
 	ldir			;2957	ed b0		. .
-	ld hl,(04f89h)		;2959	2a 89 4f	* . O
+	ld hl,(v4f89)		;2959	2a 89 4f	* . O
 	inc hl			;295c	23		#
 	call sub_2b3fh		;295d	cd 3f 2b	. ? +
 	cp 0ffh			;2960	fe ff		. .
@@ -6708,7 +6709,7 @@ l2949h:
 	call sub_1f2ah		;296c	cd 2a 1f	. * .
 	jp nz,l29ech		;296f	c2 ec 29	. . )
 	push hl			;2972	e5		.
-	ld hl,(04f89h)		;2973	2a 89 4f	* . O
+	ld hl,(v4f89)		;2973	2a 89 4f	* . O
 	call sub_1eeah		;2976	cd ea 1e	. . .
 	pop hl			;2979	e1		.
 	jp nz,l29ech		;297a	c2 ec 29	. . )
@@ -6721,7 +6722,7 @@ l297dh:
 	ld de,04c06h		;2989	11 06 4c	. . L
 	ld bc,l0140h		;298c	01 40 01	. @ .
 	ldir			;298f	ed b0		. .
-	ld hl,(04f89h)		;2991	2a 89 4f	* . O
+	ld hl,(v4f89)		;2991	2a 89 4f	* . O
 	inc hl			;2994	23		#
 	inc hl			;2995	23		#
 	call sub_2b3fh		;2996	cd 3f 2b	. ? +
@@ -6740,7 +6741,7 @@ l297dh:
 	ld de,04d46h		;29b5	11 46 4d	. F M
 	ld bc,l0140h		;29b8	01 40 01	. @ .
 	ldir			;29bb	ed b0		. .
-	ld hl,(04f89h)		;29bd	2a 89 4f	* . O
+	ld hl,(v4f89)		;29bd	2a 89 4f	* . O
 	inc hl			;29c0	23		#
 	inc hl			;29c1	23		#
 	inc hl			;29c2	23		#
@@ -6800,9 +6801,9 @@ l2a20h:
 	jr l29e9h		;2a38	18 af		. .
 
 FUN_FC:
-	ld hl,(04f89h)		;2a3a	2a 89 4f	* . O
+	ld hl,(v4f89)		;2a3a	2a 89 4f	* . O
 	inc hl			;2a3d	23		#
-	ld (04f89h),hl		;2a3e	22 89 4f	" . O
+	ld (v4f89),hl		;2a3e	22 89 4f	" . O
 	call sub_2b73h		;2a41	cd 73 2b	. s +
 	cp 0ffh			;2a44	fe ff		. .
 	jp z,l2b10h		;2a46	ca 10 2b	. . +
@@ -6810,16 +6811,16 @@ FUN_FC:
 	bit 1,(hl)		;2a4c	cb 4e		. N
 	jp z,l2949h		;2a4e	ca 49 29	. I )
 	push hl			;2a51	e5		.
-	ld hl,(04f89h)		;2a52	2a 89 4f	* . O
+	ld hl,(v4f89)		;2a52	2a 89 4f	* . O
 	call sub_1eeah		;2a55	cd ea 1e	. . .
 	pop hl			;2a58	e1		.
 	jp z,l2949h		;2a59	ca 49 29	. I )
 	jr FUN_FC		;2a5c	18 dc		. .
 
 FUN_DC:
-	ld hl,(04f89h)		;2a5e	2a 89 4f	* . O
+	ld hl,(v4f89)		;2a5e	2a 89 4f	* . O
 	dec hl			;2a61	2b		+
-	ld (04f89h),hl		;2a62	22 89 4f	" . O
+	ld (v4f89),hl		;2a62	22 89 4f	" . O
 	call sub_2b73h		;2a65	cd 73 2b	. s +
 	cp 0ffh			;2a68	fe ff		. .
 	jp z,l2b10h		;2a6a	ca 10 2b	. . +
@@ -6827,7 +6828,7 @@ FUN_DC:
 	bit 1,(hl)		;2a70	cb 4e		. N
 	jp z,l2949h		;2a72	ca 49 29	. I )
 	push hl			;2a75	e5		.
-	ld hl,(04f89h)		;2a76	2a 89 4f	* . O
+	ld hl,(v4f89)		;2a76	2a 89 4f	* . O
 	call sub_1eeah		;2a79	cd ea 1e	. . .
 	pop hl			;2a7c	e1		.
 	jp z,l2949h		;2a7d	ca 49 29	. I )
@@ -6907,7 +6908,7 @@ sub_2aeeh:
 	M_OUT_MSG 0xd082, 0x05 ; "PAGE "
 	M_OUT_VAR 0x4f89, 0x04
 	M_LEFT 1
-	M_SOMETHING1 04f89h, 4
+	M_SOMETHING1 v4f89, 4
 	ret
 sub_2b05h:
 	call sub_07f9h		;2b05	cd f9 07	. . .
@@ -6948,7 +6949,7 @@ l2b4ah:
 	jr nz,l2b60h		;2b51	20 0d		  .
 	call sub_1eeah		;2b53	cd ea 1e	. . .
 	ret nz			;2b56	c0		.
-	ld de,(04f89h)		;2b57	ed 5b 89 4f	. [ . O
+	ld de,(v4f89)		;2b57	ed 5b 89 4f	. [ . O
 l2b5bh:
 	inc de			;2b5b	13		.
 	call CMP_HLDE		;2b5c	cd 20 0f	.   .
@@ -8281,7 +8282,7 @@ FUN_E4:
 	ld b,000h		;351c	06 00		. .
 	ld (ix+003h),001h	;351e	dd 36 03 01	. 6 . .
 l3522h:
-	call 03b0ch		;3522	cd 0c 3b	. . ;
+	call sub_3b0ch		;3522	cd 0c 3b	. . ;
 	M_GOTO_YX 2,15
 	ld a,(ix+002h)		;352a	dd 7e 02	. ~ .
 	ld iy,0d183h		;352d	fd 21 83 d1	. ! . .
@@ -8314,7 +8315,7 @@ l3555h:
 	ld a,010h		;3557	3e 10		> .
 	ld (ix+002h),a		;3559	dd 77 02	. w .
 l355ch:
-	call 03b0ch		;355c	cd 0c 3b	. . ;
+	call sub_3b0ch		;355c	cd 0c 3b	. . ;
 	M_GOTO_YX 3,15
 	push bc			;3564	c5		.
 	ld c,a			;3565	4f		O
@@ -8487,7 +8488,7 @@ l3691h:
 	ld b,000h		;36ab	06 00		. .
 l36adh:
 	ld c,00ah		;36ad	0e 0a		. .
-	call 03b0ch		;36af	cd 0c 3b	. . ;
+	call sub_3b0ch		;36af	cd 0c 3b	. . ;
 l36b2h:
 	push bc			;36b2	c5		.
 	ld c,a			;36b3	4f		O
@@ -8544,7 +8545,7 @@ l3701h:
 	ld d,008h		;3703	16 08		. .
 l3705h:
 	ld c,006h		;3705	0e 06		. .
-	call 03b0ch		;3707	cd 0c 3b	. . ;
+	call sub_3b0ch		;3707	cd 0c 3b	. . ;
 l370ah:
 	push bc			;370a	c5		.
 	ld c,a			;370b	4f		O
@@ -8599,8 +8600,7 @@ l3760h:
 	ld b,000h		;377a	06 00		. .
 l377ch:
 	ld c,00bh		;377c	0e 0b		. .
-	call 03b0ch		;377e	cd 0c 3b	. . ;
-; FReD ### all this sequence is probably not code
+	call sub_3b0ch		;377e	cd 0c 3b	. . ;
 l3781h:
 	push bc			;3781	c5		.
 	ld c,a			;3782	4f		O
@@ -8648,7 +8648,7 @@ l37b5h:
 	ld (053c9h),a		;37c4	32 c9 53	2 . S
 	M_GOTO_YX 15,15
 	ld c,00bh		;37cc	0e 0b		. .
-	call 03b0ch		;37ce	cd 0c 3b	. . ;
+	call sub_3b0ch		;37ce	cd 0c 3b	. . ;
 	call sub_38fbh		;37d1	cd fb 38	. . 8
 	call sub_39c4h		;37d4	cd c4 39	. . 9
 	jp l383ah		;37d7	c3 3a 38	. : 8
@@ -8661,7 +8661,7 @@ l37dah:
 	ld (053c9h),a		;37e4	32 c9 53	2 . S
 	M_GOTO_YX 15,15
 	ld c,00bh		;37ec	0e 0b		. .
-	call 03b0ch		;37ee	cd 0c 3b	. . ;
+	call sub_3b0ch		;37ee	cd 0c 3b	. . ;
 l37f1h:
 	call sub_38fbh		;37f1	cd fb 38	. . 8
 	ld b,000h		;37f4	06 00		. .
@@ -8692,7 +8692,7 @@ l3806h:
 	ld b,001h		;3820	06 01		. .
 l3822h:
 	ld c,00bh		;3822	0e 0b		. .
-	call 03b0ch		;3824	cd 0c 3b	. . ;
+	call sub_3b0ch		;3824	cd 0c 3b	. . ;
 l3827h:
 	push bc			;3827	c5		.
 	ld c,a			;3828	4f		O
@@ -8726,7 +8726,7 @@ sub_3866h:
 	ld iy,0d194h		;3868	fd 21 94 d1	. ! . .
 	ld c,020h		;386c	0e 20		.  
 	M_GOTO_YX 25,1
-	call 03b0ch
+	call sub_3b0ch
 	pop iy			;3876	fd e1		. .
 	ret			;3878	c9		.
 sub_3879h:
@@ -8736,7 +8736,7 @@ l387eh:
 	ld b,(hl)		;387e	46		F
 	ld iy,0d27ah		;387f	fd 21 7a d2	. ! z .
 	ld c,00bh		;3883	0e 0b		. .
-	call 03b0ch		;3885	cd 0c 3b	. . ;
+	call sub_3b0ch		;3885	cd 0c 3b	. . ;
 	M_DOWN 1
 	inc hl
 	ld a,(hl)
@@ -9066,7 +9066,7 @@ l3ac7h:
 	set 7,e			;3ac7	cb fb		. .
 	ld b,001h		;3ac9	06 01		. .
 l3acbh:
-	call 03b0ch		;3acb	cd 0c 3b	. . ;
+	call sub_3b0ch		;3acb	cd 0c 3b	. . ;
 l3aceh:
 	push bc			;3ace	c5		.
 	ld c,a			;3acf	4f		O
@@ -9110,6 +9110,8 @@ l3afbh:
 	M_LEFT 1
 	pop bc
 	jr sub_3ae0h
+
+sub_3b0ch:
 	M_CALL_WITH_MMAP0 l3b12h
 	ret
 l3b12h:
@@ -10534,28 +10536,16 @@ l89adh:
 	inc hl			;89b3	23 	# 
 	ld d,(hl)			;89b4	56 	V 
 	ret			;89b5	c9 	. 
+
+
+; fred xxx looks like some sort of table of 5 bytes elements
 l89b6h:
-	ld e,b			;89b6	58 	X 
-	ret z			;89b7	c8 	. 
-	nop			;89b8	00 	. 
-	xor 054h		;89b9	ee 54 	. T 
-	ld d,b			;89bb	50 	P 
-	ld (hl),c			;89bc	71 	q 
-	ld bc,0		;89bd	01 00 00 	. . . 
-	ld d,e			;89c0	53 	S 
-	daa			;89c1	27 	' 
-	nop			;89c2	00 	. 
-	bit 2,d		;89c3	cb 52 	. R 
-	ld b,e			;89c5	43 	C 
-	ld b,000h		;89c6	06 00 	. . 
-	jp nz,04d53h		;89c8	c2 53 4d 	. S M 
-	call z,00001h		;89cb	cc 01 00 	. . . 
-	nop			;89ce	00 	. 
-	ld d,a			;89cf	57 	W 
-	and l			;89d0	a5 	. 
-	nop			;89d1	00 	. 
-	pop hl			;89d2	e1 	. 
-	ld d,l			;89d3	55 	U 
+	db 'X', 0xc8, 0x00, 0xee, 0x54
+	db 'P', 0x71, 0x01, 0x00, 0x00
+	db 'S', 0x27, 0x00, 0xcb, 0x52
+	db 'C', 0x06, 0x00, 0xc2, 0x53
+	db 'M', 0xcc, 0x01, 0x00, 0x00
+	db 'W', 0xa5, 0x00, 0xe1, 0x55
 	ld d,d			;89d4	52 	R 
 	inc c			;89d5	0c 	. 
 	nop			;89d6	00 	. 
@@ -11033,10 +11023,10 @@ l8cfah:
 	xor a			;8cfa	af 	. 
 	jr l8ce6h		;8cfb	18 e9 	. . 
 l8cfdh:
-	ld hl,(04f89h)		;8cfd	2a 89 4f 	* . O 
+	ld hl,(v4f89)		;8cfd	2a 89 4f 	* . O 
 	push hl			;8d00	e5 	. 
 	ld hl,(05cc3h)		;8d01	2a c3 5c 	* . \ 
-	ld (04f89h),hl		;8d04	22 89 4f 	" . O 
+	ld (v4f89),hl		;8d04	22 89 4f 	" . O 
 	call l1fe5h		;8d07	cd e5 1f 	. . . 
 	ld de,05cc6h		;8d0a	11 c6 5c 	. . \ 
 	ld hl,v53c2		;8d0d	21 c2 53 	! . S 
@@ -11046,7 +11036,7 @@ l8cfdh:
 	pop bc			;8d16	c1 	. 
 	call l8c8dh		;8d17	cd 8d 8c 	. . . 
 	pop hl			;8d1a	e1 	. 
-	ld (04f89h),hl		;8d1b	22 89 4f 	" . O 
+	ld (v4f89),hl		;8d1b	22 89 4f 	" . O 
 	ret			;8d1e	c9 	. 
 sub_8d1fh:
 	ld a,003h		;8d1f	3e 03 	> . 
@@ -11301,17 +11291,17 @@ l8f24h:
 	call sub_16eeh		;8f27	cd ee 16 	. . . 
 	jr l8f7fh		;8f2a	18 53 	. S 
 l8f2ch:
-	ld hl,(04f89h)		;8f2c	2a 89 4f 	* . O 
+	ld hl,(v4f89)		;8f2c	2a 89 4f 	* . O 
 	push hl			;8f2f	e5 	. 
 	ld hl,(05cc3h)		;8f30	2a c3 5c 	* . \ 
-	ld (04f89h),hl		;8f33	22 89 4f 	" . O 
+	ld (v4f89),hl		;8f33	22 89 4f 	" . O 
 	ld hl,05cc6h		;8f36	21 c6 5c 	! . \ 
 	ld de,v53c2		;8f39	11 c2 53 	. . S 
 	ld bc,0002ch		;8f3c	01 2c 00 	. , . 
 	ldir		;8f3f	ed b0 	. . 
 	call l1f44h		;8f41	cd 44 1f 	. D . 
 	pop hl			;8f44	e1 	. 
-	ld (04f89h),hl		;8f45	22 89 4f 	" . O 
+	ld (v4f89),hl		;8f45	22 89 4f 	" . O 
 	jr l8f7fh		;8f48	18 35 	. 5 
 l8f4ah:
 	ld hl,(05cc3h)		;8f4a	2a c3 5c 	* . \ 
@@ -19176,16 +19166,12 @@ lcbf5h:
 	ld a,063h		;cbfd	3e 63 	> c 
 	cp c			;cbff	b9 	. 
 	jp c,lc94dh		;cc00	da 4d c9 	. M . 
-lcc03h:
 	ld l,c			;cc03	69 	i 
 	ld h,000h		;cc04	26 00 	& . 
 	ld de,0564fh		;cc06	11 4f 56 	. O V 
-lcc09h:
 	ld c,002h		;cc09	0e 02 	. . 
-lcc0bh:
 	call NUM2STR		;cc0b	cd 9e 0f 	. . . 
 	jp lc94dh		;cc0e	c3 4d c9 	. M . 
-lcc11h:
 	ld a,(0560dh)		;cc11	3a 0d 56 	: . V 
 lcc14h:
 	cp 020h		;cc14	fe 20 	.   
@@ -19716,9 +19702,9 @@ lcd8fh:
 	db 0x54, 0x4f, 0x50, 0x20, 0x50, 0x41, 0x47, 0x45   ; d9d8 : TOP PAGE
 	db 0x20, 0x43, 0x4c, 0x4f, 0x43, 0x4b, 0x20, 0x43   ; d9e0 :  CLOCK C
 	db 0x48, 0x49, 0x50, 0x20, 0x41, 0x43, 0x54, 0x49   ; d9e8 : HIP ACTI
-	db 0x56, 0x45
+	db 0x56, 0x45										; d9f0 : VE
 REF_TEXT_TEMP_US
-	db             0x54, 0x45, 0x4d, 0x50, 0x2e, 0x20   ; d9f2 : VETEMP. 
+	db             0x54, 0x45, 0x4d, 0x50, 0x2e, 0x20   ; d9f2 :   TEMP. 
 	db 0x30, 0x30, 0x30, 0x5c, 0x46, 0x5e, 0x20, 0x20   ; d9f8 : 000\F^  
 	db 0x20, 0x20, 0x48, 0x49, 0x20, 0x30, 0x30, 0x30   ; da00 :   HI 000
 	db 0x5c, 0x20, 0x4c, 0x4f, 0x20, 0x30, 0x30, 0x30   ; da08 : \ LO 000
