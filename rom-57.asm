@@ -10,11 +10,43 @@ DBG_SERIAL: equ 6
 
 MAGIC1: equ 0xff
 MAGIC2: equ 0xfa
+MAGIC3: equ 0xf5
+
+
+
 WEATHER_PARSE_INDEX: equ 0x55d7	; current index in parsing serial intput
 WEATHER_COUNTER_UNK: equ 0x55dd  ; Some sort of 0 to 5 counter
 WEATHER_PREVIOUS_XXX: equ 0x55de
 
-; Intereting addresses:
+SCRN_WEATHER_START: equ 0x55e5
+SCRN_WEATHER_LEN: equ 40*4
+
+; "TEMP. nnn\F^    HI nnn\ LO nnn\"
+SCRN_TEMP_LBL: equ SCRN_WEATHER_START
+SCRN_TEMP_VAL: equ 0x55eb		; Current temperature value
+SCRN_TEMP_DEG: equ 0x055ee		; 'degree' character
+SCRN_TEMP_DIR: equ 0x055f0		; Temperature direction (up or down)
+SCRN_TEMP_HI: equ 0x55f8
+SCRN_TEMP_LO: equ 0x5600
+
+; "WIND nn-bb MPH      CHIL  nnn\"
+SCRN_WIND_LBL: equ SCRN_WEATHER_START+40
+SCRN_WIND_SPEED: equ 0x5612
+SCRN_WIND_GUSTS: equ 0x5615
+SCRN_WIND_XXX:equ 0x0561d		; "FROM"?
+
+; "RAIN DAY n.nn'  MONTH nn.nn' "
+SCRN_RAIN_LBL: equ 0x565d
+SCRN_RAIN_DAY: equ 0x5673
+SCRN_RAIN_MONTH: equ 0x5666
+
+
+DEGREE_US: equ 0x5C		; 'degree' character on US systems (0x5c or '\')
+DEGREE_DE: equ 0x60		; 'degree' character on German systems (0x60 or '`')
+TEMP_DIR1: equ 0x5e		; Arrows up and down
+TEMP_DIR2: equ 0x5f		; for temperature direction
+
+; Interesting addresses:
 ; 0x55e5 = location in ram the machine uses to actually show the weather data to the screen. If I modify this memory space, I can modify what the weather panel shows. 
 ; 0x55B7 = locaion in ram the machine uses to manufacture a date/time screen I think'
 ; The weather space in memory is just below the date/time area at 55B7. SOOO CLOSE
@@ -33,9 +65,6 @@ WEATHER_PREVIOUS_XXX: equ 0x55de
 ; lc963h: for example is checking to see if TEMP (or, rather, that it does NOT contain a space) exists.
 ; The code that is rendering this RAM data to the screen is right after HANDLE_SERIAL in the ROM.
 
-
-55e5
-v565d: equ 0x565d
 
 v55eb: equ 0x55eb
 
@@ -7946,8 +7975,8 @@ l3295h:
 	ld de,0x30		;32a0	11 30 00	. 0 .
 	add hl,de		;32a3	19		.
 	ex de,hl		;32a4	eb		.
-	ld hl,055e5h		;32a5	21 e5 55	! . U
-	ld bc,000a0h		;32a8	01 a0 00	. . .
+	ld hl,SCRN_WEATHER_START
+	ld bc,SCRN_WEATHER_LEN
 	ldir			;32ab	ed b0		. .
 	pop de			;32ad	d1		.
 	inc de			;32ae	13		.
@@ -18722,9 +18751,9 @@ lc85eh:
 	ret			;c86b	c9 	. 
 
 HANDLE_SERIAL:
-	ld de,FIFO_SERIAL 
-	call FIFO_READ 
-	ret c
+	ld de,FIFO_SERIAL
+	call FIFO_READ		; Read char in A
+	ret c				; Exit if empty
 	ld b,DBG_SERIAL
 	call LOG_CHAR
 	ld c,a
@@ -18732,66 +18761,87 @@ HANDLE_SERIAL:
 	ld b,a			;c87c	47 	G 
 	ld a,(055dah)		;c87d	3a da 55 	: . U 
 	cp b			;c880	b8 	. 
-	jr nz,lc899h		;c881	20 16 	  . 
+	jr nz,CLEAR_RAIN_MONTH		; 00.00 in RAIN MONTH
 	ld a,(05b95h)		;c883	3a 95 5b 	: . [ 
 	ld b,a			;c886	47 	G 
 	ld a,(055d9h)		;c887	3a d9 55 	: . U 
 	cp b			;c88a	b8 	. 
-	jr nz,lc8b3h		;c88b	20 26 	  & 
+	jr nz,CLEAR_RAIN_DAY		; 0.00 in RAIN DAY 
 	ld a,(05b97h)		;c88d	3a 97 5b 	: . [ 
 	ld b,a			;c890	47 	G 
 	ld a,(055d8h)		;c891	3a d8 55 	: . U 
 	cp b			;c894	b8 	. 
 	jr nz,lc8dfh		;c895	20 48 	  H 
 	jr WEATHER_PARSE
-lc899h:
-	ld a,(v565d)		;c899	3a 5d 56 	: ] V 
+
+; Clear rain month value (and day and temp hi/lo and gusts)
+; RAIN DAY 0.00" MONTH 00.00"
+CLEAR_RAIN_MONTH:
+	ld a,(SCRN_RAIN_LBL)		; "R"AIN
 	cp ' '
-	jr z,lc8cdh		;c89e	28 2d 	( - 
-	ld a,02eh		;c8a0	3e 2e 	> . 
-	ld hl,05673h		;c8a2	21 73 56 	! s V 
-	ld (hl),020h		;c8a5	36 20 	6   
-	ld d,030h		;c8a7	16 30 	. 0 
-	inc hl			;c8a9	23 	# 
-	ld b,004h		;c8aa	06 04 	. . 
-lc8ach:
-	cp (hl)			;c8ac	be 	. 
-	jr z,lc8b0h		;c8ad	28 01 	( . 
-	ld (hl),d			;c8af	72 	r 
-lc8b0h:
-	inc hl			;c8b0	23 	# 
-	djnz lc8ach		;c8b1	10 f9 	. . 
-lc8b3h:
-	ld a,(v565d)		;c8b3	3a 5d 56 	: ] V 
+	jr z,SKIP_RAIN
+
+		; Fills SCRN_RAIN_DAY with " 00.00"
+		; (must already contain the '.')
+	ld a,'.'
+	ld hl,SCRN_RAIN_DAY
+	ld (hl),' '
+	ld d,'0'			; Fill with '0'
+	inc hl
+	ld b,4				; 5 char long
+_loop:
+	cp (hl)
+	jr z,_skip			; Skip '.'
+	ld (hl),d			; Write '0'
+_skip:
+	inc hl
+	djnz _loop
+
+; Clear rain day value (and temp hi/lo and gusts)
+CLEAR_RAIN_DAY:
+	ld a,(SCRN_RAIN_LBL)
 	cp ' '
-	jr z,lc8cdh		;c8b8	28 13 	( . 
-	ld a,02eh		;c8ba	3e 2e 	> . 
-	ld hl,05666h		;c8bc	21 66 56 	! f V 
-	ld (hl),020h		;c8bf	36 20 	6   
-	ld d,030h		;c8c1	16 30 	. 0 
-	inc hl			;c8c3	23 	# 
-	ld b,003h		;c8c4	06 03 	. . 
-lc8c6h:
-	cp (hl)			;c8c6	be 	. 
-	jr z,lc8cah		;c8c7	28 01 	( . 
-	ld (hl),d			;c8c9	72 	r 
-lc8cah:
-	inc hl			;c8ca	23 	# 
-	djnz lc8c6h		;c8cb	10 f9 	. . 
-lc8cdh:
-	ld hl,(055ebh)		;c8cd	2a eb 55 	* . U 
-	ld (055f8h),hl		;c8d0	22 f8 55 	" . U 
-	ld (05600h),hl		;c8d3	22 00 56 	" . V 
-	ld a,(055edh)		;c8d6	3a ed 55 	: . U 
-	ld (055fah),a		;c8d9	32 fa 55 	2 . U 
-	ld (05602h),a		;c8dc	32 02 56 	2 . V 
+	jr z,SKIP_RAIN
+
+		; Fills SCRN_RAIN_MONTH with " 0.00"
+		; (must already contain the '.')
+	ld a,'.' 
+	ld hl,SCRN_RAIN_MONTH
+	ld (hl),' '
+	ld d,'0'
+	inc hl
+	ld b,3
+_loop:
+	cp (hl)
+	jr z,_skip			; Skip '.'
+	ld (hl),d			; Write '0'
+_skip:
+	inc hl
+	djnz _loop
+
+; Clear temp hi/lo (and gusts)
+SKIP_RAIN:
+		; Copies TEMP to TEMP_HI and TEMP_LO
+		; (2 bytes + 1 byte)
+	ld hl,(SCRN_TEMP_VAL)
+	ld (SCRN_TEMP_HI),hl
+	ld (SCRN_TEMP_LO),hl
+	ld a,(SCRN_TEMP_VAL+2)
+	ld (SCRN_TEMP_HI+2),a
+	ld (SCRN_TEMP_LO+2),a
+
+; Clear gusts = wind
+; WINDS 00-00
+; (speed, gusts)
 lc8dfh:
-	ld a,(0560dh)		;c8df	3a 0d 56 	: . V 
-	cp 020h		;c8e2	fe 20 	.   
-	jr z,lc8ech		;c8e4	28 06 	( . 
-	ld hl,(05612h)		;c8e6	2a 12 56 	* . V 
-	ld (05615h),hl		;c8e9	22 15 56 	" . V 
-lc8ech:
+	ld a,(SCRN_WIND_LBL)		; "W"IND
+	cp ' '
+	jr z,_skip
+	ld hl,(SCRN_WIND_SPEED)		;c8e6	2a 12 56 	* . V 
+	ld (SCRN_WIND_GUSTS),hl		;c8e9	22 15 56 	" . V 
+
+_skip:
+		; Not sure what happens
 	ld a,(05b94h)		;c8ec	3a 94 5b 	: . [ 
 	ld (055dah),a		;c8ef	32 da 55 	2 . U 
 	ld a,(05b95h)		;c8f2	3a 95 5b 	: . [ 
@@ -18804,10 +18854,10 @@ lc8ech:
 WEATHER_PARSE:
 	ld a,c				; Serial char read
 	cp MAGIC1
-	ld a,(WEATHER_PARSE_INDEX)
+	ld a,(WEATHER_PARSE_INDEX)	; a is index/state
 	jr nz,_notmagic1    ; 
 
-		;	char is MAGIC1
+		;	char is MAGIC1 (0xff)
 		; State 1 or 2 => state = 1
 	cp 3
 	jr c,WEATHER_PARSE_RESET
@@ -18819,8 +18869,8 @@ WEATHER_PARSE:
 		; State == 8
 	ld a,(WEATHER_COUNTER_UNK)		;c90e	3a dd 55 	: . U 
 	cp 5
-	jp z,lcd2dh		;c913	ca 2d cd 	. - . 
-	inc a			;c916	3c 	< 
+	jp z,lcd2dh
+	inc a
 	ld (WEATHER_COUNTER_UNK),a 
 	jr WEATHER_PARSE_NEXT
 
@@ -18831,8 +18881,8 @@ _notmagic1:
 
 		; State == 8
 	ld a,0 
-	ld (WEATHER_COUNTER_UNK),a		;c922	32 dd 55 	2 . U 
-	jp lcd2dh		;c925	c3 2d cd 	. - . 
+	ld (WEATHER_COUNTER_UNK),a 
+	jp lcd2dh
 
 _label:
 	cp 002h		;c928	fe 02 	. . 
@@ -18861,15 +18911,15 @@ WEATHER_PARSE_IX1:
 	ld a,c
 	cp MAGIC2
 	jr z,WEATHER_PARSE_NEXT
-	jr WEATHER_PARSE_RESET		;c95a	18 ed 	. . 
+	jr WEATHER_PARSE_RESET
 lc95ch:
 	ld a,c			;c95c	79 	y 
 	cp 0f5h		;c95d	fe f5 	. . 
 	jr z,WEATHER_PARSE_NEXT		;c95f	28 ec 	( . 
 	jr WEATHER_PARSE_RESET		;c961	18 e6 	. . 
 lc963h:
-	ld a,(055e5h)		;c963	3a e5 55 	: . U 
-	cp 020h		;c966	fe 20 	.   
+	ld a,(SCRN_TEMP_LBL) 
+	cp ' '
 	jr z,WEATHER_PARSE_NEXT		;c968	28 e3 	( . 
 	ld a,(055dbh)		;c96a	3a db 55 	: . U 
 	ld b,a			;c96d	47 	G 
@@ -18892,10 +18942,10 @@ lc98fh:
 	xor a			; 
 	sbc hl,de		; -670 
 	jr c,lc9b1h		;c992	38 1d 	8 . 
-	ld de,055ebh		;c994	11 eb 55 	. . U 
+	ld de,SCRN_TEMP_VAL		;c994	11 eb 55 	. . U 
 	ld c,004h		;c997	0e 04 	. . 
 	call NUM2STR		;c999	cd 9e 0f 	. . . 
-	ld hl,055ebh		;c99c	21 eb 55 	! . U 
+	ld hl,SCRN_TEMP_VAL		;c99c	21 eb 55 	! . U 
 	call sub_c9a4h		;c99f	cd a4 c9 	. . . 
 	jr lc9cdh		;c9a2	18 29 	. ) 
 sub_c9a4h:
@@ -18917,21 +18967,21 @@ lc9b1h:
 	cpl			;c9b5	2f 	/ 
 	ld h,a			;c9b6	67 	g 
 	inc hl			;c9b7	23 	# 
-	ld de,055ech		;c9b8	11 ec 55 	. . U 
+	ld de,SCRN_TEMP_VAL+1		;c9b8	11 ec 55 	. . U 
 	ld c,003h		;c9bb	0e 03 	. . 
 	call NUM2STR		;c9bd	cd 9e 0f 	. . . 
-	ld hl,055ech		;c9c0	21 ec 55 	! . U 
+	ld hl,SCRN_TEMP_VAL+1		;c9c0	21 ec 55 	! . U 
 	ld a,(hl)			;c9c3	7e 	~ 
 	cp 030h		;c9c4	fe 30 	. 0 
 	jr nz,lc9cah		;c9c6	20 02 	  . 
 	ld (hl),020h		;c9c8	36 20 	6   
 lc9cah:
 	dec hl			;c9ca	2b 	+ 
-	ld (hl),02dh		;c9cb	36 2d 	6 - 
+	ld (hl),02dh 
 lc9cdh:
-	ld a,'\' 
-	call QUOTE_DE		;c9cf	cd 82 cd 	. . . 
-	ld (055eeh),a		;c9d2	32 ee 55 	2 . U 
+	ld a,DEGREE_US
+	call LOCAL_DEGREE	; Convert to German if needed
+	ld (SCRN_TEMP_DEG),a  ; Store in screen
 	ld a,(055dch)		;c9d5	3a dc 55 	: . U 
 	ld b,a			;c9d8	47 	G 
 	ld a,(055dbh)		;c9d9	3a db 55 	: . U 
@@ -18943,23 +18993,23 @@ lc9cdh:
 	inc b			;c9e2	04 	. 
 	cp b			;c9e3	b8 	. 
 	jr c,lc9f5h		;c9e4	38 0f 	8 . 
-	ld a,05eh		;c9e6	3e 5e 	> ^ 
+	ld a,TEMP_DIR1		;c9e6	3e 5e 	> ^ 
 	jr lc9ech		;c9e8	18 02 	. . 
 lc9eah:
-	ld a,05fh		;c9ea	3e 5f 	> _ 
+	ld a,TEMP_DIR2		;c9ea	3e 5f 	> _ 
 lc9ech:
-	ld (055f0h),a		;c9ec	32 f0 55 	2 . U 
+	ld (SCRN_TEMP_DIR),a
 	ld a,(055dbh)		;c9ef	3a db 55 	: . U 
 	ld (055dch),a		;c9f2	32 dc 55 	2 . U 
 lc9f5h:
-	ld a,(055ebh)		;c9f5	3a eb 55 	: . U 
-	cp 02dh		;c9f8	fe 2d 	. - 
+	ld a,(SCRN_TEMP_VAL)		;c9f5	3a eb 55 	: . U 
+	cp '-'
 	jr nz,lca51h		;c9fa	20 55 	  U 
-	ld a,(055f8h)		;c9fc	3a f8 55 	: . U 
-	cp 02dh		;c9ff	fe 2d 	. - 
+	ld a,(SCRN_TEMP_HI)		;c9fc	3a f8 55 	: . U 
+	cp '-'
 	jr nz,lca1ah		;ca01	20 17 	  . 
-	ld de,055ech		;ca03	11 ec 55 	. . U 
-	ld hl,055f9h		;ca06	21 f9 55 	! . U 
+	ld de,SCRN_TEMP_VAL+1		;ca03	11 ec 55 	. . U 
+	ld hl,SCRN_TEMP_HI+1		;ca06	21 f9 55 	! . U 
 	ld b,(hl)			;ca09	46 	F 
 	ld a,(de)			;ca0a	1a 	. 
 	cp b			;ca0b	b8 	. 
@@ -18974,11 +19024,11 @@ lc9f5h:
 lca17h:
 	call sub_ca3dh		;ca17	cd 3d ca 	. = . 
 lca1ah:
-	ld a,(05600h)		;ca1a	3a 00 56 	: . V 
+	ld a,(SCRN_TEMP_LO)		;ca1a	3a 00 56 	: . V 
 	cp 02dh		;ca1d	fe 2d 	. - 
 	jr nz,lca37h		;ca1f	20 16 	  . 
-	ld hl,055ech		;ca21	21 ec 55 	! . U 
-	ld de,05601h		;ca24	11 01 56 	. . V 
+	ld hl,SCRN_TEMP_VAL+1		;ca21	21 ec 55 	! . U 
+	ld de,SCRN_TEMP_LO+1		;ca24	11 01 56 	. . V 
 	ld b,(hl)			;ca27	46 	F 
 	ld a,(de)			;ca28	1a 	. 
 	cp b			;ca29	b8 	. 
@@ -18994,22 +19044,22 @@ lca37h:
 	call sub_ca45h		;ca37	cd 45 ca 	. E . 
 	jp WEATHER_PARSE_NEXT		;ca3a	c3 4d c9 	. M . 
 sub_ca3dh:
-	ld hl,055ebh		;ca3d	21 eb 55 	! . U 
-	ld de,055f8h		;ca40	11 f8 55 	. . U 
+	ld hl,SCRN_TEMP_VAL		;ca3d	21 eb 55 	! . U 
+	ld de,SCRN_TEMP_HI		;ca40	11 f8 55 	. . U 
 	jr lca4bh		;ca43	18 06 	. . 
 sub_ca45h:
-	ld hl,055ebh		;ca45	21 eb 55 	! . U 
-	ld de,05600h		;ca48	11 00 56 	. . V 
+	ld hl,SCRN_TEMP_VAL		;ca45	21 eb 55 	! . U 
+	ld de,SCRN_TEMP_LO		;ca48	11 00 56 	. . V 
 lca4bh:
 	ld bc,00003h		;ca4b	01 03 00 	. . . 
 	ldir		;ca4e	ed b0 	. . 
 	ret			;ca50	c9 	. 
 lca51h:
-	ld de,055f8h		;ca51	11 f8 55 	. . U 
+	ld de,SCRN_TEMP_HI		;ca51	11 f8 55 	. . U 
 	ld a,(de)			;ca54	1a 	. 
 	cp 02dh		;ca55	fe 2d 	. - 
 	jr z,lca73h		;ca57	28 1a 	( . 
-	ld hl,055ebh		;ca59	21 eb 55 	! . U 
+	ld hl,SCRN_TEMP_VAL		;ca59	21 eb 55 	! . U 
 	ld a,(de)			;ca5c	1a 	. 
 	ld b,(hl)			;ca5d	46 	F 
 	cp b			;ca5e	b8 	. 
@@ -19031,11 +19081,11 @@ lca51h:
 lca73h:
 	call sub_ca3dh		;ca73	cd 3d ca 	. = . 
 lca76h:
-	ld hl,05600h		;ca76	21 00 56 	! . V 
+	ld hl,SCRN_TEMP_LO		;ca76	21 00 56 	! . V 
 	ld a,(hl)			;ca79	7e 	~ 
 	cp 02dh		;ca7a	fe 2d 	. - 
 	jp z,WEATHER_PARSE_NEXT		;ca7c	ca 4d c9 	. M . 
-	ld de,055ebh		;ca7f	11 eb 55 	. . U 
+	ld de,SCRN_TEMP_VAL		;ca7f	11 eb 55 	. . U 
 	ld a,(de)			;ca82	1a 	. 
 	ld b,(hl)			;ca83	46 	F 
 	cp b			;ca84	b8 	. 
@@ -19058,8 +19108,8 @@ lca9ch:
 	call sub_ca45h		;ca9c	cd 45 ca 	. E . 
 	jp WEATHER_PARSE_NEXT		;ca9f	c3 4d c9 	. M . 
 lcaa2h:
-	ld a,(0560dh)		;caa2	3a 0d 56 	: . V 
-	cp 020h		;caa5	fe 20 	.   
+	ld a,(SCRN_WIND_LBL)
+	cp ' '   
 	jp z,WEATHER_PARSE_NEXT		;caa7	ca 4d c9 	. M . 
 	ld a,c			;caaa	79 	y 
 	cpl			;caab	2f 	/ 
@@ -19095,17 +19145,20 @@ lcad4h:
 	and 008h		;cae7	e6 08 	. . 
 	jp z,lcbb6h		;cae9	ca b6 cb 	. . . 
 lcaech:
-	ld (0561dh),hl		;caec	22 1d 56 	" . V 
-	ld hl,0cbech		;caef	21 ec cb 	! . . 
+	ld (SCRN_WIND_XXX),hl	; Full 2bytes copied ?
+	ld hl,CHILL_LBL
 	ld de,0561fh		;caf2	11 1f 56 	. . V 
-	ld bc,00009h		;caf5	01 09 00 	. . . 
-	ldir		;caf8	ed b0 	. . 
+	ld bc,9
+	ldir
 	ld a,(05fd0h)		;cafa	3a d0 5f 	: . _ 
 	cp 005h		;cafd	fe 05 	. . 
 	jr nc,lcb0fh		;caff	30 0e 	0 . 
+
+	; Copies temperature into the wind field?
+	; Like in the wind temperature field?
 	ld hl,055eah		;cb01	21 ea 55 	! . U 
 	ld de,05627h		;cb04	11 27 56 	. ' V 
-	ld bc,FLAG_DISP		;cb07	01 04 00 	. . . 
+	ld bc,4 
 	ldir		;cb0a	ed b0 	. . 
 	jp lcbaah		;cb0c	c3 aa cb 	. . . 
 lcb0fh:
@@ -19187,18 +19240,19 @@ lcb92h:
 	dec hl			;cba7	2b 	+ 
 	ld (hl),02dh		;cba8	36 2d 	6 - 
 lcbaah:
-	ld a,'\' 
-	call QUOTE_DE		;cbac	cd 82 cd 	. . . 
+	ld a,DEGREE_US 
+	call LOCAL_DEGREE		; Convert to German if needed
 	ld hl,0562bh		;cbaf	21 2b 56 	! + V 
 	ld (hl),a			;cbb2	77 	w 
 	jp WEATHER_PARSE_NEXT		;cbb3	c3 4d c9 	. M . 
 lcbb6h:
-	push hl			;cbb6	e5 	. 
-	ld hl,lcbddh		;cbb7	21 dd cb 	! . . 
-	ld de,0561dh		;cbba	11 1d 56 	. . V 
-	ld bc,0000fh		;cbbd	01 0f 00 	. . . 
-	ldir		;cbc0	ed b0 	. . 
-	pop hl			;cbc2	e1 	. 
+		; Copies "FROM   " in right side of WIND
+	push hl
+	ld hl,FROM_LBL	; "FROM       "
+	ld de,SCRN_WIND_XXX
+	ld bc,15
+	ldir
+	pop hl
 	ld (05622h),hl		;cbc3	22 22 56 	" " V 
 	jp WEATHER_PARSE_NEXT		;cbc6	c3 4d c9 	. M . 
 
@@ -19207,8 +19261,10 @@ lcbb6h:
 
 lcbc9h:
 	db "W E   S SWSE  N NWNE"
-lcbddh:
-	db "FROM             CHILL  "
+FROM_LBL:
+	db "FROM           " ; 15 bytes
+CHILL_LBL:
+	db "  CHILL  "		 ; 9 bytes
 
 lcbf5h:
 	ld a,(05645h)		;cbf5	3a 45 56 	: E V 
@@ -19223,9 +19279,9 @@ lcbf5h:
 	ld c,002h		;cc09	0e 02 	. . 
 	call NUM2STR		;cc0b	cd 9e 0f 	. . . 
 	jp WEATHER_PARSE_NEXT		;cc0e	c3 4d c9 	. M . 
-	ld a,(0560dh)		;cc11	3a 0d 56 	: . V 
+	ld a,(SCRN_WIND_LBL)		;cc11	3a 0d 56 	: . V 
 lcc14h:
-	cp 020h		;cc14	fe 20 	.   
+	cp ' '
 	jp z,WEATHER_PARSE_NEXT		;cc16	ca 4d c9 	. M . 
 	ld ix,05fd0h		;cc19	dd 21 d0 5f 	. ! . _ 
 	ld a,(CFG8)		;cc1d	3a 3d 00 	: = . 
@@ -19288,18 +19344,18 @@ lcc78h:
 	ld l,c			;cc7d	69 	i 
 	ld h,000h		;cc7e	26 00 	& . 
 	push hl			;cc80	e5 	. 
-	ld de,05612h		;cc81	11 12 56 	. . V 
-	ld c,002h		;cc84	0e 02 	. . 
+	ld de,SCRN_WIND_SPEED		;cc81	11 12 56 	. . V 
+	ld c,2 
 	call NUM2STR		;cc86	cd 9e 0f 	. . . 
-	ld de,05615h		;cc89	11 15 56 	. . V 
-	ld c,002h		;cc8c	0e 02 	. . 
+	ld de,SCRN_WIND_GUSTS		;cc89	11 15 56 	. . V 
+	ld c,2
 	call STR2NUM		;cc8e	cd 54 0f 	. T . 
 	ld a,l			;cc91	7d 	} 
 	pop hl			;cc92	e1 	. 
 	cp l			;cc93	bd 	. 
 	jr nc,lcc9ch		;cc94	30 06 	0 . 
-	ld hl,(05612h)		;cc96	2a 12 56 	* . V 
-	ld (05615h),hl		;cc99	22 15 56 	" . V 
+	ld hl,(SCRN_WIND_SPEED)		;cc96	2a 12 56 	* . V 
+	ld (SCRN_WIND_GUSTS),hl		;cc99	22 15 56 	" . V 
 lcc9ch:
 	ld hl,(05633h)		;cc9c	2a 33 56 	* 3 V 
 	ld a,020h		;cc9f	3e 20 	>   
@@ -19376,7 +19432,7 @@ lcd21h:
 	jp WEATHER_PARSE_NEXT		;cd2a	c3 4d c9 	. M . 
 
 lcd2dh:
-	ld a,(v565d)
+	ld a,(SCRN_RAIN_LBL)
 	cp ' '
 	jp z,WEATHER_PARSE_NEXT		; not interested, skip 
 	ld a,(WEATHER_PREVIOUS_XXX) 
@@ -19430,16 +19486,16 @@ _skip:
 	djnz INCREMENT_ASCII_NUMBER 
 	ret 
 
+; Makes sure the correct 'degree' symbol is used
 ; A='``' if German (called with A='\')
-; Unsure if really a quote (ie: ascii), or some value 0x5c/0x60 (92/96)
-QUOTE_DE:
+LOCAL_DEGREE:
 	push bc 
 	ld b,a 
 	ld a,(CFG4_LANG)
 	ld a,b
 	cp LANG_DE 
 	jp nz,_skip 
-	ld a,'`'
+	ld a,DEGREE_DE
 _skip:
 	pop bc 
 	ret 
