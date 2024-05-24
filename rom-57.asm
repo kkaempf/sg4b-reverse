@@ -5,6 +5,40 @@ v4f89: equ 0x4f89
 p4f84: equ 0x4f84
 v53c2: equ 0x53c2
 
+vDBG_LEVEL: equ 0x5cb9
+DBG_SERIAL: equ 6
+
+MAGIC1: equ 0xff
+MAGIC2: equ 0xfa
+WEATHER_PARSE_INDEX: equ 0x55d7	; current index in parsing serial intput
+WEATHER_COUNTER_UNK: equ 0x55dd  ; Some sort of 0 to 5 counter
+WEATHER_PREVIOUS_XXX: equ 0x55de
+
+; Intereting addresses:
+; 0x55e5 = location in ram the machine uses to actually show the weather data to the screen. If I modify this memory space, I can modify what the weather panel shows. 
+; 0x55B7 = locaion in ram the machine uses to manufacture a date/time screen I think'
+; The weather space in memory is just below the date/time area at 55B7. SOOO CLOSE
+; 55EB,3    current temperature
+; 55F8,3    low temperature    (calculated from past history)
+; 5600,3    high temperature (calculated from past history)
+; 5612,2    wind speed
+; 5622,2    wind direction
+; 563B,?    Barometer (4 or 5 digits?)
+; 564F,2    Humidity
+; 5666,?    rain total today (3 or 4 digits?) (calculated ?)
+; 5673,?    rain this month (4 or 5 digits?) (calculated from past history) 
+; sub_ca45h: is probably "Copy Current Temp into High Temp Field" 
+; sub_ca3dh: is probably "Copy Current Temp into Low Temp Field" 
+; Found where the code is checking to see if the screen actually contains something other than a space where it should say TEMP or RAIN or whatever..
+; lc963h: for example is checking to see if TEMP (or, rather, that it does NOT contain a space) exists.
+; The code that is rendering this RAM data to the screen is right after HANDLE_SERIAL in the ROM.
+
+
+55e5
+v565d: equ 0x565d
+
+v55eb: equ 0x55eb
+
 ; Strange: overwrites other. Either there is a memory mapping, or this is only scracth space
 vUserCodes: equ 0x53c3	; See manual page 3-51
 						; 24 entries of 10 bytes
@@ -272,7 +306,9 @@ CFG2:
 	db 0xff, 0xff, 0xff
 CFG3:
 	db 0xff
-CFG4:
+CFG4_LANG:
+LANG_US: equ 0xff
+LANG_DE: equ 0xaa
 	db 0xff				;	0xaa for German
 CFG5:
 	db 0xaa
@@ -2732,8 +2768,8 @@ KBD_TRANSLATE:
 	push bc
 	push hl
 	ld b,a
-	ld a,(CFG4)
-	cp 0xaa
+	ld a,(CFG4_LANG)
+	cp LANG_DE
 	ld a,b
 	jr nz,_skiptranslate
 	ld b,19
@@ -4065,7 +4101,7 @@ NEXT_KEY:
 	jr NEXT_KEY		;17ea	18 ea		. .
 l17ech:
 	ld b,001h		;17ec	06 01		. .
-	call sub_1ae6h		;17ee	cd e6 1a	. . .
+	call LOG_CHAR		;17ee	cd e6 1a	. . .
 	ld b,a			;17f1	47		G
 	call sub_82b6h		; Some kind of key mapping
 TYPE_KEY:
@@ -4439,15 +4475,15 @@ READ_ADRS:
 l1a78h:
 	call sub_1b0dh		;1a78	cd 0d 1b	. . .
 	call NEXT_MACRO_OR_KEY
-	call OUT_CH		; Based on the usage of 05cb9h, this outputs a single digit
-	and 0x0f
-	ld (05cb9h),a
+	call OUT_CH
+	and %00001111
+	ld (vDBG_LEVEL),a
 _loop:
 	call NEXT_MACRO_OR_KEY
 	cp 0x1b				; ESC
 	jr nz,_loop
 	ld a,000h		;1a8d	3e 00		> .
-	ld (05cb9h),a		;1a8f	32 b9 5c	2 . \
+	ld (vDBG_LEVEL),a		;1a8f	32 b9 5c	2 . \
 	jp SHIFT_EDIT_CMDS		;1a92	c3 86 19	. . .
 
 l1a95h:
@@ -4524,10 +4560,10 @@ _throw:
 	scf
 	ret
 
-; Weird routine maybe some debug. Displays a as char or '*HEX2'. Does nothing if the content of 05cb9h is zero or not equal to b.
-sub_1ae6h:
+; Weird routine maybe some debug. Displays a as char or '*HEX2'. Does nothing if the content of vDBG_LEVEL is zero or not equal to b.
+LOG_CHAR:
 	push af
-	ld a,(05cb9h)
+	ld a,(vDBG_LEVEL)
 	or a
 	jr z,_exit		; exit if A==0
 	cp b
@@ -5844,7 +5880,7 @@ _loop:
 	inc hl
 	djnz _loop
 	ld a,0
-	ld (05cb9h),a
+	ld (vDBG_LEVEL),a
 	ret			;235b	c9		.
 
 FUN_F8:
@@ -10837,7 +10873,7 @@ l8b83h:
 	ret			;8b99	c9 	. 
 l8b9ah:
 	ld b,004h		;8b9a	06 04 	. . 
-	call sub_1ae6h		;8b9c	cd e6 1a 	. . . 
+	call LOG_CHAR		;8b9c	cd e6 1a 	. . . 
 	ld b,a			;8b9f	47 	G 
 	call sub_8b36h		;8ba0	cd 36 8b 	. 6 . 
 	cp 0aah		;8ba3	fe aa 	. . 
@@ -13613,7 +13649,7 @@ HANDLE_KBD:
 	ld hl,05bb8h		;a0dd	21 b8 5b 	! . [ 
 	M_CALL_WITH_MMAP0 sub_c103h
 	ld b,002h		;a0e5	06 02 	. . 
-	call sub_1ae6h		;a0e7	cd e6 1a 	. . . 
+	call LOG_CHAR		;a0e7	cd e6 1a 	. . . 
 	push af			;a0ea	f5 	. 
 	ld b,a			;a0eb	47 	G 
 	ld a,(05bb9h)		;a0ec	3a b9 5b 	: . [ 
@@ -13883,7 +13919,7 @@ la2afh:
 	ld a,c			;a2b2	79 	y 
 	M_CALL_WITH_MMAP0 sub_c103h
 	ld b,002h		;a2b8	06 02 	. . 
-	call sub_1ae6h		;a2ba	cd e6 1a 	. . . 
+	call LOG_CHAR		;a2ba	cd e6 1a 	. . . 
 	cp 01fh		;a2bd	fe 1f 	. . 
 	ret z			;a2bf	c8 	. 
 	cp 01ch		;a2c0	fe 1c 	. . 
@@ -14135,7 +14171,7 @@ HANDLE_FIFO4_1:
 	ld hl,05bdeh		;a492	21 de 5b 	! . [ 
 	M_CALL_WITH_MMAP0 sub_c103h
 	ld b,003h		;a49a	06 03 	. . 
-	call sub_1ae6h		;a49c	cd e6 1a 	. . . 
+	call LOG_CHAR		;a49c	cd e6 1a 	. . . 
 	push af			;a49f	f5 	. 
 	ld b,a			;a4a0	47 	G 
 	cp 01ch		;a4a1	fe 1c 	. . 
@@ -14424,7 +14460,7 @@ HANDLE_FIFO4_2:
 	ret c			;a68f	d8 	. 
 	res 7,a		;a690	cb bf 	. . 
 	ld b,003h		;a692	06 03 	. . 
-	call sub_1ae6h		;a694	cd e6 1a 	. . . 
+	call LOG_CHAR		;a694	cd e6 1a 	. . . 
 	call sub_a818h		;a697	cd 18 a8 	. . . 
 	ld c,a			;a69a	4f 	O 
 	ld ix,05541h		;a69b	dd 21 41 55 	. ! A U 
@@ -14649,7 +14685,7 @@ HANDLE_FIFO6:
 la84ah:
 	res 7,a		;a84a	cb bf 	. . 
 	ld b,005h		;a84c	06 05 	. . 
-	call sub_1ae6h		;a84e	cd e6 1a 	. . . 
+	call LOG_CHAR		;a84e	cd e6 1a 	. . . 
 	call sub_a85eh		;a851	cd 5e a8 	. ^ . 
 	ret z			;a854	c8 	. 
 	call sub_a870h		;a855	cd 70 a8 	. p . 
@@ -14998,7 +15034,7 @@ laacfh:
 	call KEY2CHAR		;aacf	cd f2 0f 	. . . 
 laad2h:
 	ld b,005h		;aad2	06 05 	. . 
-	call sub_1ae6h		;aad4	cd e6 1a 	. . . 
+	call LOG_CHAR		;aad4	cd e6 1a 	. . . 
 	ld (0604eh),a		;aad7	32 4e 60 	2 N ` 
 	ld a,0ffh		;aada	3e ff 	> . 
 	ld (05fd5h),a		;aadc	32 d5 5f 	2 . _ 
@@ -17894,11 +17930,11 @@ sub_c204h:
 	push de			;c204	d5 	. 
 	ld d,h			;c205	54 	T 
 	ld e,l			;c206	5d 	] 
-	add hl,hl			;c207	29 	) 
-	add hl,hl			;c208	29 	) 
-	add hl,hl			;c209	29 	) 
-	add hl,de			;c20a	19 	. 
-	add hl,hl			;c20b	29 	) 
+	add hl,hl			; *2
+	add hl,hl			; *4 
+	add hl,hl			; *8 
+	add hl,de			; *9 
+	add hl,hl			; *18 
 	pop de			;c20c	d1 	. 
 	ret			;c20d	c9 	. 
 sub_c20eh:
@@ -18363,8 +18399,8 @@ lc5f3h:
 	out (PORT_20),a		;c608	d3 20 	.   
 	ret			;c60a	c9 	. 
 sub_c60bh:
-	ld a,(CFG4)		;c60b	3a 0b 00 	: . . 
-	cp 0aah		;c60e	fe aa 	. . 
+	ld a,(CFG4_LANG) 
+	cp LANG_DE 
 	ld hl,TIME_LABEL_EN		;c610	21 0a c7 	! . . 
 	push hl			;c613	e5 	. 
 	ld hl,MONTH_EN		;c614	21 e6 c6 	! . . 
@@ -18403,8 +18439,8 @@ lc62bh:
 	ldir		;c64c	ed b0 	. . 
 	pop bc			;c64e	c1 	. 
 	inc bc			;c64f	03 	. 
-	ld a,(CFG4)		;c650	3a 0b 00 	: . . 
-	cp 0aah		;c653	fe aa 	. . 
+	ld a,(CFG4_LANG) 
+	cp LANG_DE
 	jr nz,lc66ch		;c655	20 15 	  . 
 	ld a,020h		;c657	3e 20 	>   
 	ld (de),a			;c659	12 	. 
@@ -18447,9 +18483,9 @@ lc672h:
 	ld (de),a			;c68a	12 	. 
 	inc de			;c68b	13 	. 
 	inc bc			;c68c	03 	. 
-	ld a,(CFG4)		;c68d	3a 0b 00 	: . . 
-	cp 0aah		;c690	fe aa 	. . 
-	ret z			;c692	c8 	. 
+	ld a,(CFG4_LANG) 
+	cp LANG_DE 
+	ret z
 	ld a,(bc)			;c693	0a 	. 
 	or a			;c694	b7 	. 
 	ld a,041h		;c695	3e 41 	> A 
@@ -18686,12 +18722,12 @@ lc85eh:
 	ret			;c86b	c9 	. 
 
 HANDLE_SERIAL:
-	ld de,FIFO_SERIAL		;c86c	11 e0 40 	. . @ 
-	call FIFO_READ		;c86f	cd e1 0e 	. . . 
-	ret c			;c872	d8 	. 
-	ld b,006h		;c873	06 06 	. . 
-	call sub_1ae6h		;c875	cd e6 1a 	. . . 
-	ld c,a			;c878	4f 	O 
+	ld de,FIFO_SERIAL 
+	call FIFO_READ 
+	ret c
+	ld b,DBG_SERIAL
+	call LOG_CHAR
+	ld c,a
 	ld a,(05b94h)		;c879	3a 94 5b 	: . [ 
 	ld b,a			;c87c	47 	G 
 	ld a,(055dah)		;c87d	3a da 55 	: . U 
@@ -18707,10 +18743,10 @@ HANDLE_SERIAL:
 	ld a,(055d8h)		;c891	3a d8 55 	: . U 
 	cp b			;c894	b8 	. 
 	jr nz,lc8dfh		;c895	20 48 	  H 
-	jr lc8feh		;c897	18 65 	. e 
+	jr WEATHER_PARSE
 lc899h:
-	ld a,(0565dh)		;c899	3a 5d 56 	: ] V 
-	cp 020h		;c89c	fe 20 	.   
+	ld a,(v565d)		;c899	3a 5d 56 	: ] V 
+	cp ' '
 	jr z,lc8cdh		;c89e	28 2d 	( - 
 	ld a,02eh		;c8a0	3e 2e 	> . 
 	ld hl,05673h		;c8a2	21 73 56 	! s V 
@@ -18726,8 +18762,8 @@ lc8b0h:
 	inc hl			;c8b0	23 	# 
 	djnz lc8ach		;c8b1	10 f9 	. . 
 lc8b3h:
-	ld a,(0565dh)		;c8b3	3a 5d 56 	: ] V 
-	cp 020h		;c8b6	fe 20 	.   
+	ld a,(v565d)		;c8b3	3a 5d 56 	: ] V 
+	cp ' '
 	jr z,lc8cdh		;c8b8	28 13 	( . 
 	ld a,02eh		;c8ba	3e 2e 	> . 
 	ld hl,05666h		;c8bc	21 66 56 	! f V 
@@ -18762,84 +18798,99 @@ lc8ech:
 	ld (055d9h),a		;c8f5	32 d9 55 	2 . U 
 	ld a,(05b97h)		;c8f8	3a 97 5b 	: . [ 
 	ld (055d8h),a		;c8fb	32 d8 55 	2 . U 
-lc8feh:
-	ld a,c			;c8fe	79 	y 
-	cp 0ffh		;c8ff	fe ff 	. . 
-	ld a,(055d7h)		;c901	3a d7 55 	: . U 
-	jr nz,lc91ch		;c904	20 16 	  . 
-	cp 003h		;c906	fe 03 	. . 
-	jr c,lc949h		;c908	38 3f 	8 ? 
-	cp 008h		;c90a	fe 08 	. . 
-	jr nz,lc94dh		;c90c	20 3f 	  ? 
-	ld a,(055ddh)		;c90e	3a dd 55 	: . U 
-	cp 005h		;c911	fe 05 	. . 
+
+; Parse serial input as weather command
+; c contains current char
+WEATHER_PARSE:
+	ld a,c				; Serial char read
+	cp MAGIC1
+	ld a,(WEATHER_PARSE_INDEX)
+	jr nz,_notmagic1    ; 
+
+		;	char is MAGIC1
+		; State 1 or 2 => state = 1
+	cp 3
+	jr c,WEATHER_PARSE_RESET
+
+		; State !=8 => next state
+	cp 8
+	jr nz,WEATHER_PARSE_NEXT
+
+		; State == 8
+	ld a,(WEATHER_COUNTER_UNK)		;c90e	3a dd 55 	: . U 
+	cp 5
 	jp z,lcd2dh		;c913	ca 2d cd 	. - . 
 	inc a			;c916	3c 	< 
-	ld (055ddh),a		;c917	32 dd 55 	2 . U 
-	jr lc94dh		;c91a	18 31 	. 1 
-lc91ch:
-	cp 008h		;c91c	fe 08 	. . 
-	jr nz,lc928h		;c91e	20 08 	  . 
-	ld a,000h		;c920	3e 00 	> . 
-	ld (055ddh),a		;c922	32 dd 55 	2 . U 
+	ld (WEATHER_COUNTER_UNK),a 
+	jr WEATHER_PARSE_NEXT
+
+_notmagic1:
+
+	cp 8
+	jr nz,_label
+
+		; State == 8
+	ld a,0 
+	ld (WEATHER_COUNTER_UNK),a		;c922	32 dd 55 	2 . U 
 	jp lcd2dh		;c925	c3 2d cd 	. - . 
-lc928h:
+
+_label:
 	cp 002h		;c928	fe 02 	. . 
-	jr c,lc955h		;c92a	38 29 	8 ) 
+	jr c,WEATHER_PARSE_IX1
 	jr z,lc95ch		;c92c	28 2e 	( . 
 	cp 004h		;c92e	fe 04 	. . 
 	jr c,lc963h		;c930	38 31 	8 1 
 	jp z,lcaa2h		;c932	ca a2 ca 	. . . 
 	cp 006h		;c935	fe 06 	. . 
 	jp c,lcbf5h		;c937	da f5 cb 	. . . 
-	jp z,lcc11h		;c93a	ca 11 cc 	. . . 
+	jp z,0xcc11		;c93a	ca 11 cc 	. . . 
 	cp 008h		;c93d	fe 08 	. . 
 	jp c,lccaah		;c93f	da aa cc 	. . . 
 	jp z,lcd2dh		;c942	ca 2d cd 	. - . 
 	cp 00ah		;c945	fe 0a 	. . 
-	jr c,lc94dh		;c947	38 04 	8 . 
-lc949h:
-	xor a			;c949	af 	. 
-	ld (055d7h),a		;c94a	32 d7 55 	2 . U 
-lc94dh:
-	ld a,(055d7h)		;c94d	3a d7 55 	: . U 
-	inc a			;c950	3c 	< 
-	ld (055d7h),a		;c951	32 d7 55 	2 . U 
-	ret			;c954	c9 	. 
-lc955h:
-	ld a,c			;c955	79 	y 
-	cp 0fah		;c956	fe fa 	. . 
-	jr z,lc94dh		;c958	28 f3 	( . 
-	jr lc949h		;c95a	18 ed 	. . 
+	jr c,WEATHER_PARSE_NEXT		;c947	38 04 	8 . 
+WEATHER_PARSE_RESET:	; back to char 1 (accepted MAGIC1)
+	xor a
+	ld (WEATHER_PARSE_INDEX),a
+WEATHER_PARSE_NEXT:
+	ld a,(WEATHER_PARSE_INDEX) 
+	inc a 
+	ld (WEATHER_PARSE_INDEX),a
+	ret
+WEATHER_PARSE_IX1:
+	ld a,c
+	cp MAGIC2
+	jr z,WEATHER_PARSE_NEXT
+	jr WEATHER_PARSE_RESET		;c95a	18 ed 	. . 
 lc95ch:
 	ld a,c			;c95c	79 	y 
 	cp 0f5h		;c95d	fe f5 	. . 
-	jr z,lc94dh		;c95f	28 ec 	( . 
-	jr lc949h		;c961	18 e6 	. . 
+	jr z,WEATHER_PARSE_NEXT		;c95f	28 ec 	( . 
+	jr WEATHER_PARSE_RESET		;c961	18 e6 	. . 
 lc963h:
 	ld a,(055e5h)		;c963	3a e5 55 	: . U 
 	cp 020h		;c966	fe 20 	.   
-	jr z,lc94dh		;c968	28 e3 	( . 
+	jr z,WEATHER_PARSE_NEXT		;c968	28 e3 	( . 
 	ld a,(055dbh)		;c96a	3a db 55 	: . U 
 	ld b,a			;c96d	47 	G 
 	ld a,c			;c96e	79 	y 
 	ld (055dbh),a		;c96f	32 db 55 	2 . U 
 	cp b			;c972	b8 	. 
-	jr nz,lc94dh		;c973	20 d8 	  . 
+	jr nz,WEATHER_PARSE_NEXT		;c973	20 d8 	  . 
 	ld h,000h		;c975	26 00 	& . 
 	ld l,b			;c977	68 	h 
 	ld a,(05685h)		;c978	3a 85 56 	: . V 
 	bit 0,a		;c97b	cb 47 	. G 
 	jp z,lc989h		;c97d	ca 89 c9 	. . . 
 	call sub_c1fbh		;c980	cd fb c1 	. . . 
-	ld de,00226h		;c983	11 26 02 	. & . 
-	jp lc98fh		;c986	c3 8f c9 	. . . 
+	ld de,550		;
+	jp lc98fh		;
 lc989h:
-	call sub_c204h		;c989	cd 04 c2 	. . . 
-	ld de,0029eh		;c98c	11 9e 02 	. . . 
+	call sub_c204h		; *18
+	ld de,670 
 lc98fh:
-	xor a			;c98f	af 	. 
-	sbc hl,de		;c990	ed 52 	. R 
+	xor a			; 
+	sbc hl,de		; -670 
 	jr c,lc9b1h		;c992	38 1d 	8 . 
 	ld de,055ebh		;c994	11 eb 55 	. . U 
 	ld c,004h		;c997	0e 04 	. . 
@@ -18878,8 +18929,8 @@ lc9cah:
 	dec hl			;c9ca	2b 	+ 
 	ld (hl),02dh		;c9cb	36 2d 	6 - 
 lc9cdh:
-	ld a,05ch		;c9cd	3e 5c 	> \ 
-	call sub_cd82h		;c9cf	cd 82 cd 	. . . 
+	ld a,'\' 
+	call QUOTE_DE		;c9cf	cd 82 cd 	. . . 
 	ld (055eeh),a		;c9d2	32 ee 55 	2 . U 
 	ld a,(055dch)		;c9d5	3a dc 55 	: . U 
 	ld b,a			;c9d8	47 	G 
@@ -18932,16 +18983,16 @@ lca1ah:
 	ld a,(de)			;ca28	1a 	. 
 	cp b			;ca29	b8 	. 
 	jr c,lca37h		;ca2a	38 0b 	8 . 
-	jp nz,lc94dh		;ca2c	c2 4d c9 	. M . 
+	jp nz,WEATHER_PARSE_NEXT		;ca2c	c2 4d c9 	. M . 
 	inc hl			;ca2f	23 	# 
 	inc de			;ca30	13 	. 
 	ld b,(hl)			;ca31	46 	F 
 	ld a,(de)			;ca32	1a 	. 
 	cp b			;ca33	b8 	. 
-	jp nc,lc94dh		;ca34	d2 4d c9 	. M . 
+	jp nc,WEATHER_PARSE_NEXT		;ca34	d2 4d c9 	. M . 
 lca37h:
 	call sub_ca45h		;ca37	cd 45 ca 	. E . 
-	jp lc94dh		;ca3a	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;ca3a	c3 4d c9 	. M . 
 sub_ca3dh:
 	ld hl,055ebh		;ca3d	21 eb 55 	! . U 
 	ld de,055f8h		;ca40	11 f8 55 	. . U 
@@ -18983,44 +19034,44 @@ lca76h:
 	ld hl,05600h		;ca76	21 00 56 	! . V 
 	ld a,(hl)			;ca79	7e 	~ 
 	cp 02dh		;ca7a	fe 2d 	. - 
-	jp z,lc94dh		;ca7c	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;ca7c	ca 4d c9 	. M . 
 	ld de,055ebh		;ca7f	11 eb 55 	. . U 
 	ld a,(de)			;ca82	1a 	. 
 	ld b,(hl)			;ca83	46 	F 
 	cp b			;ca84	b8 	. 
 	jr c,lca9ch		;ca85	38 15 	8 . 
-	jp nz,lc94dh		;ca87	c2 4d c9 	. M . 
+	jp nz,WEATHER_PARSE_NEXT		;ca87	c2 4d c9 	. M . 
 	inc hl			;ca8a	23 	# 
 	inc de			;ca8b	13 	. 
 	ld a,(de)			;ca8c	1a 	. 
 	ld b,(hl)			;ca8d	46 	F 
 	cp b			;ca8e	b8 	. 
 	jr c,lca9ch		;ca8f	38 0b 	8 . 
-	jp nz,lc94dh		;ca91	c2 4d c9 	. M . 
+	jp nz,WEATHER_PARSE_NEXT		;ca91	c2 4d c9 	. M . 
 	inc hl			;ca94	23 	# 
 	inc de			;ca95	13 	. 
 	ld a,(de)			;ca96	1a 	. 
 	ld b,(hl)			;ca97	46 	F 
 	cp b			;ca98	b8 	. 
-	jp nc,lc94dh		;ca99	d2 4d c9 	. M . 
+	jp nc,WEATHER_PARSE_NEXT		;ca99	d2 4d c9 	. M . 
 lca9ch:
 	call sub_ca45h		;ca9c	cd 45 ca 	. E . 
-	jp lc94dh		;ca9f	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;ca9f	c3 4d c9 	. M . 
 lcaa2h:
 	ld a,(0560dh)		;caa2	3a 0d 56 	: . V 
 	cp 020h		;caa5	fe 20 	.   
-	jp z,lc94dh		;caa7	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;caa7	ca 4d c9 	. M . 
 	ld a,c			;caaa	79 	y 
 	cpl			;caab	2f 	/ 
 	and 00fh		;caac	e6 0f 	. . 
 	cp 00bh		;caae	fe 0b 	. . 
-	jp nc,lc94dh		;cab0	d2 4d c9 	. M . 
+	jp nc,WEATHER_PARSE_NEXT		;cab0	d2 4d c9 	. M . 
 	or a			;cab3	b7 	. 
-	jp z,lc94dh		;cab4	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;cab4	ca 4d c9 	. M . 
 	cp 003h		;cab7	fe 03 	. . 
-	jp z,lc94dh		;cab9	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;cab9	ca 4d c9 	. M . 
 	cp 007h		;cabc	fe 07 	. . 
-	jp z,lc94dh		;cabe	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;cabe	ca 4d c9 	. M . 
 	dec a			;cac1	3d 	= 
 	add a,a			;cac2	87 	. 
 	ld hl,lcbc9h		;cac3	21 c9 cb 	! . . 
@@ -19032,7 +19083,7 @@ lcaa2h:
 	ld d,(hl)			;cacc	56 	V 
 	ex de,hl			;cacd	eb 	. 
 	ld (05633h),hl		;cace	22 33 56 	" 3 V 
-	jp lc94dh		;cad1	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;cad1	c3 4d c9 	. M . 
 lcad4h:
 	ld a,(055dbh)		;cad4	3a db 55 	: . U 
 	cp 03fh		;cad7	fe 3f 	. ? 
@@ -19136,11 +19187,11 @@ lcb92h:
 	dec hl			;cba7	2b 	+ 
 	ld (hl),02dh		;cba8	36 2d 	6 - 
 lcbaah:
-	ld a,05ch		;cbaa	3e 5c 	> \ 
-	call sub_cd82h		;cbac	cd 82 cd 	. . . 
+	ld a,'\' 
+	call QUOTE_DE		;cbac	cd 82 cd 	. . . 
 	ld hl,0562bh		;cbaf	21 2b 56 	! + V 
 	ld (hl),a			;cbb2	77 	w 
-	jp lc94dh		;cbb3	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;cbb3	c3 4d c9 	. M . 
 lcbb6h:
 	push hl			;cbb6	e5 	. 
 	ld hl,lcbddh		;cbb7	21 dd cb 	! . . 
@@ -19149,7 +19200,7 @@ lcbb6h:
 	ldir		;cbc0	ed b0 	. . 
 	pop hl			;cbc2	e1 	. 
 	ld (05622h),hl		;cbc3	22 22 56 	" " V 
-	jp lc94dh		;cbc6	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;cbc6	c3 4d c9 	. M . 
 
 
 ; Weather-related stuff
@@ -19162,20 +19213,20 @@ lcbddh:
 lcbf5h:
 	ld a,(05645h)		;cbf5	3a 45 56 	: E V 
 	cp 020h		;cbf8	fe 20 	.   
-	jp z,lc94dh		;cbfa	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;cbfa	ca 4d c9 	. M . 
 	ld a,063h		;cbfd	3e 63 	> c 
 	cp c			;cbff	b9 	. 
-	jp c,lc94dh		;cc00	da 4d c9 	. M . 
+	jp c,WEATHER_PARSE_NEXT		;cc00	da 4d c9 	. M . 
 	ld l,c			;cc03	69 	i 
 	ld h,000h		;cc04	26 00 	& . 
 	ld de,0564fh		;cc06	11 4f 56 	. O V 
 	ld c,002h		;cc09	0e 02 	. . 
 	call NUM2STR		;cc0b	cd 9e 0f 	. . . 
-	jp lc94dh		;cc0e	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;cc0e	c3 4d c9 	. M . 
 	ld a,(0560dh)		;cc11	3a 0d 56 	: . V 
 lcc14h:
 	cp 020h		;cc14	fe 20 	.   
-	jp z,lc94dh		;cc16	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;cc16	ca 4d c9 	. M . 
 	ld ix,05fd0h		;cc19	dd 21 d0 5f 	. ! . _ 
 	ld a,(CFG8)		;cc1d	3a 3d 00 	: = . 
 	and 008h		;cc20	e6 08 	. . 
@@ -19258,7 +19309,7 @@ lcc9ch:
 lccaah:
 	ld a,(05635h)		;ccaa	3a 35 56 	: 5 V 
 	cp 020h		;ccad	fe 20 	.   
-	jp z,lc94dh		;ccaf	ca 4d c9 	. M . 
+	jp z,WEATHER_PARSE_NEXT		;ccaf	ca 4d c9 	. M . 
 	ld a,(055dfh)		;ccb2	3a df 55 	: . U 
 	and 0f8h		;ccb5	e6 f8 	. . 
 	ld b,a			;ccb7	47 	G 
@@ -19266,7 +19317,7 @@ lccaah:
 	ld (055dfh),a		;ccb9	32 df 55 	2 . U 
 	and 0f8h		;ccbc	e6 f8 	. . 
 	cp b			;ccbe	b8 	. 
-	jp nz,lc94dh		;ccbf	c2 4d c9 	. M . 
+	jp nz,WEATHER_PARSE_NEXT		;ccbf	c2 4d c9 	. M . 
 	ld l,c			;ccc2	69 	i 
 	ld h,000h		;ccc3	26 00 	& . 
 	ld a,(05685h)		;ccc5	3a 85 56 	: . V 
@@ -19312,30 +19363,32 @@ lcd13h:
 	dec b			;cd13	05 	. 
 lcd14h:
 	cp b			;cd14	b8 	. 
-	jp nc,lc94dh		;cd15	d2 4d c9 	. M . 
+	jp nc,WEATHER_PARSE_NEXT		;cd15	d2 4d c9 	. M . 
 	ld (055e0h),a		;cd18	32 e0 55 	2 . U 
 	ld a,05fh		;cd1b	3e 5f 	> _ 
 	ld (hl),a			;cd1d	77 	w 
-	jp lc94dh		;cd1e	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;cd1e	c3 4d c9 	. M . 
 lcd21h:
 	ld a,(055dfh)		;cd21	3a df 55 	: . U 
 	ld (055e0h),a		;cd24	32 e0 55 	2 . U 
 	ld a,05eh		;cd27	3e 5e 	> ^ 
 	ld (hl),a			;cd29	77 	w 
-	jp lc94dh		;cd2a	c3 4d c9 	. M . 
+	jp WEATHER_PARSE_NEXT		;cd2a	c3 4d c9 	. M . 
+
 lcd2dh:
-	ld a,(0565dh)		;cd2d	3a 5d 56 	: ] V 
-	cp 020h		;cd30	fe 20 	.   
-	jp z,lc94dh		;cd32	ca 4d c9 	. M . 
-	ld a,(055deh)		;cd35	3a de 55 	: . U 
-	cp c			;cd38	b9 	. 
-	jp z,lc94dh		;cd39	ca 4d c9 	. M . 
-	ld b,a			;cd3c	47 	G 
-	ld a,c			;cd3d	79 	y 
-	ld (055deh),a		;cd3e	32 de 55 	2 . U 
-	inc b			;cd41	04 	. 
-	cp b			;cd42	b8 	. 
-	jp nz,lc94dh		;cd43	c2 4d c9 	. M . 
+	ld a,(v565d)
+	cp ' '
+	jp z,WEATHER_PARSE_NEXT		; not interested, skip 
+	ld a,(WEATHER_PREVIOUS_XXX) 
+	cp c
+	jp z,WEATHER_PARSE_NEXT		; no change, skip
+	ld b,a
+	ld a,c
+	ld (WEATHER_PREVIOUS_XXX),a
+	inc b
+	cp b
+	jp nz,WEATHER_PARSE_NEXT	; Unclear why skipping???
+
 	ld a,(05685h)		;cd46	3a 85 56 	: . V 
 	bit 0,a		;cd49	cb 47 	. G 
 	jr z,lcd5dh		;cd4b	28 10 	( . 
@@ -19343,43 +19396,53 @@ lcd2dh:
 	inc a			;cd50	3c 	< 
 	ld (05bb3h),a		;cd51	32 b3 5b 	2 . [ 
 	cp 004h		;cd54	fe 04 	. . 
-	jp c,lc94dh		;cd56	da 4d c9 	. M . 
+	jp c,WEATHER_PARSE_NEXT		;cd56	da 4d c9 	. M . 
 	xor a			;cd59	af 	. 
 	ld (05bb3h),a		;cd5a	32 b3 5b 	2 . [ 
 lcd5dh:
-	ld hl,05669h		;cd5d	21 69 56 	! i V 
-	call sub_cd6ch		;cd60	cd 6c cd 	. l . 
-	ld hl,05677h		;cd63	21 77 56 	! w V 
-	call sub_cd6ch		;cd66	cd 6c cd 	. l . 
-	jp lc94dh		;cd69	c3 4d c9 	. M . 
-sub_cd6ch:
-	ld a,(hl)			;cd6c	7e 	~ 
-	cp 02eh		;cd6d	fe 2e 	. . 
-	jr z,lcd7eh		;cd6f	28 0d 	( . 
-	cp 020h		;cd71	fe 20 	.   
-	jr nz,lcd77h		;cd73	20 02 	  . 
-	ld a,030h		;cd75	3e 30 	> 0 
-lcd77h:
-	inc a			;cd77	3c 	< 
-	ld (hl),a			;cd78	77 	w 
-	cp 03ah		;cd79	fe 3a 	. : 
-	ret nz			;cd7b	c0 	. 
-	ld (hl),030h		;cd7c	36 30 	6 0 
-lcd7eh:
-	dec hl			;cd7e	2b 	+ 
-	djnz sub_cd6ch		;cd7f	10 eb 	. . 
-	ret			;cd81	c9 	. 
-sub_cd82h:
-	push bc			;cd82	c5 	. 
-	ld b,a			;cd83	47 	G 
-	ld a,(CFG4)		;cd84	3a 0b 00 	: . . 
-	ld a,b			;cd87	78 	x 
-	cp 0aah		;cd88	fe aa 	. . 
-	jp nz,lcd8fh		;cd8a	c2 8f cd 	. . . 
-	ld a,060h		;cd8d	3e 60 	> ` 
-lcd8fh:
-	pop bc			;cd8f	c1 	. 
-	ret			;cd90	c9 	. 
+	ld hl,05669h 
+	call INCREMENT_ASCII_NUMBER 
+	ld hl,05677h 
+	call INCREMENT_ASCII_NUMBER 
+	jp WEATHER_PARSE_NEXT 
+
+; Increments an ASCII number in memory
+; Pass pointer to last digit
+; Increment at most 'b' characters
+; "XXX  99.99" => "XXX 100.00"
+; "XXXXX99.99" => "XXXX100.00"
+; (seems 'b' is often 255 due to sequential calls)
+INCREMENT_ASCII_NUMBER:
+	ld a,(hl)			; Current digit
+	cp '.'
+	jr z,_skip 
+	cp ' '
+	jr nz,_inc_digit
+	ld a,'0' 			; space is '0'
+_inc_digit:
+	inc a 				; next number
+	ld (hl),a 
+	cp '9'+1			; overflow?
+	ret nz				; nope, increment finished
+	ld (hl),'0'			; yes, this digit is 0
+_skip:
+	dec hl				; and move to prev
+	djnz INCREMENT_ASCII_NUMBER 
+	ret 
+
+; A='``' if German (called with A='\')
+; Unsure if really a quote (ie: ascii), or some value 0x5c/0x60 (92/96)
+QUOTE_DE:
+	push bc 
+	ld b,a 
+	ld a,(CFG4_LANG)
+	ld a,b
+	cp LANG_DE 
+	jp nz,_skip 
+	ld a,'`'
+_skip:
+	pop bc 
+	ret 
 
 	; Fills with 0 until 0xd000
 	ds 0xd000-$, 0x00
