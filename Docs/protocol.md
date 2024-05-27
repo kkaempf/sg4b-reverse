@@ -4,17 +4,46 @@ Field	Name	Value	How to Calculate
 0	magic	FF	Magic number. Must be FF.
 1	magic	FA	Magic number. Must be FA.
 2	magic	F5	Magic Number. Must be F5
-3	Temperature	0-254	Use LUT
-4	Wind Direction		Use LUT
-5	Humidity	0-99	Literal percentage value. Values higher than 99 will not update the field.
-			
+
+3 - Temperature, 0-254
+
+## Converting real-world temp to input
+
+x = (Celcius*10+550)/10
+x = (Farhenheit*10+670)/18
+
+x>=0 and x<0xff
+
+## Converting input byte to displayed temp:
+
+Celcius:    (x*10-550)/10
+Farhenheit: (x*18-670)/10
+
+
+4 - Wind direction: 1 byte, lower nibble:
+|  Digit  | Value |
+| :-----: | :---: |
+|    5    |  NE   |
+|    6    |  NW   |
+|    7    |  N    |
+|    9    |  SE   |
+|    A    |  SW   |
+|    B    |  S    |
+|    D    |  E    |
+|    E    |  W    |
+high nibble ignored
+
+5	Humidity	0-99	Literal percentage value. Values higher than 99 ignored.
+
 6	Wind Speed	0-254	For MPH, multiply current wind by 2. So for a wind of 25mph, send decimal 50.
 			For KPH, convert from MPH and round up greedily. So 25mph, despite being 40.2336 kph will read 41 KPH
 			
 7	Barometer	0-254	Displays "literal" pressure in inches.
 			For Inches values between 29.00 and 29.99, send the literal value of the last two digits. For values 30.00 and above, send literal 100 to 254.
 			For kilopascals, convert from inches and round up greedily. So, 29.00", despite 98.2053 kpa will read 98.3.
-			
+
+Will only update if changes value/8
+
 8	Rain?	0-254	This is an incrementing value. Does not take literals.
 			First packet at startup must be 00. If you are ever unsure. Start by sending 00 twice, then incrementing from there.
 			Can only increment by 0.01 inches per packet, or 0.1CM per packet. 
@@ -24,278 +53,3 @@ Field	Name	Value	How to Calculate
 9	Footer	00	Must Be 00
 A	Footer	00	Must Be 00
 
-# Temperature LUT
-
-HEX	DEC	F	C
-00	0	-67	-55
-01	1	-65	-54
-02	2	-63	-53
-03	3	-61	-52
-04	4	-59	-51
-05	5	-58	-50
-06	6	-56	-49
-07	7	-54	-48
-08	8	-52	-47
-09	9	-50	-46
-0A	10	-49	-45
-0B	11	-47	-44
-0C	12	-45	-43
-0D	13	-43	-42
-0E	14	-41	-41
-0F	15	-40	-40
-10	16	-38	-39
-11	17	-36	-38
-12	18	-34	-37
-13	19	-32	-36
-14	20	-31	-35
-15	21	-29	-34
-16	22	-27	-33
-17	23	-25	-32
-18	24	-23	-31
-19	25	-22	-30
-1A	26	-20	-29
-1B	27	-18	-28
-1C	28	-16	-27
-1D	29	-14	-26
-1E	30	-13	-25
-1F	31	-11	-24
-20	32	-9	-23
-21	33	-7	-22
-22	34	-5	-21
-23	35	-4	-20
-24	36	-2	-19
-25	37	0	-18
-26	38	1	-17
-27	39	3	-16
-28	40	5	-15
-29	41	6	-14
-2A	42	8	-13
-2B	43	10	-12
-2C	44	12	-11
-2D	45	14	-10
-2E	46	15	-9
-2F	47	17	-8
-30	48	19	-7
-31	49	21	-6
-32	50	23	-5
-33	51	24	-4
-34	52	26	-3
-35	53	28	-2
-36	54	30	-1
-37	55	32	0
-38	56	33	1
-39	57	35	2
-3A	58	37	3
-3B	59	39	4
-3C	60	41	5
-3D	61	42	6
-3E	62	44	7
-3F	63	46	8
-40	64	48	9
-41	65	50	10
-42	66	51	11
-43	67	53	12
-44	68	55	13
-45	69	57	14
-46	70	59	15
-47	71	60	16
-48	72	62	17
-49	73	64	18
-4A	74	66	19
-4B	75	68	20
-4C	76	69	21
-4D	77	71	22
-4E	78	73	23
-4F	79	75	24
-50	80	77	25
-51	81	78	26
-52	82	80	27
-53	83	82	28
-54	84	84	29
-55	85	86	30
-56	86	87	31
-57	87	89	32
-58	88	91	33
-59	89	93	34
-5A	90	95	35
-5B	91	96	36
-5C	92	98	37
-5D	93	100	38
-5E	94	102	39
-5F	95	104	40
-60	96	105	41
-61	97	107	42
-62	98	109	43
-63	99	111	44
-64	100	113	45
-65	101	114	46
-66	102	116	47
-67	103	118	48
-68	104	120	49
-69	105	122	50
-6A	106	123	51
-6B	107	125	52
-6C	108	127	53
-6D	109	129	54
-6E	110	131	55
-6F	111	132	56
-70	112	134	57
-71	113	136	58
-72	114	138	59
-73	115	140	60
-74	116	141	61
-75	117	143	62
-76	118	145	63
-77	119	147	64
-78	120	149	65
-79	121	150	66
-7A	122	152	67
-7B	123	154	68
-7C	124	156	69
-7D	125	158	70
-7E	126	159	71
-7F	127	161	72
-80	128	163	73
-81	129	165	74
-82	130	167	75
-83	131	168	76
-84	132	170	77
-85	133	172	78
-86	134	174	79
-87	135	176	80
-88	136	177	81
-89	137	179	82
-8A	138	181	83
-8B	139	183	84
-8C	140	185	85
-8D	141	186	86
-8E	142	188	87
-8F	143	190	88
-90	144	192	89
-91	145	194	90
-92	146	195	91
-93	147	197	92
-94	148	199	93
-95	149	201	94
-96	150	203	95
-97	151	204	96
-98	152	206	97
-99	153	208	98
-9A	154	210	99
-9B	155	212	100
-9C	156	213	101
-9D	157	215	102
-9E	158	217	103
-9F	159	219	104
-A0	160	221	105
-A1	161	222	106
-A2	162	224	107
-A3	163	226	108
-A4	164	228	109
-A5	165	230	110
-A6	166	231	111
-A7	167	233	112
-A8	168	235	113
-A9	169	237	114
-AA	170	239	115
-AB	171	240	116
-AC	172	242	117
-AD	173	244	118
-AE	174	246	119
-AF	175	248	120
-B0	176	249	121
-B1	177	251	122
-B2	178	253	123
-B3	179	255	124
-B4	180	257	125
-B5	181	258	126
-B6	182	260	127
-B7	183	262	128
-B8	184	264	129
-B9	185	266	130
-BA	186	267	131
-BB	187	269	132
-BC	188	271	133
-BD	189	273	134
-BE	190	275	135
-BF	191	276	136
-C0	192	278	137
-C1	193	280	138
-C2	194	282	139
-C3	195	284	140
-C4	196	285	141
-C5	197	287	142
-C6	198	289	143
-C7	199	291	144
-C8	200	293	145
-C9	201	294	146
-CA	202	296	147
-CB	203	298	148
-CC	204	300	149
-CD	205	302	150
-CE	206	303	151
-CF	207	305	152
-D0	208	307	153
-D1	209	309	154
-D2	210	311	155
-D3	211	312	156
-D4	212	314	157
-D5	213	316	158
-D6	214	318	159
-D7	215	320	160
-D8	216	321	161
-D9	217	323	162Wind Direction
-
-
-DA	218	325	163
-DB	219	327	164
-DC	220	329	165
-DD	221	330	166
-DE	222	332	167
-DF	223	334	168
-E0	224	336	169
-E1	225	338	170
-E2	226	339	171
-E3	227	341	172
-E4	228	343	173
-E5	229	345	174
-E6	230	347	175
-E7	231	348	176
-E8	232	350	177
-E9	233	352	178
-EA	234	354	179
-EB	235	356	180
-EC	236	357	181
-ED	237	359	182
-EE	238	361	183
-EF	239	363	184
-F0	240	365	185
-F1	241	366	186
-F2	242	368	187
-F3	243	370	188
-F4	244	372	189
-F5	245	374	190
-F6	246	375	191
-F7	247	377	192
-F8	248	379	193
-F9	249	381	194
-FA	250	383	195
-FB	251	384	196
-FC	252	386	197
-FD	253	388	198
-FE	254	390	199
-FF	255	n/a	n/a
-
-# Wind Direction LUT		
-
-HEX	DEC	Value
-15	21	NE
-16	22	NW
-17	23	N
-18	24	(blank)
-19	25	SE
-1A	26	SW
-1B	27	S
-18	24	(blank)
-1D	29	E
-1E	30	W
