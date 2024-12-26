@@ -1,0 +1,63 @@
+HEX Key
+01  KEY_LINE_INSERT
+02  EOP, CLEAR key
+03  EOL key
+04  HOME
+05  CRLF
+07  KEY_ATTR_ERASE
+87  ctrl KEY_ATTR_ERASE
+08  LEFT
+09  RIGHT
+0b  DOWN
+0c  UP
+10  "COLOR SEL" key
+11  "BLUE" key
+12  "RED" key
+13  "GREEN" key
+14  "WHITE" key
+15  "YEL" key
+16  "BRN" key
+17  "VIOLET" key
+18  "BLACK" key
+19  "EDGE" key
+1A  "FONTS" key
+
+1B  ESC
+61  A
+
+5F  "Arrow Down" Graphic Key
+
+73  "Arrow Up" Graphic Key
+
+81  ctrl KEY_LINE_INSERT
+
+90  ctrl RESET
+92  LST EV
+93  EXT DAT
+94  KEY DIR
+95  PG COPY
+96  SET MEM
+
+A0  GRAPH key release
+a5  SET CHN
+A6  BACK TAB
+
+B0  GRAPH key lock down
+D0  shift RESET
+d2  NXT EV
+d3  LEVEL
+d4  REMOTE
+d9  shift EDIT
+dc  LST PG
+
+F0  RESET
+f1  SEQ
+F2  EVENT
+f4  BATCH
+f7  SET WTR
+f8  RESUME
+f9  EDIT
+fa  BLK EDT
+fb  RECALL
+fc  NXT PG
+fd  STORE
