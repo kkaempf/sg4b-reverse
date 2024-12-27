@@ -1,0 +1,31 @@
+Print codes
+see jump table @ 10ab
+
+0x00 (CTRL-@)    nop
+0x01 (CTRL-A)    nop
+0x02 (CTRL-B)    Clears all text from edit screen.
+0x03 (CTRL-C)    Clears line from cursor to end of line.
+0x04 (CTRL-D)    Returns cursor to top left of page.
+0x05 (CTRL-E)    CRLF
+0x06 (CTRL-F)    nop
+0x07 (CTRL-G)    nop
+0x08 (CTRL-H)    Move Cursor Left
+0x09 (CTRL-I)    Move Cursor Right
+0x0A (CTRL-J)    Move to specified column (@4f82)
+0x0B (CTRL-K)    Moves Cursor Down
+0x0C (CTRL-L)    Moves Cursor Up
+0x0D (CTRL-M)    nop
+0x0E (CTRL-N)    switch to left to right
+0x0F (CTRL-O)    switch to right to left
+
+0x10(CTRL-p)    "COLOR SEL" key
+0x11(CTRL-q)    "BLUE" key
+0x12(CTRL-r)    "RED" key
+0x13(CTRL-s)    "GREEN" key
+0x14(CTRL-t)    "WHITE" key
+0x15(CTRL-u)    "YEL" key
+0x16(CTRL-v)    "BRN" key
+0x17(CTRL-w)    "VIOLET" key
+0x18(CTRL-x)    "BLACK" key
+0x19(CTRL-y)    "EDGE" key
+0x1A(CTRL-z)    "FONTS" key
