@@ -1,0 +1,39 @@
+Interrupt vectors
+
+port 0x02, DART 0 Ch A, serial - ?
+port 0x03, DART 0 Ch B, keyboard, intr 0x60
+
+port 0x05, line level
+
+port 0x07, PIO Ch B, - 0x10
+port 0x10, DART 1 Ch A data
+port 0x11, DART 1 Ch B data
+port 0x12, DART 1 Ch A cmd
+port 0x13, DART 1 Ch B cmd, intr 0x70
+port 0x14, DART 2 Ch A data
+port 0x15, DART 2 Ch B data
+port 0x16, DART 2 Ch A cmd
+port 0x17, DART 2 Ch B cmd, intr 0x80
+
+port 0x20, RTC counter 1/100th seconds
+port 0x21, RTC counter hours
+port 0x22, RTC counter minutes
+port 0x23, RTC counter seconds
+port 0x24, RTC counter month
+port 0x25, RTC counter date
+port 0x26, RTC counter year
+port 0x27, RTC counter day-of-week
+port 0x2c, RTC RAM month
+port 0x2d, RTC RAM date
+port 0x2e, RTC RAM year
+port 0x2f, RTC RAM day-of-week
+port 0x30, RTC intr status & mask
+port 0x31, RTC command
+
+port 0x62, z80 DMA ?
+
+port 0xfe, memory page at 0xc000-0xffff
+           00 = ROM
+           01,02,... -> RAM page to view in 0xc000-0xffff
+
+port 0xff, read only, never written to
